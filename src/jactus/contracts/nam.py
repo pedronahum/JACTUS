@@ -85,6 +85,31 @@ class NAMPayoffFunction(BasePayoffFunction):
         POF_PR = R(CNTRL) × Nsc × (Prnxt - Ipac - Y(Sd, t) × Ipnr × Ipcb)
     """
 
+    def _build_dispatch_table(self) -> dict[EventType, Any]:
+        """Build event type → handler dispatch table.
+
+        Lambdas normalize varying handler signatures to a uniform
+        (state, attributes, time, risk_factor_observer) interface.
+        """
+        return {
+            EventType.AD: lambda s, a, t, r: self._pof_ad(s, a),
+            EventType.IED: lambda s, a, t, r: self._pof_ied(s, a),
+            EventType.PR: lambda s, a, t, r: self._pof_pr(s, a, t),
+            EventType.MD: lambda s, a, t, r: self._pof_md(s, a),
+            EventType.PP: self._pof_pp,
+            EventType.PY: self._pof_py,
+            EventType.FP: self._pof_fp,
+            EventType.PRD: lambda s, a, t, r: self._pof_prd(s, a, t),
+            EventType.TD: lambda s, a, t, r: self._pof_td(s, a, t),
+            EventType.IP: lambda s, a, t, r: self._pof_ip(s, a, t),
+            EventType.IPCI: lambda s, a, t, r: self._pof_ipci(s, a),
+            EventType.IPCB: lambda s, a, t, r: self._pof_ipcb(s, a),
+            EventType.RR: lambda s, a, t, r: self._pof_rr(s, a),
+            EventType.RRF: lambda s, a, t, r: self._pof_rrf(s, a),
+            EventType.SC: lambda s, a, t, r: self._pof_sc(s, a),
+            EventType.CE: lambda s, a, t, r: self._pof_ce(s, a),
+        }
+
     def calculate_payoff(
         self,
         event_type: Any,
@@ -94,7 +119,7 @@ class NAMPayoffFunction(BasePayoffFunction):
         risk_factor_observer: RiskFactorObserver,
         child_contract_observer: Any | None = None,
     ) -> jnp.ndarray:
-        """Calculate payoff for NAM event.
+        """Calculate payoff for NAM event via dict dispatch.
 
         Args:
             event_type: Type of event
@@ -106,38 +131,9 @@ class NAMPayoffFunction(BasePayoffFunction):
         Returns:
             JAX array containing the payoff amount
         """
-        if event_type == EventType.AD:
-            return self._pof_ad(state, attributes)
-        if event_type == EventType.IED:
-            return self._pof_ied(state, attributes)
-        if event_type == EventType.PR:
-            return self._pof_pr(state, attributes, time)
-        if event_type == EventType.MD:
-            return self._pof_md(state, attributes)
-        if event_type == EventType.PP:
-            return self._pof_pp(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.PY:
-            return self._pof_py(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.FP:
-            return self._pof_fp(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.PRD:
-            return self._pof_prd(state, attributes, time)
-        if event_type == EventType.TD:
-            return self._pof_td(state, attributes, time)
-        if event_type == EventType.IP:
-            return self._pof_ip(state, attributes, time)
-        if event_type == EventType.IPCI:
-            return self._pof_ipci(state, attributes)
-        if event_type == EventType.IPCB:
-            return self._pof_ipcb(state, attributes)
-        if event_type == EventType.RR:
-            return self._pof_rr(state, attributes)
-        if event_type == EventType.RRF:
-            return self._pof_rrf(state, attributes)
-        if event_type == EventType.SC:
-            return self._pof_sc(state, attributes)
-        if event_type == EventType.CE:
-            return self._pof_ce(state, attributes)
+        handler = self._build_dispatch_table().get(event_type)
+        if handler is not None:
+            return handler(state, attributes, time, risk_factor_observer)
         return jnp.array(0.0, dtype=jnp.float32)
 
     def _pof_ad(self, state: ContractState, attrs: ContractAttributes) -> jnp.ndarray:
@@ -304,6 +300,27 @@ class NAMStateTransitionFunction(BaseStateTransitionFunction):
         ACTUS v1.1 Section 7.4 - NAM State Transition Functions
     """
 
+    def _build_dispatch_table(self) -> dict[EventType, Any]:
+        """Build event type → handler dispatch table."""
+        return {
+            EventType.AD: self._stf_ad,
+            EventType.IED: self._stf_ied,
+            EventType.PR: self._stf_pr,
+            EventType.MD: self._stf_md,
+            EventType.PP: self._stf_pp,
+            EventType.PY: self._stf_py,
+            EventType.FP: self._stf_fp,
+            EventType.PRD: self._stf_prd,
+            EventType.TD: self._stf_td,
+            EventType.IP: self._stf_ip,
+            EventType.IPCI: self._stf_ipci,
+            EventType.IPCB: self._stf_ipcb,
+            EventType.RR: self._stf_rr,
+            EventType.RRF: self._stf_rrf,
+            EventType.SC: self._stf_sc,
+            EventType.CE: self._stf_ce,
+        }
+
     def transition_state(
         self,
         event_type: Any,
@@ -313,7 +330,7 @@ class NAMStateTransitionFunction(BaseStateTransitionFunction):
         risk_factor_observer: RiskFactorObserver,
         child_contract_observer: Any | None = None,
     ) -> ContractState:
-        """Apply state transition for NAM event.
+        """Apply state transition for NAM event via dict dispatch.
 
         Args:
             event_type: Type of event
@@ -325,38 +342,9 @@ class NAMStateTransitionFunction(BaseStateTransitionFunction):
         Returns:
             New contract state after event
         """
-        if event_type == EventType.AD:
-            return self._stf_ad(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.IED:
-            return self._stf_ied(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.PR:
-            return self._stf_pr(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.MD:
-            return self._stf_md(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.PP:
-            return self._stf_pp(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.PY:
-            return self._stf_py(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.FP:
-            return self._stf_fp(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.PRD:
-            return self._stf_prd(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.TD:
-            return self._stf_td(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.IP:
-            return self._stf_ip(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.IPCI:
-            return self._stf_ipci(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.IPCB:
-            return self._stf_ipcb(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.RR:
-            return self._stf_rr(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.RRF:
-            return self._stf_rrf(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.SC:
-            return self._stf_sc(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.CE:
-            return self._stf_ce(state, attributes, time, risk_factor_observer)
+        handler = self._build_dispatch_table().get(event_type)
+        if handler is not None:
+            return handler(state, attributes, time, risk_factor_observer)
         return state
 
     def _stf_ad(
@@ -440,7 +428,10 @@ class NAMStateTransitionFunction(BaseStateTransitionFunction):
         net_principal_reduction = state.prnxt - state.ipac - accrued_interest
 
         # Update notional (can increase if net_principal_reduction < 0)
-        new_nt = state.nt - role_sign * net_principal_reduction
+        # Note: state.nt already has role_sign applied from IED initialization,
+        # so we must NOT multiply net_principal_reduction by role_sign again.
+        # Per ACTUS spec: Nt_t = Nt_(t-) - (Prnxt - Ipac - Y*Ipnr*Ipcb)
+        new_nt = state.nt - net_principal_reduction
 
         # Update IPCB if mode is 'NT'
         ipcb_mode = attrs.interest_calculation_base or "NT"

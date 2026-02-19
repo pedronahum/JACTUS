@@ -7,7 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **NAM**: Fixed critical sign error in STF_PR state transition (`nam.py:443`) where
+  `role_sign` was double-applied to `net_principal_reduction`, causing notional to
+  increase instead of decrease for borrower (RPL) positions. Per ACTUS spec:
+  `Nt_t = Nt_(t-) - (Prnxt - Ipac - Y*Ipnr*Ipcb)`. This also fixes ANN contracts
+  which inherit NAM's state transition logic.
+- **PAM**: Implemented STF_RR (Rate Reset) and STF_RRF (Rate Reset Fixing) state
+  transitions. RR now observes market rates via `O_rf(RRMO, t)`, applies rate
+  multiplier (RRMLT), spread (RRSP), floor (RRLF), and cap (RRLC). RRF sets the
+  rate to the predefined RRNXT value. Previously both were no-ops that only accrued
+  interest without updating the rate.
+- **SWPPV**: Fixed ipac1/ipac2 accrual tracking for plain vanilla swaps. STF_AD now
+  properly accrues both fixed leg (ipac1 using IPNR) and floating leg (ipac2 using
+  current ipnr). STF_RR accrues before resetting the floating rate. POF_IP computes
+  the net payment as (fixed_accrual - floating_accrual) with proper role sign.
+  Previously STF_AD was a no-op and ipac was never computed from the two legs.
+- **Time/BDC**: Fixed ISO date string construction in Modified Following (SCMF)
+  business day convention (`time.py:545`) where `original_month` was used for both
+  the year and month fields, producing an invalid date string. Now correctly uses
+  `py_dt.year` for the year component.
+- **PAM**: Implemented IPAC/IPANX initialization in STF_IED (`pam.py:538`). At
+  initial exchange, accrued interest is now set from the IPAC attribute if provided,
+  or calculated as `Y(IPANX, IED) × IPNR × |NT|` when the interest payment anchor
+  (IPANX) precedes the initial exchange date. Previously always initialized to 0.0.
+
+- **CAPFL**: Implemented proper cap/floor payoff mechanism (`capfl.py`). CAPFL now
+  computes cap payoffs as `max(0, rate - cap_rate) × NT × YF` and floor payoffs as
+  `max(0, floor_rate - rate) × NT × YF`. Added STF_RR to observe market rates and
+  track the floating rate. Supports embedded underlier terms with automatic schedule
+  generation from the underlier's IP/RR cycles. IP events correctly run before RR
+  events at the same timestamp so payoffs use the previous period's rate. Validated
+  against official ACTUS CAPFL test cases (capfl01-capfl04).
+- **OPTNS**: Implemented American and Bermudan exercise date (XD) scheduling
+  (`optns.py:590`). American options now generate monthly XD events from purchase/status
+  date to maturity via `generate_schedule`. Bermudan options schedule an XD event at
+  `option_exercise_end_date`. Previously American exercise was a no-op (`pass`).
+- **PAM**: Implemented five missing payoff functions (`pam.py:220-340`):
+  - **PP** (Principal Prepayment): Observes prepayment amount from risk factor observer
+    via `_get_event_data(CID, PP, t)`. Returns 0.0 when no observer data available.
+  - **PY** (Penalty Payment): Supports all three ACTUS penalty types — 'A' (absolute
+    fixed amount), 'N' (notional percentage `Y × Nt × PYRT`), 'I' (interest rate
+    differential, falls back to type N).
+  - **FP** (Fee Payment): Supports FEB='A' (absolute `FER`) and FEB='N' (notional
+    percentage `Y × Nt × FER + Feac`). Default returns accrued fees.
+  - **PRD** (Purchase): `R(CNTRL) × (-1) × (PPRD + Ipac + Y × Ipnr × Nt)` — buyer
+    pays purchase price plus accrued interest.
+  - **TD** (Termination): `R(CNTRL) × (PTD + Ipac + Y × Ipnr × Nt)` — seller receives
+    termination price plus accrued interest.
+  Previously all five returned 0.0.
+
+### Changed
+- **Event Dispatch**: Refactored POF/STF event dispatch in PAM, LAM, NAM, and ANN
+  contracts from if/elif chains to dictionary-based dispatch tables with O(1) lookup.
+  Each POF/STF class now has a `_build_dispatch_table()` method returning an
+  `EventType → handler` dict. ANN composes its table by extending NAM's dispatch
+  and overriding RR/RRF entries. Added `EventType.index` property with stable integer
+  mapping in `types.py` to support future `jax.lax.switch` migration for full JIT
+  compilation of the simulation loop.
+
 ### Added
+- **Cross-Validation Test Framework** (`tests/cross_validation/`): Built automated
+  test runner that downloads official ACTUS test cases from
+  [actusfrf/actus-tests](https://github.com/actusfrf/actus-tests) and validates
+  JACTUS simulation results against expected outputs. Includes:
+  - `actus_mapper.py`: Maps ACTUS JSON camelCase terms to JACTUS attributes with
+    type conversion (enums, dates, floats, cycles)
+  - `TimeSeriesRiskFactorObserver`: Piecewise-constant interpolation for market data
+    from ACTUS test dataObserved format
+  - `runner.py`: Generic comparison engine that aligns events by (date, type) pairs
+    for robust comparison even when schedule generation differs
+  - Tests for PAM (25 cases), LAM, NAM, ANN contract types
+  - Identified key compliance gaps: missing IP at cycle anchor date, missing RR/IPCI
+    event scheduling, IED < SD validation too strict, MD state zeroing
+
 - MCP (Model Context Protocol) server for AI-assisted development
   - 10 tools for contract discovery, validation, examples, documentation, and system diagnostics
   - 4 MCP resources providing direct access to JACTUS documentation

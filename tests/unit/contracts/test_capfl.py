@@ -284,8 +284,8 @@ class TestCAPFLPayoffAndStateTransition:
         # CAPFL payoffs come from differential events, parent returns zero
         assert float(payoff) == pytest.approx(0.0, abs=0.01)
 
-    def test_capfl_state_transition_returns_unchanged(self):
-        """Test that CAPFL state transition returns state unchanged."""
+    def test_capfl_state_transition_advances_sd(self):
+        """Test that CAPFL IP state transition advances status date."""
         attrs = ContractAttributes(
             contract_id="CAP001",
             contract_type=ContractType.CAPFL,
@@ -302,16 +302,15 @@ class TestCAPFLPayoffAndStateTransition:
         state = cap.initialize_state()
         stf = cap.get_state_transition_function(EventType.IP)
 
+        event_time = ActusDateTime(2024, 6, 15, 0, 0, 0)
         state_post = stf.transition_state(
-            EventType.IP,
-            state,
-            attrs,
-            ActusDateTime(2024, 6, 15, 0, 0, 0),
-            rf_obs,
+            EventType.IP, state, attrs, event_time, rf_obs,
         )
 
-        # CAPFL state changes come from underlier, parent returns unchanged
-        assert state_post == state
+        # IP should advance sd and preserve other fields
+        assert state_post.sd == event_time
+        assert float(state_post.ipnr) == float(state.ipnr)
+        assert float(state_post.nt) == float(state.nt)
 
 
 class TestCAPFLEdgeCases:

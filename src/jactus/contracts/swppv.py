@@ -55,6 +55,7 @@ from jactus.core import (
 )
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.observers import RiskFactorObserver
+from jactus.utilities.conventions import DayCountConvention, year_fraction
 from jactus.utilities.schedules import generate_schedule
 
 
@@ -138,20 +139,37 @@ class PlainVanillaSwapPayoffFunction(BasePayoffFunction):
     ) -> jnp.ndarray:
         """POF_IP_SWPPV: Interest Payment (Net settlement).
 
-        Net payment = Fixed leg - Floating leg = ipac1 - ipac2
+        Computes the net payment including accrual up to payment time.
 
-        Formula:
-            POF_IP = X × R × ipac
+        POF is called with pre-event state, so we accrue from state.sd to time,
+        then compute: net = (ipac1 + fixed_accrual) - (ipac2 + floating_accrual)
 
-        Where ipac = ipac1 - ipac2 (net accrual)
+        For RPA (receive fixed, pay floating):
+            payoff = net  (positive when fixed > floating)
+        For RPL (pay fixed, receive floating):
+            payoff = -net
         """
-        ipac = float(state.ipac) if hasattr(state, "ipac") and state.ipac is not None else 0.0
-        nt = attributes.notional_principal or 1.0
+        dcc = attributes.day_count_convention or DayCountConvention.A360
+        yf = year_fraction(state.sd, time, dcc)
+        nt = float(state.nt)
 
-        # Contract role multiplier
-        x = 1.0 if attributes.contract_role == ContractRole.RPA else -1.0
+        # Accrue fixed leg up to payment time
+        fixed_rate = attributes.nominal_interest_rate or 0.0
+        ipac1 = float(state.ipac1) if state.ipac1 is not None else 0.0
+        total_ipac1 = ipac1 + yf * fixed_rate * nt
 
-        return jnp.array(x * ipac * nt, dtype=jnp.float32)
+        # Accrue floating leg up to payment time
+        floating_rate = float(state.ipnr)
+        ipac2 = float(state.ipac2) if state.ipac2 is not None else 0.0
+        total_ipac2 = ipac2 + yf * floating_rate * nt
+
+        # Net accrual (fixed - floating)
+        net_accrual = total_ipac1 - total_ipac2
+
+        # Contract role sign: RPA receives fixed leg, RPL pays it
+        role_sign = 1.0 if attributes.contract_role in (ContractRole.RPA, ContractRole.RFL) else -1.0
+
+        return jnp.array(role_sign * net_accrual, dtype=jnp.float32)
 
     def _pof_rr(
         self,
@@ -235,6 +253,38 @@ class PlainVanillaSwapStateTransitionFunction(BaseStateTransitionFunction):
         # Unknown event, return state unchanged
         return state_pre
 
+    def _accrue_legs(
+        self,
+        state: ContractState,
+        time: ActusDateTime,
+        attributes: ContractAttributes,
+    ) -> tuple[float, float, float]:
+        """Accrue interest for both legs up to the given time.
+
+        Returns:
+            Tuple of (new_ipac1, new_ipac2, new_ipac) where:
+                ipac1 = fixed leg accrual
+                ipac2 = floating leg accrual
+                ipac = net accrual (ipac1 - ipac2)
+        """
+        dcc = attributes.day_count_convention or DayCountConvention.A360
+        yf = year_fraction(state.sd, time, dcc)
+        nt = float(state.nt)
+
+        # Fixed leg accrual: uses IPNR (nominal_interest_rate)
+        fixed_rate = attributes.nominal_interest_rate or 0.0
+        ipac1 = float(state.ipac1) if state.ipac1 is not None else 0.0
+        new_ipac1 = ipac1 + yf * fixed_rate * nt
+
+        # Floating leg accrual: uses current ipnr (updated by rate resets)
+        ipac2 = float(state.ipac2) if state.ipac2 is not None else 0.0
+        new_ipac2 = ipac2 + yf * float(state.ipnr) * nt
+
+        # Net accrual (fixed - floating)
+        new_ipac = new_ipac1 - new_ipac2
+
+        return new_ipac1, new_ipac2, new_ipac
+
     def _stf_ad(
         self,
         state: ContractState,
@@ -244,10 +294,25 @@ class PlainVanillaSwapStateTransitionFunction(BaseStateTransitionFunction):
     ) -> ContractState:
         """STF_AD_SWPPV: Analysis Date state transition.
 
-        Update accruals for both legs.
+        Accrue interest for both fixed and floating legs.
         """
-        # This would normally update accruals, but for now return unchanged
-        return state
+        new_ipac1, new_ipac2, new_ipac = self._accrue_legs(
+            state, event.event_time, attributes
+        )
+
+        return ContractState(
+            tmd=state.tmd,
+            sd=event.event_time,
+            nt=state.nt,
+            ipnr=state.ipnr,
+            ipac=jnp.array(new_ipac, dtype=jnp.float32),
+            feac=state.feac,
+            nsc=state.nsc,
+            isc=state.isc,
+            ipac1=jnp.array(new_ipac1, dtype=jnp.float32),
+            ipac2=jnp.array(new_ipac2, dtype=jnp.float32),
+            prf=state.prf if hasattr(state, "prf") else ContractPerformance.PF,
+        )
 
     def _stf_ied(
         self,
@@ -298,19 +363,22 @@ class PlainVanillaSwapStateTransitionFunction(BaseStateTransitionFunction):
     ) -> ContractState:
         """STF_IP_SWPPV: Interest Payment state transition.
 
-        Reset net accrual to zero after payment.
+        Accrue both legs up to payment time, then reset all accruals to zero.
+        The payoff function reads ipac (net) before this transition resets it.
         """
+        # First accrue up to payment time (payoff function will read state before transition)
+        # After payment, reset all accruals to zero
         return ContractState(
-            tmd=state.tmd if hasattr(state, "tmd") else event.event_time,
+            tmd=state.tmd,
             sd=event.event_time,
-            nt=state.nt if hasattr(state, "nt") else jnp.array(1.0, dtype=jnp.float32),
-            ipnr=state.ipnr if hasattr(state, "ipnr") else jnp.array(0.0, dtype=jnp.float32),
-            ipac=jnp.array(0.0, dtype=jnp.float32),  # Reset net accrual
+            nt=state.nt,
+            ipnr=state.ipnr,
+            ipac=jnp.array(0.0, dtype=jnp.float32),
             feac=state.feac,
             nsc=state.nsc,
             isc=state.isc,
-            ipac1=state.ipac1 if hasattr(state, "ipac1") else None,  # Keep leg accruals
-            ipac2=state.ipac2 if hasattr(state, "ipac2") else None,
+            ipac1=jnp.array(0.0, dtype=jnp.float32),
+            ipac2=jnp.array(0.0, dtype=jnp.float32),
             prf=state.prf if hasattr(state, "prf") else ContractPerformance.PF,
         )
 
@@ -323,15 +391,22 @@ class PlainVanillaSwapStateTransitionFunction(BaseStateTransitionFunction):
     ) -> ContractState:
         """STF_RR_SWPPV: Rate Reset state transition.
 
-        Update floating leg rate (ipnr).
+        Accrue both legs up to reset time, then update floating rate.
 
         Formula:
-            ipnr = RRMLT × O_rf(RRMO, t) + RRSP
+            Ipac1_t = Ipac1_(t-) + Y(Sd_(t-), t) * IPNR * Nt
+            Ipac2_t = Ipac2_(t-) + Y(Sd_(t-), t) * Ipnr_(t-) * Nt
+            Ipnr_t = min(max(RRMLT * O_rf(RRMO, t) + RRSP, RRLF), RRLC)
         """
+        # First accrue both legs up to reset time using old rates
+        new_ipac1, new_ipac2, new_ipac = self._accrue_legs(
+            state, event.event_time, attributes
+        )
+
         # Get rate reset parameters
-        rrmlt = attributes.rate_reset_multiplier or 1.0
-        rrsp = attributes.rate_reset_spread or 0.0
-        rrmo = attributes.rate_reset_market_object or "LIBOR"
+        rrmlt = attributes.rate_reset_multiplier if attributes.rate_reset_multiplier is not None else 1.0
+        rrsp = attributes.rate_reset_spread if attributes.rate_reset_spread is not None else 0.0
+        rrmo = attributes.rate_reset_market_object or ""
 
         # Observe market rate
         market_rate = risk_factor_observer.observe_risk_factor(rrmo, event.event_time)
@@ -340,22 +415,22 @@ class PlainVanillaSwapStateTransitionFunction(BaseStateTransitionFunction):
         new_rate = rrmlt * float(market_rate) + rrsp
 
         # Apply caps and floors if specified
-        if attributes.rate_reset_cap is not None:
-            new_rate = min(new_rate, attributes.rate_reset_cap)
         if attributes.rate_reset_floor is not None:
             new_rate = max(new_rate, attributes.rate_reset_floor)
+        if attributes.rate_reset_cap is not None:
+            new_rate = min(new_rate, attributes.rate_reset_cap)
 
         return ContractState(
-            tmd=state.tmd if hasattr(state, "tmd") else event.event_time,
+            tmd=state.tmd,
             sd=event.event_time,
-            nt=state.nt if hasattr(state, "nt") else jnp.array(1.0, dtype=jnp.float32),
-            ipnr=jnp.array(new_rate, dtype=jnp.float32),  # Update floating rate
-            ipac=state.ipac if hasattr(state, "ipac") else jnp.array(0.0, dtype=jnp.float32),
+            nt=state.nt,
+            ipnr=jnp.array(new_rate, dtype=jnp.float32),
+            ipac=jnp.array(new_ipac, dtype=jnp.float32),
             feac=state.feac,
             nsc=state.nsc,
             isc=state.isc,
-            ipac1=state.ipac1 if hasattr(state, "ipac1") else None,
-            ipac2=state.ipac2 if hasattr(state, "ipac2") else None,
+            ipac1=jnp.array(new_ipac1, dtype=jnp.float32),
+            ipac2=jnp.array(new_ipac2, dtype=jnp.float32),
             prf=state.prf if hasattr(state, "prf") else ContractPerformance.PF,
         )
 
@@ -368,20 +443,24 @@ class PlainVanillaSwapStateTransitionFunction(BaseStateTransitionFunction):
     ) -> ContractState:
         """STF_TD_SWPPV: Termination Date state transition.
 
-        Set contract to terminated.
+        Accrue up to termination, then zero out.
         """
+        new_ipac1, new_ipac2, new_ipac = self._accrue_legs(
+            state, event.event_time, attributes
+        )
+
         return ContractState(
             tmd=event.event_time,
             sd=event.event_time,
-            nt=state.nt if hasattr(state, "nt") else jnp.array(0.0, dtype=jnp.float32),
-            ipnr=state.ipnr if hasattr(state, "ipnr") else jnp.array(0.0, dtype=jnp.float32),
-            ipac=state.ipac if hasattr(state, "ipac") else jnp.array(0.0, dtype=jnp.float32),
+            nt=jnp.array(0.0, dtype=jnp.float32),
+            ipnr=jnp.array(0.0, dtype=jnp.float32),
+            ipac=jnp.array(new_ipac, dtype=jnp.float32),
             feac=state.feac,
             nsc=state.nsc,
             isc=state.isc,
-            ipac1=state.ipac1 if hasattr(state, "ipac1") else None,
-            ipac2=state.ipac2 if hasattr(state, "ipac2") else None,
-            prf=ContractPerformance.PF,  # Could be DL/DF
+            ipac1=jnp.array(new_ipac1, dtype=jnp.float32),
+            ipac2=jnp.array(new_ipac2, dtype=jnp.float32),
+            prf=state.prf if hasattr(state, "prf") else ContractPerformance.PF,
         )
 
     def _stf_ce(

@@ -587,16 +587,42 @@ class OptionContract(BaseContract):
                 )
             )
 
-        # Exercise dates (for American/Bermudan)
+        # Exercise dates (XD) depend on exercise type
         if self.attributes.option_exercise_type == "A":
-            # American: Can exercise anytime before maturity
-            # For simulation, we'll create monthly exercise opportunities
-            # (In practice, exercise decision would be made dynamically)
-            pass  # Exercise handled in state transition
+            # American: generate monthly XD events from purchase/status to maturity
+            from jactus.utilities.schedules import generate_schedule
+
+            xd_start = self.attributes.purchase_date or self.attributes.status_date
+            xd_dates = generate_schedule(
+                start=xd_start,
+                cycle="1M",
+                end=self.attributes.maturity_date,
+            )
+            # Include all dates except the first (purchase) and last (maturity)
+            # since maturity has its own MD event that handles auto-exercise
+            for xd_time in xd_dates[1:-1]:
+                events.append(
+                    ContractEvent(
+                        event_type=EventType.XD,
+                        event_time=xd_time,
+                        payoff=jnp.array(0.0, dtype=jnp.float32),
+                        currency=self.attributes.currency,
+                        sequence=2,
+                    )
+                )
         elif self.attributes.option_exercise_type == "B":
-            # Bermudan: Specific exercise dates
-            # (Would come from exercise schedule attribute in full implementation)
-            pass  # Exercise dates from schedule
+            # Bermudan: exercise on specific dates from exercise end date schedule
+            # Use option_exercise_end_date if provided as single exercise date
+            if self.attributes.option_exercise_end_date:
+                events.append(
+                    ContractEvent(
+                        event_type=EventType.XD,
+                        event_time=self.attributes.option_exercise_end_date,
+                        payoff=jnp.array(0.0, dtype=jnp.float32),
+                        currency=self.attributes.currency,
+                        sequence=2,
+                    )
+                )
 
         # Maturity date
         events.append(

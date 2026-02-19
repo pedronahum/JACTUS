@@ -60,16 +60,19 @@ from jactus.core import (
     DayCountConvention,
     EventSchedule,
     EventType,
+    FeeBasis,
 )
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.observers import ChildContractObserver, RiskFactorObserver
-from jactus.utilities import generate_schedule, year_fraction
+from jactus.utilities import contract_role_sign, generate_schedule, year_fraction
 
 
 class PAMPayoffFunction(BasePayoffFunction):
     """Payoff function for PAM contracts.
 
     Implements all 14 PAM payoff functions according to ACTUS specification.
+    Uses dictionary-based dispatch for O(1) lookup and future jax.lax.switch
+    compatibility (requires EventType.index integer mapping).
 
     ACTUS Reference:
         ACTUS v1.1 Section 7.1 - PAM Payoff Functions
@@ -91,6 +94,30 @@ class PAMPayoffFunction(BasePayoffFunction):
         CE: Credit Event
     """
 
+    def _build_dispatch_table(self) -> dict[EventType, Any]:
+        """Build event type → handler dispatch table.
+
+        Returns a dict mapping each handled EventType to its payoff method.
+        This replaces the if/elif chain with O(1) dict lookup and provides
+        a clear registry of supported events.
+        """
+        return {
+            EventType.AD: self._pof_ad,
+            EventType.IED: self._pof_ied,
+            EventType.MD: self._pof_md,
+            EventType.PP: self._pof_pp,
+            EventType.PY: self._pof_py,
+            EventType.FP: self._pof_fp,
+            EventType.PRD: self._pof_prd,
+            EventType.TD: self._pof_td,
+            EventType.IP: self._pof_ip,
+            EventType.IPCI: self._pof_ipci,
+            EventType.RR: self._pof_rr,
+            EventType.RRF: self._pof_rrf,
+            EventType.SC: self._pof_sc,
+            EventType.CE: self._pof_ce,
+        }
+
     def calculate_payoff(
         self,
         event_type: Any,
@@ -101,7 +128,7 @@ class PAMPayoffFunction(BasePayoffFunction):
     ) -> jnp.ndarray:
         """Calculate payoff for PAM events.
 
-        Dispatches to specific payoff function based on event type.
+        Dispatches to specific payoff function via dict lookup (O(1)).
 
         Args:
             event_type: Type of event
@@ -116,34 +143,9 @@ class PAMPayoffFunction(BasePayoffFunction):
         ACTUS Reference:
             POF_[event]_PAM functions from Section 7.1
         """
-        if event_type == EventType.AD:
-            return self._pof_ad(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.IED:
-            return self._pof_ied(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.MD:
-            return self._pof_md(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.PP:
-            return self._pof_pp(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.PY:
-            return self._pof_py(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.FP:
-            return self._pof_fp(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.PRD:
-            return self._pof_prd(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.TD:
-            return self._pof_td(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.IP:
-            return self._pof_ip(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.IPCI:
-            return self._pof_ipci(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.RR:
-            return self._pof_rr(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.RRF:
-            return self._pof_rrf(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.SC:
-            return self._pof_sc(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.CE:
-            return self._pof_ce(state, attributes, time, risk_factor_observer)
+        handler = self._build_dispatch_table().get(event_type)
+        if handler is not None:
+            return handler(state, attributes, time, risk_factor_observer)
         # Unknown event type - return 0
         return jnp.array(0.0, dtype=jnp.float32)
 
@@ -229,14 +231,24 @@ class PAMPayoffFunction(BasePayoffFunction):
         Formula:
             POF_PP_PAM = X^CURS_CUR(t) × f(O_ev(CID, PP, t))
 
-        The prepayment amount is observed from the risk factor observer.
+        The prepayment amount is observed from the risk factor observer
+        using the contract ID and PP event type.
 
         Returns:
             Observed prepayment amount
         """
-        # Observe prepayment amount from risk factor
-        # For now, return 0.0 - will be enhanced with observer integration
-        return jnp.array(0.0, dtype=jnp.float32)
+        # Observe prepayment amount from risk factor observer
+        try:
+            pp_amount = risk_factor_observer._get_event_data(
+                attributes.contract_id or "",
+                EventType.PP,
+                time,
+                state,
+                attributes,
+            )
+            return jnp.array(float(pp_amount), dtype=jnp.float32)
+        except (KeyError, NotImplementedError, TypeError):
+            return jnp.array(0.0, dtype=jnp.float32)
 
     def _pof_py(
         self,
@@ -248,15 +260,28 @@ class PAMPayoffFunction(BasePayoffFunction):
         """POF_PY_PAM: Penalty Payment.
 
         Formula depends on PYTP (penalty type):
-            PYTP='A': Fixed amount = PYRT
-            PYTP='N': Percentage of notional = Y(Sd_t⁻, t) × Nt_t⁻ × PYRT
-            PYTP='I': Interest rate differential
+            PYTP='A': Fixed amount = R(CNTRL) × PYRT
+            PYTP='N': Notional % = R(CNTRL) × Y(Sd_t⁻, t) × Nt_t⁻ × PYRT
+            PYTP='I': Interest rate differential (simplified to type N)
 
         Returns:
             Penalty amount based on type
         """
-        # For now, return 0.0 - will be enhanced with full penalty logic
-        return jnp.array(0.0, dtype=jnp.float32)
+        role_sign = contract_role_sign(self.contract_role)
+        pytp = attributes.penalty_type
+        pyrt = attributes.penalty_rate or 0.0
+
+        if pytp == "A":
+            # Absolute fixed penalty amount
+            return jnp.array(role_sign * pyrt, dtype=jnp.float32)
+        elif pytp == "N" or pytp == "I":
+            # Notional percentage (also used as fallback for interest differential)
+            dcc = attributes.day_count_convention or DayCountConvention.A360
+            yf = year_fraction(state.sd, time, dcc)
+            nt = float(state.nt)
+            return jnp.array(role_sign * yf * nt * pyrt, dtype=jnp.float32)
+        else:
+            return jnp.array(0.0, dtype=jnp.float32)
 
     def _pof_fp(
         self,
@@ -268,14 +293,30 @@ class PAMPayoffFunction(BasePayoffFunction):
         """POF_FP_PAM: Fee Payment.
 
         Formula depends on FEB (fee basis):
-            FEB='A': Absolute = FER
-            FEB='N': Notional percentage = Y(Sd_t⁻, t) × Nt_t⁻ × FER + Feac_t⁻
+            FEB='A': Absolute = R(CNTRL) × FER
+            FEB='N': Notional % = R(CNTRL) × (Y(Sd_t⁻, t) × Nt_t⁻ × FER + Feac_t⁻)
 
         Returns:
             Fee payment amount
         """
-        # For now, return 0.0 - will be enhanced with full fee logic
-        return jnp.array(0.0, dtype=jnp.float32)
+        role_sign = contract_role_sign(self.contract_role)
+        feb = attributes.fee_basis
+        fer = attributes.fee_rate or 0.0
+
+        if feb == FeeBasis.A:
+            # Absolute fee amount
+            return jnp.array(role_sign * fer, dtype=jnp.float32)
+        elif feb == FeeBasis.N:
+            # Notional percentage: current period fee + previously accrued
+            dcc = attributes.day_count_convention or DayCountConvention.A360
+            yf = year_fraction(state.sd, time, dcc)
+            nt = float(state.nt)
+            feac = float(state.feac)
+            return jnp.array(role_sign * (yf * nt * fer + feac), dtype=jnp.float32)
+        else:
+            # Default: just return accrued fees
+            feac = float(state.feac)
+            return jnp.array(role_sign * feac, dtype=jnp.float32)
 
     def _pof_prd(
         self,
@@ -287,14 +328,25 @@ class PAMPayoffFunction(BasePayoffFunction):
         """POF_PRD_PAM: Purchase Date - pay purchase price + accrued interest.
 
         Formula:
-            POF_PRD_PAM = X^CURS_CUR(t) × R(CNTRL) × (-1) ×
+            POF_PRD_PAM = R(CNTRL) × (-1) ×
                           (PPRD + Ipac_t⁻ + Y(Sd_t⁻, t) × Ipnr_t⁻ × Nt_t⁻)
 
         Returns:
             Negative of (purchase price + accrued interest)
         """
-        # For now, return 0.0 - will be enhanced with purchase logic
-        return jnp.array(0.0, dtype=jnp.float32)
+        role_sign = contract_role_sign(self.contract_role)
+        dcc = attributes.day_count_convention or DayCountConvention.A360
+        yf = year_fraction(state.sd, time, dcc)
+
+        ipac = float(state.ipac)
+        ipnr = float(state.ipnr)
+        nt = float(state.nt)
+        accrued_interest = yf * ipnr * nt
+
+        pprd = attributes.price_at_purchase_date or 0.0
+        payoff = role_sign * (-1.0) * (pprd + ipac + accrued_interest)
+
+        return jnp.array(payoff, dtype=jnp.float32)
 
     def _pof_td(
         self,
@@ -306,14 +358,25 @@ class PAMPayoffFunction(BasePayoffFunction):
         """POF_TD_PAM: Termination Date - receive termination price + accrued.
 
         Formula:
-            POF_TD_PAM = X^CURS_CUR(t) × R(CNTRL) ×
+            POF_TD_PAM = R(CNTRL) ×
                          (PTD + Ipac_t⁻ + Y(Sd_t⁻, t) × Ipnr_t⁻ × Nt_t⁻)
 
         Returns:
             Termination price + accrued interest
         """
-        # For now, return 0.0 - will be enhanced with termination logic
-        return jnp.array(0.0, dtype=jnp.float32)
+        role_sign = contract_role_sign(self.contract_role)
+        dcc = attributes.day_count_convention or DayCountConvention.A360
+        yf = year_fraction(state.sd, time, dcc)
+
+        ipac = float(state.ipac)
+        ipnr = float(state.ipnr)
+        nt = float(state.nt)
+        accrued_interest = yf * ipnr * nt
+
+        ptd = attributes.price_at_termination_date or 0.0
+        payoff = role_sign * (ptd + ipac + accrued_interest)
+
+        return jnp.array(payoff, dtype=jnp.float32)
 
     def _pof_ip(
         self,
@@ -419,10 +482,30 @@ class PAMStateTransitionFunction(BaseStateTransitionFunction):
     """State transition function for PAM contracts.
 
     Implements all 14 PAM state transition functions according to ACTUS specification.
+    Uses dictionary-based dispatch for O(1) lookup.
 
     ACTUS Reference:
         ACTUS v1.1 Section 7.1 - PAM State Transition Functions
     """
+
+    def _build_dispatch_table(self) -> dict[EventType, Any]:
+        """Build event type → handler dispatch table."""
+        return {
+            EventType.AD: self._stf_ad,
+            EventType.IED: self._stf_ied,
+            EventType.MD: self._stf_md,
+            EventType.PP: self._stf_pp,
+            EventType.PY: self._stf_py,
+            EventType.FP: self._stf_fp,
+            EventType.PRD: self._stf_prd,
+            EventType.TD: self._stf_td,
+            EventType.IP: self._stf_ip,
+            EventType.IPCI: self._stf_ipci,
+            EventType.RR: self._stf_rr,
+            EventType.RRF: self._stf_rrf,
+            EventType.SC: self._stf_sc,
+            EventType.CE: self._stf_ce,
+        }
 
     def transition_state(
         self,
@@ -434,7 +517,7 @@ class PAMStateTransitionFunction(BaseStateTransitionFunction):
     ) -> ContractState:
         """Transition PAM contract state.
 
-        Dispatches to specific state transition function based on event type.
+        Dispatches to specific state transition function via dict lookup (O(1)).
 
         Args:
             event_type: Type of event
@@ -449,34 +532,9 @@ class PAMStateTransitionFunction(BaseStateTransitionFunction):
         ACTUS Reference:
             STF_[event]_PAM functions from Section 7.1
         """
-        if event_type == EventType.AD:
-            return self._stf_ad(state_pre, attributes, time, risk_factor_observer)
-        if event_type == EventType.IED:
-            return self._stf_ied(state_pre, attributes, time, risk_factor_observer)
-        if event_type == EventType.MD:
-            return self._stf_md(state_pre, attributes, time, risk_factor_observer)
-        if event_type == EventType.PP:
-            return self._stf_pp(state_pre, attributes, time, risk_factor_observer)
-        if event_type == EventType.PY:
-            return self._stf_py(state_pre, attributes, time, risk_factor_observer)
-        if event_type == EventType.FP:
-            return self._stf_fp(state_pre, attributes, time, risk_factor_observer)
-        if event_type == EventType.PRD:
-            return self._stf_prd(state_pre, attributes, time, risk_factor_observer)
-        if event_type == EventType.TD:
-            return self._stf_td(state_pre, attributes, time, risk_factor_observer)
-        if event_type == EventType.IP:
-            return self._stf_ip(state_pre, attributes, time, risk_factor_observer)
-        if event_type == EventType.IPCI:
-            return self._stf_ipci(state_pre, attributes, time, risk_factor_observer)
-        if event_type == EventType.RR:
-            return self._stf_rr(state_pre, attributes, time, risk_factor_observer)
-        if event_type == EventType.RRF:
-            return self._stf_rrf(state_pre, attributes, time, risk_factor_observer)
-        if event_type == EventType.SC:
-            return self._stf_sc(state_pre, attributes, time, risk_factor_observer)
-        if event_type == EventType.CE:
-            return self._stf_ce(state_pre, attributes, time, risk_factor_observer)
+        handler = self._build_dispatch_table().get(event_type)
+        if handler is not None:
+            return handler(state_pre, attributes, time, risk_factor_observer)
         # Unknown event type - return unchanged state
         return state_pre
 
@@ -535,8 +593,19 @@ class PAMStateTransitionFunction(BaseStateTransitionFunction):
         # Set interest rate
         ipnr = attributes.nominal_interest_rate or 0.0
 
-        # Set initial accrued interest (for now, 0.0)
-        ipac = 0.0
+        # Set initial accrued interest
+        # Per ACTUS spec: use IPAC if given, else calculate from IPANX if before IED
+        if attributes.accrued_interest is not None:
+            ipac = attributes.accrued_interest
+        elif (
+            attributes.interest_payment_anchor is not None
+            and attributes.interest_payment_anchor < time
+        ):
+            dcc = attributes.day_count_convention or DayCountConvention.A360
+            yf = year_fraction(attributes.interest_payment_anchor, time, dcc)
+            ipac = yf * ipnr * abs(nt)
+        else:
+            ipac = 0.0
 
         return ContractState(
             sd=time,
@@ -724,10 +793,46 @@ class PAMStateTransitionFunction(BaseStateTransitionFunction):
         time: ActusDateTime,
         risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
-        """STF_RR_PAM: Rate Reset - update interest rate with caps/floors."""
-        # For now, just accrue interest and update sd
-        # TODO: Implement full rate reset logic with caps/floors/spreads
-        return self._stf_ad(state_pre, attributes, time, risk_factor_observer)
+        """STF_RR_PAM: Rate Reset - observe market rate and apply caps/floors.
+
+        Per ACTUS spec (Section 7.1):
+            Ipac_t = Ipac_(t-) + Y(Sd_(t-), t) * Ipnr_(t-) * Nt_(t-)
+            Ipnr_t = min(max(RRMLT * O_rf(RRMO, t) + RRSP, RRLF), RRLC)
+            Sd_t = t
+        """
+        dcc = attributes.day_count_convention or DayCountConvention.A360
+        yf = year_fraction(state_pre.sd, time, dcc)
+
+        # Accrue interest up to reset time using old rate
+        ipac = float(state_pre.ipac) + yf * float(state_pre.ipnr) * float(state_pre.nt)
+
+        # Observe new market rate
+        market_object = attributes.rate_reset_market_object or ""
+        observed_rate = float(risk_factor_observer.observe_risk_factor(
+            market_object, time, state_pre, attributes
+        ))
+
+        # Apply rate multiplier and spread
+        multiplier = attributes.rate_reset_multiplier if attributes.rate_reset_multiplier is not None else 1.0
+        spread = attributes.rate_reset_spread if attributes.rate_reset_spread is not None else 0.0
+        new_rate = multiplier * observed_rate + spread
+
+        # Apply floor and cap
+        if attributes.rate_reset_floor is not None:
+            new_rate = max(new_rate, attributes.rate_reset_floor)
+        if attributes.rate_reset_cap is not None:
+            new_rate = min(new_rate, attributes.rate_reset_cap)
+
+        return ContractState(
+            sd=time,
+            tmd=state_pre.tmd,
+            nt=state_pre.nt,
+            ipnr=jnp.array(new_rate, dtype=jnp.float32),
+            ipac=jnp.array(ipac, dtype=jnp.float32),
+            feac=state_pre.feac,
+            nsc=state_pre.nsc,
+            isc=state_pre.isc,
+        )
 
     def _stf_rrf(
         self,
@@ -736,9 +841,32 @@ class PAMStateTransitionFunction(BaseStateTransitionFunction):
         time: ActusDateTime,
         risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
-        """STF_RRF_PAM: Rate Reset Fixing - set rate to predefined value."""
-        # For now, same as AD
-        return self._stf_ad(state_pre, attributes, time, risk_factor_observer)
+        """STF_RRF_PAM: Rate Reset Fixing - set rate to predefined value.
+
+        Per ACTUS spec (Section 7.1):
+            Ipac_t = Ipac_(t-) + Y(Sd_(t-), t) * Ipnr_(t-) * Nt_(t-)
+            Ipnr_t = RRNXT
+            Sd_t = t
+        """
+        dcc = attributes.day_count_convention or DayCountConvention.A360
+        yf = year_fraction(state_pre.sd, time, dcc)
+
+        # Accrue interest up to reset time using old rate
+        ipac = float(state_pre.ipac) + yf * float(state_pre.ipnr) * float(state_pre.nt)
+
+        # Set rate to next predefined value
+        new_rate = attributes.rate_reset_next if attributes.rate_reset_next is not None else float(state_pre.ipnr)
+
+        return ContractState(
+            sd=time,
+            tmd=state_pre.tmd,
+            nt=state_pre.nt,
+            ipnr=jnp.array(new_rate, dtype=jnp.float32),
+            ipac=jnp.array(ipac, dtype=jnp.float32),
+            feac=state_pre.feac,
+            nsc=state_pre.nsc,
+            isc=state_pre.isc,
+        )
 
     def _stf_sc(
         self,

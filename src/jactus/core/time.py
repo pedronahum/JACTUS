@@ -542,7 +542,7 @@ def adjust_to_business_day(
             # If we crossed a month boundary, go back instead
             if dt.month != original_month:
                 dt_original = ActusDateTime.from_iso(
-                    f"{original_month:04d}-{original_month:02d}-"
+                    f"{py_dt.year:04d}-{original_month:02d}-"
                     f"{py_dt.day:02d}T{py_dt.hour:02d}:{py_dt.minute:02d}:{py_dt.second:02d}"
                 )
                 py_dt = dt_original.to_datetime()

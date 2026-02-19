@@ -547,7 +547,12 @@ class TestSWPPVAllPayoffFunctions:
         assert float(payoff) == pytest.approx(0.0, abs=0.01)
 
     def test_swppv_ip_payoff_with_accrual(self):
-        """Test IP payoff with non-zero accrual."""
+        """Test IP payoff computes net of fixed and floating leg accruals.
+
+        POF_IP accrues both legs from state.sd to event time, then nets them:
+            net = (ipac1 + fixed_accrual) - (ipac2 + floating_accrual)
+        With RPA role (receive fixed), payoff = +net.
+        """
         attrs = ContractAttributes(
             contract_id="SWAP001",
             contract_type=ContractType.SWPPV,
@@ -555,39 +560,31 @@ class TestSWPPVAllPayoffFunctions:
             status_date=ActusDateTime(2024, 1, 1, 0, 0, 0),
             maturity_date=ActusDateTime(2026, 1, 15, 0, 0, 0),
             notional_principal=1000000.0,
-            nominal_interest_rate=0.05,
-            nominal_interest_rate_2=0.03,
+            nominal_interest_rate=0.05,  # Fixed leg: 5%
+            nominal_interest_rate_2=0.03,  # Floating leg initial: 3%
             interest_payment_cycle="6M",
             rate_reset_cycle="3M",
+            day_count_convention="A360",
         )
 
         rf_obs = ConstantRiskFactorObserver(constant_value=0.04)
         swap = PlainVanillaSwapContract(attrs, rf_obs)
 
-        # Create state with accrual
+        # State at IED with zero accruals, floating rate = 0.03
         state = swap.initialize_state()
-        # Manually set ipac to test payoff calculation
-        from jactus.core import ContractState
-
-        state_with_accrual = ContractState(
-            tmd=state.tmd,
-            sd=state.sd,
-            nt=state.nt,
-            ipnr=state.ipnr,
-            ipac=jnp.array(0.025, dtype=jnp.float32),  # 2.5% accrual
-            feac=state.feac,
-            nsc=state.nsc,
-            isc=state.isc,
-            prf=state.prf,
-        )
 
         pof = swap.get_payoff_function(EventType.IP)
+        # Payment at 6 months: 2024-01-01 to 2024-07-01 = 181 days / 360
         payoff = pof.calculate_payoff(
-            EventType.IP, state_with_accrual, attrs, ActusDateTime(2024, 7, 15, 0, 0, 0), rf_obs
+            EventType.IP, state, attrs, ActusDateTime(2024, 7, 1, 0, 0, 0), rf_obs
         )
 
-        # Payoff = X × ipac × NT = 1.0 × 0.025 × 1000000 = 25000
-        assert float(payoff) == pytest.approx(25000.0, abs=1.0)
+        # Fixed leg accrual: 181/360 * 0.05 * 1M = 25138.89
+        # Floating leg accrual: 181/360 * 0.03 * 1M = 15083.33
+        # Net = 25138.89 - 15083.33 = 10055.56 (approx)
+        # RPA receives fixed, so payoff > 0 when fixed > floating
+        assert float(payoff) > 0.0
+        assert float(payoff) == pytest.approx(10055.56, abs=100.0)
 
 
 class TestSWPPVStateTransitions:
@@ -755,7 +752,7 @@ class TestSWPPVStateTransitions:
         assert float(state_post.ipac) == pytest.approx(0.0, abs=0.01)
 
     def test_swppv_ad_state_transition(self):
-        """Test AD state transition doesn't change state."""
+        """Test AD state transition accrues both legs."""
         attrs = ContractAttributes(
             contract_id="SWAP001",
             contract_type=ContractType.SWPPV,
@@ -763,10 +760,11 @@ class TestSWPPVStateTransitions:
             status_date=ActusDateTime(2024, 1, 1, 0, 0, 0),
             maturity_date=ActusDateTime(2026, 1, 15, 0, 0, 0),
             notional_principal=1000000.0,
-            nominal_interest_rate=0.05,
-            nominal_interest_rate_2=0.03,
+            nominal_interest_rate=0.05,  # Fixed: 5%
+            nominal_interest_rate_2=0.03,  # Floating: 3%
             interest_payment_cycle="6M",
             rate_reset_cycle="3M",
+            day_count_convention="A360",
         )
 
         rf_obs = ConstantRiskFactorObserver(constant_value=0.04)
@@ -779,8 +777,16 @@ class TestSWPPVStateTransitions:
             EventType.AD, state_pre, attrs, ActusDateTime(2024, 3, 1, 0, 0, 0), rf_obs
         )
 
-        # State should remain unchanged
-        assert state_post == state_pre
+        # Status date should advance
+        assert state_post.sd == ActusDateTime(2024, 3, 1, 0, 0, 0)
+        # Fixed leg accrues: 60/360 * 0.05 * 1M = 8333.33
+        assert float(state_post.ipac1) == pytest.approx(8333.33, abs=1.0)
+        # Floating leg accrues: 60/360 * 0.03 * 1M = 5000.0
+        assert float(state_post.ipac2) == pytest.approx(5000.0, abs=1.0)
+        # Net accrual = 8333.33 - 5000.0 = 3333.33
+        assert float(state_post.ipac) == pytest.approx(3333.33, abs=1.0)
+        # Notional unchanged
+        assert float(state_post.nt) == pytest.approx(1000000.0)
 
     def test_swppv_pr_state_transition(self):
         """Test PR state transition doesn't change state."""

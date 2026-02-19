@@ -97,6 +97,19 @@ class ANNStateTransitionFunction(BaseStateTransitionFunction):
         # Delegate to NAM for most state transitions
         self._nam_stf = NAMStateTransitionFunction()
 
+    def _build_dispatch_table(self) -> dict[EventType, Any]:
+        """Build event type → handler dispatch table.
+
+        ANN overrides RR and RRF with annuity-specific handlers that
+        recalculate Prnxt. All other events delegate to NAM's dispatch.
+        """
+        # Start with NAM's full dispatch table
+        table = self._nam_stf._build_dispatch_table()
+        # Override RR and RRF with ANN-specific handlers
+        table[EventType.RR] = self._stf_rr
+        table[EventType.RRF] = self._stf_rrf
+        return table
+
     def transition_state(
         self,
         event_type: Any,
@@ -106,7 +119,10 @@ class ANNStateTransitionFunction(BaseStateTransitionFunction):
         risk_factor_observer: RiskFactorObserver,
         child_contract_observer: Any | None = None,
     ) -> ContractState:
-        """Apply state transition for ANN event.
+        """Apply state transition for ANN event via dict dispatch.
+
+        ANN overrides RR/RRF to recalculate Prnxt using annuity formula.
+        All other events delegate to NAM's handlers.
 
         Args:
             event_type: Type of event
@@ -118,16 +134,10 @@ class ANNStateTransitionFunction(BaseStateTransitionFunction):
         Returns:
             New contract state after event
         """
-        # For RR and RRF, we need to recalculate Prnxt
-        if event_type == EventType.RR:
-            return self._stf_rr(state, attributes, time, risk_factor_observer)
-        if event_type == EventType.RRF:
-            return self._stf_rrf(state, attributes, time, risk_factor_observer)
-
-        # All other events use NAM state transitions
-        return self._nam_stf.transition_state(
-            event_type, state, attributes, time, risk_factor_observer
-        )
+        handler = self._build_dispatch_table().get(event_type)
+        if handler is not None:
+            return handler(state, attributes, time, risk_factor_observer)
+        return state
 
     def _stf_rr(
         self,
