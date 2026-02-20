@@ -8,6 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **109/109 ACTUS Cross-Validation Compliance**: All PAM, LAM, NAM, and ANN official
+  test cases now pass, up from partial compliance.
+- **BDC Modified Following/Preceding**: Fixed month boundary adjustment in
+  `adjust_to_business_day` (`time.py:529`) — when a Modified convention crosses a
+  month boundary, the code now properly resets to the original date before searching
+  in the opposite direction. Previously reconstructed an invalid date from the
+  shifted position.
+- **Schedule Generation**: Fixed `generate_schedule` (`schedules.py`) to compute
+  dates from the anchor using cumulative offsets, avoiding day-capping drift.
+  E.g., Jan 30 → Feb 28 → Mar 28 was incorrect; now computes Jan 30 + 2M = Mar 30
+  directly. Also restricted EOM convention to month-based periods (M/Q/H/Y) only.
+- **PAM/LAM/NAM/ANN Role Sign**: Removed spurious `R(CNTRL)` from payoff functions
+  (IP, PR, MD, FP, PY, PRD, TD) where state variables (`Nt`, `Ipac`, `Feac`,
+  `Prnxt`) are already signed. The base class `apply_role_sign` step was removed
+  from the payoff pipeline; each POF now applies role sign only for unsigned
+  attributes (NT, PPRD, PTD).
+- **PAM/LAM/NAM/ANN STF_MD**: Maturity state transition now preserves `ipnr` per
+  ACTUS spec (previously zeroed the nominal interest rate).
+- **LAM/NAM PR Overshoot**: Capped principal redemption at remaining notional to
+  prevent `Nt` from going negative after the final redemption period.
+- **NAM Open-Ended Contracts**: Handle NAM contracts without explicit maturity date
+  by deriving MD from the test horizon.
+- **Attributes IED < SD**: Relaxed `initial_exchange_date ≥ status_date` validation
+  — per ACTUS spec, IED before SD is allowed (contract existed before the observation
+  date). When IED < SD, the IED event is skipped but state initializes as if IED
+  occurred.
 - **NAM**: Fixed critical sign error in STF_PR state transition (`nam.py:443`) where
   `role_sign` was double-applied to `net_principal_reduction`, causing notional to
   increase instead of decrease for borrower (RPL) positions. Per ACTUS spec:
@@ -31,7 +57,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   initial exchange, accrued interest is now set from the IPAC attribute if provided,
   or calculated as `Y(IPANX, IED) × IPNR × |NT|` when the interest payment anchor
   (IPANX) precedes the initial exchange date. Previously always initialized to 0.0.
-
 - **CAPFL**: Implemented proper cap/floor payoff mechanism (`capfl.py`). CAPFL now
   computes cap payoffs as `max(0, rate - cap_rate) × NT × YF` and floor payoffs as
   `max(0, floor_rate - rate) × NT × YF`. Added STF_RR to observe market rates and
@@ -58,6 +83,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Previously all five returned 0.0.
 
 ### Changed
+- **Event Scheduling**: Implemented CS (Calculate/Shift) vs SC (Shift/Calculate)
+  business day convention distinction across PAM, LAM, NAM, ANN. CS conventions
+  generate schedule dates without BDC, then shift `event_time` for display while
+  preserving the original date in `calculation_time` for accrual calculations.
+- **Event Priority**: Added `EVENT_SCHEDULE_PRIORITY` mapping in `types.py` defining
+  ACTUS-compliant processing order for same-date events (AD → IED → PR → IP → IPCI
+  → RR → IPCB → SC → FP → PRD → TD → MD).
+- **Scaling (SC)**: Implemented STF_SC state transition with market data observation
+  via `SCMO` risk factor. SC events are now scheduled and processed with correct
+  priority (after PR/IP/RR/IPCB).
 - **Event Dispatch**: Refactored POF/STF event dispatch in PAM, LAM, NAM, and ANN
   contracts from if/elif chains to dictionary-based dispatch tables with O(1) lookup.
   Each POF/STF class now has a `_build_dispatch_table()` method returning an
@@ -67,6 +102,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compilation of the simulation loop.
 
 ### Added
+- **ContractAttributes**: Added `scaling_index_at_contract_deal_date` (SCIXCDD),
+  `interest_calculation_base_amount` (IPCBA), and `amortization_date` (AMD)
+  attributes.
+- **ContractEvent**: Added `calculation_time` field to support CS business day
+  conventions where the calculation date differs from the shifted event date.
 - **Cross-Validation Test Framework** (`tests/cross_validation/`): Built automated
   test runner that downloads official ACTUS test cases from
   [actusfrf/actus-tests](https://github.com/actusfrf/actus-tests) and validates
@@ -77,9 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     from ACTUS test dataObserved format
   - `runner.py`: Generic comparison engine that aligns events by (date, type) pairs
     for robust comparison even when schedule generation differs
-  - Tests for PAM (25 cases), LAM, NAM, ANN contract types
-  - Identified key compliance gaps: missing IP at cycle anchor date, missing RR/IPCI
-    event scheduling, IED < SD validation too strict, MD state zeroing
+  - Tests for PAM (25 cases), LAM, NAM, ANN contract types — all 109 cases passing
 
 - MCP (Model Context Protocol) server for AI-assisted development
   - 10 tools for contract discovery, validation, examples, documentation, and system diagnostics
