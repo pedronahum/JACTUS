@@ -1,22 +1,11 @@
 """Example retrieval tools."""
 
-import json
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
-
-def get_jactus_root() -> Path:
-    """Get the root directory of the JACTUS repository."""
-    # MCP server is in tools/mcp-server/src/jactus_mcp/tools/
-    # Navigate up to find JACTUS root (look for src/jactus directory)
-    current = Path(__file__).parent
-    for _ in range(10):  # Safety limit
-        if (current / "src" / "jactus").exists():
-            return current
-        current = current.parent
-
-    # Fallback: 5 levels up
-    return Path(__file__).parent.parent.parent.parent.parent
+from ._utils import get_jactus_root
 
 
 def list_examples() -> dict[str, Any]:
@@ -170,3 +159,65 @@ for event in result.events:
 # 2024-07-15: IP   $  2,500.00   (6-month interest)
 # 2025-01-15: MD   $102,500.00   (principal + final interest)
 '''
+
+
+def run_example(example_name: str) -> dict[str, Any]:
+    """Execute a JACTUS example and return its output.
+
+    Args:
+        example_name: Name of the example to run
+
+    Returns:
+        Dictionary with stdout, stderr, and return code.
+    """
+    jactus_root = get_jactus_root()
+    examples_dir = jactus_root / "examples"
+
+    # Find the example file
+    if not example_name.endswith(".py"):
+        py_path = examples_dir / f"{example_name}.py"
+    else:
+        py_path = examples_dir / example_name
+
+    if not py_path.exists():
+        return {
+            "error": f"Example '{example_name}' not found",
+            "available": list_examples(),
+        }
+
+    # Security: ensure the resolved path is within the examples directory
+    try:
+        py_path.resolve().relative_to(examples_dir.resolve())
+    except ValueError:
+        return {
+            "error": "Invalid example path: must be within examples directory",
+            "success": False,
+        }
+
+    try:
+        result = subprocess.run(
+            [sys.executable, str(py_path)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=str(jactus_root),
+        )
+        return {
+            "name": example_name,
+            "return_code": result.returncode,
+            "stdout": result.stdout,
+            "stderr": result.stderr if result.returncode != 0 else None,
+            "success": result.returncode == 0,
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "name": example_name,
+            "error": "Example execution timed out (30s limit)",
+            "success": False,
+        }
+    except Exception as e:
+        return {
+            "name": example_name,
+            "error": str(e),
+            "success": False,
+        }

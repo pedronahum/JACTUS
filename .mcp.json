@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "jactus": {
+      "command": "python",
+      "args": ["-m", "jactus_mcp"],
+      "description": "JACTUS - JAX ACTUS financial contract simulation"
+    }
+  }
+}

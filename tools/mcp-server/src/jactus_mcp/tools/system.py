@@ -3,18 +3,7 @@
 from pathlib import Path
 from typing import Any
 
-
-def get_jactus_root() -> Path:
-    """Get the root directory of the JACTUS repository."""
-    # Navigate up to find JACTUS root (look for src/jactus directory)
-    current = Path(__file__).parent
-    for _ in range(10):  # Safety limit
-        if (current / "src" / "jactus").exists():
-            return current
-        current = current.parent
-
-    # Fallback: 5 levels up
-    return Path(__file__).parent.parent.parent.parent.parent
+from ._utils import get_jactus_root
 
 
 def get_version_info() -> dict[str, Any]:

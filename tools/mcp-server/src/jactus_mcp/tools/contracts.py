@@ -119,8 +119,9 @@ def get_contract_schema(contract_type: str) -> dict[str, Any]:
         "contract_role": "ContractRole enum - RPA (lender) or RPL (borrower)",
     }
 
-    # Contract-specific required fields
+    # Contract-specific required fields (all 18 types)
     specific_required = {
+        # Principal contracts
         "PAM": {
             "initial_exchange_date": "ActusDateTime",
             "maturity_date": "ActusDateTime",
@@ -133,30 +134,65 @@ def get_contract_schema(contract_type: str) -> dict[str, Any]:
             "maturity_date": "ActusDateTime",
             "notional_principal": "float",
             "nominal_interest_rate": "float",
-            "next_principal_redemption_payment": "float",
-            "cycle_of_principal_redemption": "str (e.g., '1M', '3M')",
+            "next_principal_redemption_amount": "float - Fixed principal payment amount",
+            "principal_redemption_cycle": "str (e.g., '1M', '3M')",
+        },
+        "LAX": {
+            "initial_exchange_date": "ActusDateTime",
+            "maturity_date": "ActusDateTime",
+            "notional_principal": "float",
+            "nominal_interest_rate": "float",
+            "array_pr_cycle": "list[str] - Array of PR cycles for exotic amortization",
+            "array_pr_next": "list[float] - Array of next PR amounts",
+        },
+        "NAM": {
+            "initial_exchange_date": "ActusDateTime",
+            "maturity_date": "ActusDateTime",
+            "notional_principal": "float",
+            "nominal_interest_rate": "float",
+            "next_principal_redemption_amount": "float",
+            "principal_redemption_cycle": "str (e.g., '1M', '3M')",
         },
         "ANN": {
             "initial_exchange_date": "ActusDateTime",
             "maturity_date": "ActusDateTime",
             "notional_principal": "float",
             "nominal_interest_rate": "float",
-            "cycle_of_interest_payment": "str",
-            "cycle_of_principal_redemption": "str",
+            "interest_payment_cycle": "str",
+            "principal_redemption_cycle": "str",
         },
-        "SWPPV": {
+        "CLM": {
             "initial_exchange_date": "ActusDateTime",
-            "maturity_date": "ActusDateTime",
             "notional_principal": "float",
             "nominal_interest_rate": "float",
             "interest_payment_cycle": "str",
-            "rate_reset_cycle": "str",
         },
+        # Non-principal contracts
+        "UMP": {
+            "initial_exchange_date": "ActusDateTime",
+            "notional_principal": "float",
+            "nominal_interest_rate": "float",
+        },
+        "CSH": {
+            "notional_principal": "float",
+        },
+        "STK": {
+            "initial_exchange_date": "ActusDateTime",
+            "notional_principal": "float - Number of shares or position value",
+        },
+        # Exotic contracts
+        "COM": {
+            "initial_exchange_date": "ActusDateTime",
+            "notional_principal": "float - Commodity value",
+        },
+        # Derivative contracts
         "FXOUT": {
             "initial_exchange_date": "ActusDateTime",
             "maturity_date": "ActusDateTime",
             "notional_principal": "float",
-            "delivery_settlement": "str ('D' or 'S')",
+            "delivery_settlement": "str ('D' for delivery/net or 'S' for settlement/gross)",
+            "currency_2": "str - Second currency ISO code",
+            "notional_principal_2": "float - Second currency notional",
         },
         "OPTNS": {
             "initial_exchange_date": "ActusDateTime",
@@ -164,8 +200,51 @@ def get_contract_schema(contract_type: str) -> dict[str, Any]:
             "notional_principal": "float",
             "option_type": "str ('C' for call, 'P' for put)",
             "option_strike_1": "float",
-            "option_exercise_type": "str ('E' or 'A')",
-            "contract_structure": "str (JSON)",
+            "option_exercise_type": "str ('E' European, 'A' American, 'B' Bermudan)",
+            "contract_structure": "str (JSON) - Reference to underlier contract",
+        },
+        "FUTUR": {
+            "initial_exchange_date": "ActusDateTime",
+            "maturity_date": "ActusDateTime",
+            "notional_principal": "float",
+            "contract_structure": "str (JSON) - Reference to underlier contract",
+        },
+        "SWPPV": {
+            "initial_exchange_date": "ActusDateTime",
+            "maturity_date": "ActusDateTime",
+            "notional_principal": "float",
+            "nominal_interest_rate": "float - Fixed leg rate",
+            "interest_payment_cycle": "str - Payment frequency (e.g., '3M', '6M')",
+            "rate_reset_cycle": "str - Floating leg reset frequency",
+        },
+        "SWAPS": {
+            "initial_exchange_date": "ActusDateTime",
+            "maturity_date": "ActusDateTime",
+            "notional_principal": "float",
+            "contract_structure": "str (JSON) - Defines swap legs configuration",
+        },
+        "CAPFL": {
+            "initial_exchange_date": "ActusDateTime",
+            "maturity_date": "ActusDateTime",
+            "notional_principal": "float",
+            "nominal_interest_rate": "float",
+            "rate_reset_cap": "float - Interest rate cap level",
+            "rate_reset_floor": "float - Interest rate floor level",
+            "rate_reset_cycle": "str - Reset frequency",
+        },
+        "CEG": {
+            "initial_exchange_date": "ActusDateTime",
+            "maturity_date": "ActusDateTime",
+            "notional_principal": "float",
+            "coverage": "float - Coverage ratio",
+            "contract_structure": "str (JSON) - Reference to guaranteed contract",
+        },
+        "CEC": {
+            "initial_exchange_date": "ActusDateTime",
+            "maturity_date": "ActusDateTime",
+            "notional_principal": "float",
+            "coverage": "float - Coverage ratio",
+            "contract_structure": "str (JSON) - Reference to collateral contract",
         },
     }
 
