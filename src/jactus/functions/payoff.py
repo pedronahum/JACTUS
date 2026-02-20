@@ -218,12 +218,13 @@ class BasePayoffFunction(ABC):
             ACTUS v1.1 Section 2.7
         """
         # Step 1: Calculate base payoff
+        # Each POF method returns the complete payoff with correct sign.
+        # R(CNTRL) is applied only in formulas that use unsigned attributes
+        # (e.g., IED). Formulas using signed state variables (IP, MD, PR)
+        # already have the correct sign from state.nt.
         payoff = self.calculate_payoff(event_type, state, attributes, time, risk_factor_observer)
 
-        # Step 2: Apply contract role sign
-        payoff = self.apply_role_sign(payoff)
-
-        # Step 3: Apply FX rate
+        # Step 2: Apply FX rate
         return self.apply_fx_rate(payoff, time, risk_factor_observer)
 
 

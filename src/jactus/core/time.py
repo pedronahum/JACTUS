@@ -433,8 +433,12 @@ def add_period(
         new_dt.second,
     )
 
-    # Apply end-of-month convention
-    if end_of_month_convention == EndOfMonthConvention.EOM and started_at_eom:
+    # Apply end-of-month convention (only for month-based periods)
+    if (
+        end_of_month_convention == EndOfMonthConvention.EOM
+        and started_at_eom
+        and period_type in ("M", "Q", "H", "Y")
+    ):
         # Move to end of target month
         result_dt = result.to_datetime()
         # Add days until we're at the last day of the month
@@ -525,9 +529,8 @@ def adjust_to_business_day(
     if is_business_day(dt, calendar):
         return dt
 
-    # Extract direction from convention
-    # Convention format: S/C + Direction + Modified
-    # We'll focus on the most common ones first
+    # Save original date for Modified conventions
+    original_dt = dt
     py_dt = dt.to_datetime()
     original_month = py_dt.month
 
@@ -537,27 +540,13 @@ def adjust_to_business_day(
             py_dt = dt.to_datetime() + timedelta(days=1)
             dt = ActusDateTime(py_dt.year, py_dt.month, py_dt.day, dt.hour, dt.minute, dt.second)
 
-        # Check if Modified
-        if "M" in convention.value:
-            # If we crossed a month boundary, go back instead
-            if dt.month != original_month:
-                dt_original = ActusDateTime.from_iso(
-                    f"{py_dt.year:04d}-{original_month:02d}-"
-                    f"{py_dt.day:02d}T{py_dt.hour:02d}:{py_dt.minute:02d}:{py_dt.second:02d}"
-                )
-                py_dt = dt_original.to_datetime()
-                # Move backward
-                while not is_business_day(dt_original, calendar):
-                    py_dt = py_dt - timedelta(days=1)
-                    dt_original = ActusDateTime(
-                        py_dt.year,
-                        py_dt.month,
-                        py_dt.day,
-                        dt.hour,
-                        dt.minute,
-                        dt.second,
-                    )
-                return dt_original
+        # Check if Modified: if we crossed a month boundary, go backward from original instead
+        if "M" in convention.value and dt.month != original_month:
+            dt = original_dt
+            py_dt = original_dt.to_datetime()
+            while not is_business_day(dt, calendar):
+                py_dt = py_dt - timedelta(days=1)
+                dt = ActusDateTime(py_dt.year, py_dt.month, py_dt.day, dt.hour, dt.minute, dt.second)
 
     elif "P" in convention.value:  # Preceding
         # Move backward to previous business day
@@ -565,26 +554,12 @@ def adjust_to_business_day(
             py_dt = dt.to_datetime() - timedelta(days=1)
             dt = ActusDateTime(py_dt.year, py_dt.month, py_dt.day, dt.hour, dt.minute, dt.second)
 
-        # Check if Modified
-        if "M" in convention.value:
-            # If we crossed a month boundary, go forward instead
-            if dt.month != original_month:
-                dt_original = ActusDateTime.from_iso(
-                    f"{py_dt.year:04d}-{original_month:02d}-"
-                    f"{py_dt.day:02d}T{py_dt.hour:02d}:{py_dt.minute:02d}:{py_dt.second:02d}"
-                )
-                py_dt = dt_original.to_datetime()
-                # Move forward
-                while not is_business_day(dt_original, calendar):
-                    py_dt = py_dt + timedelta(days=1)
-                    dt_original = ActusDateTime(
-                        py_dt.year,
-                        py_dt.month,
-                        py_dt.day,
-                        dt.hour,
-                        dt.minute,
-                        dt.second,
-                    )
-                return dt_original
+        # Check if Modified: if we crossed a month boundary, go forward from original instead
+        if "M" in convention.value and dt.month != original_month:
+            dt = original_dt
+            py_dt = original_dt.to_datetime()
+            while not is_business_day(dt, calendar):
+                py_dt = py_dt + timedelta(days=1)
+                dt = ActusDateTime(py_dt.year, py_dt.month, py_dt.day, dt.hour, dt.minute, dt.second)
 
     return dt

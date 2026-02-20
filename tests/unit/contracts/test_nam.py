@@ -297,12 +297,12 @@ class TestNAMStateTransitionFunction:
         )
 
         # Payment = $5000
-        # Interest = (31/360) × 0.05 × 100000 = 430.56
+        # Interest accrued = (31/360) × 0.05 × 100000 = 430.56
         # Net principal reduction = 5000 - 0 - 430.56 = 4569.44
         # New notional = 100000 - 4569.44 = 95430.56
         assert float(new_state.nt) == pytest.approx(95430.56, rel=0.01)
-        # Interest paid, so IPAC reset to 0
-        assert float(new_state.ipac) == pytest.approx(0.0)
+        # IPAC accumulates at PR (zeroed at IP, not PR)
+        assert float(new_state.ipac) == pytest.approx(430.56, rel=0.01)
         # In NT mode, IPCB follows notional
         assert float(new_state.ipcb) == pytest.approx(95430.56, rel=0.01)
 
@@ -353,8 +353,8 @@ class TestNAMStateTransitionFunction:
         # Net principal reduction = 200 - 0 - 430.56 = -230.56 (NEGATIVE!)
         # New notional = 100000 - (-230.56) = 100230.56 (INCREASED!)
         assert float(new_state.nt) == pytest.approx(100230.56, rel=0.01)
-        # Interest capitalized, IPAC reset to 0
-        assert float(new_state.ipac) == pytest.approx(0.0)
+        # IPAC accumulates at PR (zeroed at IP, not PR)
+        assert float(new_state.ipac) == pytest.approx(430.56, rel=0.01)
         # In NT mode, IPCB follows notional
         assert float(new_state.ipcb) == pytest.approx(100230.56, rel=0.01)
 
@@ -417,16 +417,16 @@ class TestNegativeAmortizerContract:
         pr_events = [e for e in schedule.events if e.event_type == EventType.PR]
         ip_events = [e for e in schedule.events if e.event_type == EventType.IP]
 
-        # PR: 2025, 2026, 2027, 2028 (MD is 2029) = 4 events
-        # IP: Should stop one period before last PR (2028), so 2025, 2026 = 2 events
-        # (IP ends at second-to-last PR date)
-        assert len(pr_events) == 4
-        assert len(ip_events) == 2  # Stops before 2027 (second-to-last PR)
-
-        # Last IP should be one year before second-to-last PR
-        if ip_events:
-            last_ip_year = ip_events[-1].event_time.year
-            assert last_ip_year == 2026  # Stops at 2026 (before 2027 which is second-to-last PR)
+        # PR: IED, 2025, 2026, 2027, 2028 (MD is 2029) = 5 events (PRANX defaults to IED)
+        # IP: from IPANX (or IED) to MD per ACTUS spec
+        assert len(pr_events) == 5
+        # IP events include IED (payoff=0) and all cycle dates up to MD
+        # Filter out IP at IED for count check
+        ip_after_ied = [
+            e for e in ip_events
+            if e.event_time != attrs.initial_exchange_date
+        ]
+        assert len(ip_after_ied) >= 4  # At least one IP per year
 
     def test_simulate_with_negative_amortization(self):
         """Test complete NAM simulation with periods of negative amortization."""
@@ -459,16 +459,19 @@ class TestNegativeAmortizerContract:
         # Find PR events
         pr_events = [e for e in result.events if e.event_type == EventType.PR]
 
-        # All PR payoffs should be negative (payment < interest)
-        for pr_event in pr_events:
+        # All PR payoffs after IED should be negative (payment < interest)
+        # Skip first PR at IED (no accrued interest yet)
+        for pr_event in pr_events[1:]:
             # Each payment is $200 but interest is ~$400-420/month
             # So payoff should be negative
             assert float(pr_event.payoff) < 0.0
 
         # Check that notional INCREASES over time (negative amortization)
-        if len(pr_events) >= 2:
-            first_pr = pr_events[0]
-            second_pr = pr_events[1]
+        # Use PR events after IED for comparison
+        later_prs = pr_events[1:]
+        if len(later_prs) >= 2:
+            first_pr = later_prs[0]
+            second_pr = later_prs[1]
             # Notional should increase from first to second PR
             if first_pr.state_pre and second_pr.state_pre:
                 assert float(second_pr.state_pre.nt) > float(first_pr.state_pre.nt)

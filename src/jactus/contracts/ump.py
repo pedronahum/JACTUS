@@ -126,9 +126,12 @@ class UMPPayoffFunction(BasePayoffFunction):
     def _pof_ied(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
     ) -> jnp.ndarray:
-        """POF_IED: Initial Exchange - disburse principal."""
+        """POF_IED: Initial Exchange - disburse principal.
+
+        Formula: R(CNTRL) × (-1) × Nsc × NT
+        """
         role_sign = contract_role_sign(attrs.contract_role)
-        return -role_sign * state.nsc * attrs.notional_principal
+        return jnp.array(role_sign * (-1.0), dtype=jnp.float32) * state.nsc * attrs.notional_principal
 
     def _pof_pr(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
@@ -136,37 +139,33 @@ class UMPPayoffFunction(BasePayoffFunction):
         """POF_PR: Principal Repayment - return partial principal.
 
         For UMP, the amount comes from observed events (not a fixed schedule).
-        This is a simplified version - the actual amount should come from the observer.
+        No R(CNTRL) — state variables are signed.
         """
-        role_sign = contract_role_sign(attrs.contract_role)
-        # In a real implementation, this would come from observer
-        # For now, we return a placeholder that will be updated by tests/observer
-        return role_sign * state.nsc * jnp.array(0.0, dtype=jnp.float32)
+        return state.nsc * jnp.array(0.0, dtype=jnp.float32)
 
     def _pof_md(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
     ) -> jnp.ndarray:
         """POF_MD: Maturity - return principal + accrued interest.
 
-        UMP pays all accrued interest at maturity (not periodically).
+        No R(CNTRL) — all signed state variables.
         """
-        role_sign = contract_role_sign(attrs.contract_role)
         yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
         accrued = yf * state.ipnr * state.nt
-        return role_sign * state.nsc * (state.nt + state.ipac + accrued)
+        return state.nsc * (state.nt + state.ipac + accrued)
 
     def _pof_fp(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
     ) -> jnp.ndarray:
-        """POF_FP: Fee Payment - pay accrued fees."""
-        role_sign = contract_role_sign(attrs.contract_role)
+        """POF_FP: Fee Payment - pay accrued fees.
+
+        No R(CNTRL) — Feac is a signed state variable.
+        """
         yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
 
-        # Accrue any remaining fees
         if attrs.fee_rate and attrs.fee_basis:
-            # Simplified fee accrual on notional
             accrued_fees = yf * attrs.fee_rate * abs(state.nt)
-            return role_sign * state.nsc * (state.feac + accrued_fees)
+            return state.nsc * (state.feac + accrued_fees)
         else:
             return role_sign * state.nsc * state.feac
 

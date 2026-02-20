@@ -55,6 +55,7 @@ class ContractEvent:
     state_pre: ContractState | None = None
     state_post: ContractState | None = None
     sequence: int = 0
+    calculation_time: ActusDateTime | None = None
 
     def __lt__(self, other: ContractEvent) -> bool:
         """Compare by time, then sequence."""

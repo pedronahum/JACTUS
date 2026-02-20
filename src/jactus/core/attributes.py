@@ -235,6 +235,9 @@ class ContractAttributes(BaseModel):
     scaling_index_at_status_date: float | None = Field(
         None, description="Scaling index at SD (SCIXSD)"
     )
+    scaling_index_at_contract_deal_date: float | None = Field(
+        None, description="Scaling index at CDD (SCIXCDD)"
+    )
     scaling_market_object: str | None = Field(None, description="Scaling market reference (SCMO)")
 
     # ========== CREDIT ENHANCEMENT ATTRIBUTES ==========
@@ -250,6 +253,12 @@ class ContractAttributes(BaseModel):
     accrued_interest: float | None = Field(None, description="Accrued interest (IPAC)")
     interest_calculation_base: InterestCalculationBase | None = Field(
         None, description="Interest calculation base (IPCB)"
+    )
+    interest_calculation_base_amount: float | None = Field(
+        None, description="Interest calculation base amount (IPCBA)"
+    )
+    amortization_date: ActusDateTime | None = Field(
+        None, description="Amortization end date for ANN contracts (AMD)"
     )
     contract_performance: ContractPerformance = Field(
         default=ContractPerformance.PF, description="Contract performance status (PRF)"
@@ -297,13 +306,9 @@ class ContractAttributes(BaseModel):
     @model_validator(mode="after")
     def validate_dates(self) -> ContractAttributes:
         """Validate date ordering constraints."""
-        # IED must be after SD
-        if self.status_date and self.initial_exchange_date:
-            if self.initial_exchange_date < self.status_date:
-                raise ValueError(
-                    f"Initial exchange date {self.initial_exchange_date.to_iso()} "
-                    f"must be >= status date {self.status_date.to_iso()}"
-                )
+        # Note: IED < SD is allowed per ACTUS spec (contract already existed
+        # before the status/observation date). When IED < SD, the IED event
+        # is not generated but state is initialized as if IED already occurred.
 
         # MD must be after IED
         if self.initial_exchange_date and self.maturity_date:

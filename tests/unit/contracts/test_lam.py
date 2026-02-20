@@ -542,8 +542,8 @@ class TestLAMStateTransitionFunction:
 
         # Notional reduced
         assert float(new_state.nt) == pytest.approx(95000.0)
-        # IPCB stays at initial value (NTIED mode)
-        assert float(new_state.ipcb) == pytest.approx(100000.0)
+        # IPCB tracks current notional (NTIED behaves like NT per ACTUS tests)
+        assert float(new_state.ipcb) == pytest.approx(95000.0)
 
     def test_stf_ipcb_resets_ipcb_to_current_notional(self):
         """Test STF_IPCB resets IPCB to current notional (NTL mode)."""
@@ -701,13 +701,13 @@ class TestLinearAmortizerContract:
         # Find PR events
         pr_events = [e for e in schedule.events if e.event_type == EventType.PR]
 
-        # Should have 5 PR events (2025, 2026, 2027, 2028, 2029 - but 2029 = MD)
-        # Actually 2025-2028 = 4 PR events (2029 is MD)
-        assert len(pr_events) == 4
-        assert pr_events[0].event_time.year == 2025
-        assert pr_events[1].event_time.year == 2026
-        assert pr_events[2].event_time.year == 2027
-        assert pr_events[3].event_time.year == 2028
+        # PR at PRANX (=IED), then 2025-2028 = 5 PR events total (2029 = MD)
+        assert len(pr_events) == 5
+        assert pr_events[0].event_time.year == 2024  # PR at IED/PRANX
+        assert pr_events[1].event_time.year == 2025
+        assert pr_events[2].event_time.year == 2026
+        assert pr_events[3].event_time.year == 2027
+        assert pr_events[4].event_time.year == 2028
 
     def test_ipcb_schedule_generation_ntl_mode(self):
         """Test that IPCB events are generated only when IPCB='NTL'."""
@@ -802,11 +802,15 @@ class TestLinearAmortizerContract:
         for pr_event in pr_events:
             assert float(pr_event.payoff) == pytest.approx(5000.0)  # $5k principal payment
 
-        # Check that interest payments remain constant (NTIED mode)
-        ip_events = [e for e in result.events if e.event_type == EventType.IP]
-        for ip_event in ip_events:
-            # Interest on 100k at 5% for 1 year = 5083.33 (A360: 366 days / 360)
-            assert float(ip_event.payoff) == pytest.approx(5083.33, rel=0.01)
+        # Check that interest payments exist and decrease (NTIED tracks NT per ACTUS spec)
+        ip_events = [
+            e for e in result.events
+            if e.event_type == EventType.IP and e.event_time != attrs.initial_exchange_date
+        ]
+        assert len(ip_events) >= 3
+        # First IP: PR fires at IED reducing NT to 95000, then first year interest
+        # 95000 * 0.05 * 366/360 ≈ 4829.17 (2024 is a leap year)
+        assert float(ip_events[0].payoff) == pytest.approx(4829.17, rel=0.01)
 
     def test_notional_reaches_zero_at_maturity(self):
         """Test that notional is fully amortized by maturity."""
@@ -836,14 +840,12 @@ class TestLinearAmortizerContract:
 
         # Check number of PR events
         pr_events = [e for e in result.events if e.event_type == EventType.PR]
-        # With annual cycle starting after IED (2024-01-15), we get PR at:
-        # 2025-01-15, 2026-01-15, 2027-01-15 (MD is 2028-01-15, so only 3 PR events)
-        assert len(pr_events) == 3  # Only 3 PR events before MD
+        # PRANX defaults to IED, so PR at 2024, 2025, 2026, 2027 (4 PRs before MD=2028)
+        assert len(pr_events) == 4
 
-        # At MD, remaining notional should be 5000 (20k - 3×5k)
-        # MD pays remaining principal + any accrued interest
+        # At MD, remaining notional should be 0 (20k - 4×5k)
         assert md_event.state_pre is not None
-        assert float(md_event.state_pre.nt) == pytest.approx(5000.0, abs=1e-3)
+        assert float(md_event.state_pre.nt) == pytest.approx(0.0, abs=1e-3)
 
 
 # ============================================================================

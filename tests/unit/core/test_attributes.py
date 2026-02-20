@@ -172,16 +172,15 @@ class TestValidation:
         )
         assert attrs.initial_exchange_date > attrs.status_date
 
-        # Invalid: IED before SD
-        with pytest.raises(ValidationError) as exc_info:
-            ContractAttributes(
-                contract_id="TEST-011",
-                contract_type=ContractType.PAM,
-                contract_role=ContractRole.RPA,
-                status_date=ActusDateTime(2024, 1, 15, 0, 0, 0),
-                initial_exchange_date=ActusDateTime(2024, 1, 1, 0, 0, 0),
-            )
-        assert "must be >=" in str(exc_info.value)
+        # IED before SD is allowed per ACTUS spec (contract already existed)
+        attrs2 = ContractAttributes(
+            contract_id="TEST-011",
+            contract_type=ContractType.PAM,
+            contract_role=ContractRole.RPA,
+            status_date=ActusDateTime(2024, 1, 15, 0, 0, 0),
+            initial_exchange_date=ActusDateTime(2024, 1, 1, 0, 0, 0),
+        )
+        assert attrs2.initial_exchange_date < attrs2.status_date
 
     def test_date_ordering_md_after_ied(self):
         """Test that MD must be > IED."""

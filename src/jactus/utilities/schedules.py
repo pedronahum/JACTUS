@@ -59,26 +59,42 @@ def generate_schedule(
     # Parse cycle
     multiplier, period, stub = parse_cycle(cycle)
 
+    # Convert cycle to months (for month-based periods)
+    months_map = {"M": 1, "Q": 3, "H": 6, "Y": 12}
+    is_month_based = period in months_map
+
     # Generate base schedule
+    # Always compute dates from the anchor (start) to avoid day-capping drift.
+    # E.g., Jan 30 +1M = Feb 28 is correct, but Feb 28 +1M = Mar 28 is wrong
+    # (should be Mar 30). Computing start+2M directly gives Mar 30.
     dates = []
-    current = start
+    n = 0
 
-    while current <= end:
+    while True:
+        if n == 0:
+            current = start
+        elif is_month_based:
+            total_months = n * multiplier * months_map[period]
+            current = start.add_period(f"{total_months}M", end_of_month_convention)
+        else:
+            # For D/W periods, chaining is fine (no day-capping issue)
+            if period == "D":
+                total_days = n * multiplier
+                current = start.add_period(f"{total_days}D", end_of_month_convention)
+            else:  # W
+                total_weeks = n * multiplier
+                current = start.add_period(f"{total_weeks}W", end_of_month_convention)
+
+        if current > end:
+            break
         dates.append(current)
-        # Add cycle to get next date
-        current = current.add_period(f"{multiplier}{period}", end_of_month_convention)
+        n += 1
 
-    # Handle stub indicator
-    if stub == "-" and len(dates) > 1:
-        # Short stub: remove last date if it's beyond end
-        if dates[-1] > end:
-            dates = dates[:-1]
-    elif stub == "+":
-        # Long stub: keep dates beyond end up to one cycle
-        pass  # Already done
+    # Note: stub indicator ("+"/"-") is parsed but handled at the caller level
+    # for event-type-specific logic (e.g., PR uses long stub, IP doesn't).
 
-    # Apply end-of-month convention
-    if end_of_month_convention == EndOfMonthConvention.EOM:
+    # Apply end-of-month convention (only for month-based cycles)
+    if end_of_month_convention == EndOfMonthConvention.EOM and is_month_based:
         dates = apply_end_of_month_convention(dates, start, cycle, end_of_month_convention)
 
     # Apply business day convention

@@ -62,8 +62,10 @@ from jactus.core import (
     EventType,
     FeeBasis,
 )
+from jactus.core.types import BusinessDayConvention, Calendar, EndOfMonthConvention, EVENT_SCHEDULE_PRIORITY
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.observers import ChildContractObserver, RiskFactorObserver
+from jactus.core.time import adjust_to_business_day
 from jactus.utilities import contract_role_sign, generate_schedule, year_fraction
 
 
@@ -188,9 +190,10 @@ class PAMPayoffFunction(BasePayoffFunction):
         nt = attributes.notional_principal or 0.0
         pdied = attributes.premium_discount_at_ied or 0.0
 
-        # Calculate payoff: -1 × (NT + PDIED)
-        # Note: Role sign and FX are applied by base class
-        payoff = -1.0 * (nt + pdied)
+        # Calculate payoff: R(CNTRL) × (-1) × (NT + PDIED)
+        # R(CNTRL) is needed because NT and PDIED are unsigned attributes
+        role_sign = contract_role_sign(self.contract_role)
+        payoff = role_sign * (-1.0) * (nt + pdied)
 
         return jnp.array(payoff, dtype=jnp.float32)
 
@@ -260,26 +263,22 @@ class PAMPayoffFunction(BasePayoffFunction):
         """POF_PY_PAM: Penalty Payment.
 
         Formula depends on PYTP (penalty type):
-            PYTP='A': Fixed amount = R(CNTRL) × PYRT
-            PYTP='N': Notional % = R(CNTRL) × Y(Sd_t⁻, t) × Nt_t⁻ × PYRT
+            PYTP='A': PYRT
+            PYTP='N': Y(Sd_t⁻, t) × Nt_t⁻ × PYRT
             PYTP='I': Interest rate differential (simplified to type N)
 
-        Returns:
-            Penalty amount based on type
+        No R(CNTRL) — Nt is a signed state variable.
         """
-        role_sign = contract_role_sign(self.contract_role)
         pytp = attributes.penalty_type
         pyrt = attributes.penalty_rate or 0.0
 
         if pytp == "A":
-            # Absolute fixed penalty amount
-            return jnp.array(role_sign * pyrt, dtype=jnp.float32)
+            return jnp.array(pyrt, dtype=jnp.float32)
         elif pytp == "N" or pytp == "I":
-            # Notional percentage (also used as fallback for interest differential)
             dcc = attributes.day_count_convention or DayCountConvention.A360
             yf = year_fraction(state.sd, time, dcc)
             nt = float(state.nt)
-            return jnp.array(role_sign * yf * nt * pyrt, dtype=jnp.float32)
+            return jnp.array(yf * nt * pyrt, dtype=jnp.float32)
         else:
             return jnp.array(0.0, dtype=jnp.float32)
 
@@ -293,30 +292,25 @@ class PAMPayoffFunction(BasePayoffFunction):
         """POF_FP_PAM: Fee Payment.
 
         Formula depends on FEB (fee basis):
-            FEB='A': Absolute = R(CNTRL) × FER
-            FEB='N': Notional % = R(CNTRL) × (Y(Sd_t⁻, t) × Nt_t⁻ × FER + Feac_t⁻)
+            FEB='A': FER
+            FEB='N': Y(Sd_t⁻, t) × Nt_t⁻ × FER + Feac_t⁻
 
-        Returns:
-            Fee payment amount
+        No R(CNTRL) — Nt and Feac are signed state variables.
         """
-        role_sign = contract_role_sign(self.contract_role)
         feb = attributes.fee_basis
         fer = attributes.fee_rate or 0.0
 
         if feb == FeeBasis.A:
-            # Absolute fee amount
-            return jnp.array(role_sign * fer, dtype=jnp.float32)
+            return jnp.array(fer, dtype=jnp.float32)
         elif feb == FeeBasis.N:
-            # Notional percentage: current period fee + previously accrued
             dcc = attributes.day_count_convention or DayCountConvention.A360
             yf = year_fraction(state.sd, time, dcc)
             nt = float(state.nt)
             feac = float(state.feac)
-            return jnp.array(role_sign * (yf * nt * fer + feac), dtype=jnp.float32)
+            return jnp.array(yf * nt * fer + feac, dtype=jnp.float32)
         else:
-            # Default: just return accrued fees
             feac = float(state.feac)
-            return jnp.array(role_sign * feac, dtype=jnp.float32)
+            return jnp.array(feac, dtype=jnp.float32)
 
     def _pof_prd(
         self,
@@ -334,7 +328,6 @@ class PAMPayoffFunction(BasePayoffFunction):
         Returns:
             Negative of (purchase price + accrued interest)
         """
-        role_sign = contract_role_sign(self.contract_role)
         dcc = attributes.day_count_convention or DayCountConvention.A360
         yf = year_fraction(state.sd, time, dcc)
 
@@ -344,7 +337,9 @@ class PAMPayoffFunction(BasePayoffFunction):
         accrued_interest = yf * ipnr * nt
 
         pprd = attributes.price_at_purchase_date or 0.0
-        payoff = role_sign * (-1.0) * (pprd + ipac + accrued_interest)
+        # POF_PRD_PAM = (-1) × (PPRD + Ipac + Y × Ipnr × Nt)
+        # No R(CNTRL) — Ipac and Nt are signed state variables
+        payoff = (-1.0) * (pprd + ipac + accrued_interest)
 
         return jnp.array(payoff, dtype=jnp.float32)
 
@@ -364,7 +359,6 @@ class PAMPayoffFunction(BasePayoffFunction):
         Returns:
             Termination price + accrued interest
         """
-        role_sign = contract_role_sign(self.contract_role)
         dcc = attributes.day_count_convention or DayCountConvention.A360
         yf = year_fraction(state.sd, time, dcc)
 
@@ -374,7 +368,9 @@ class PAMPayoffFunction(BasePayoffFunction):
         accrued_interest = yf * ipnr * nt
 
         ptd = attributes.price_at_termination_date or 0.0
-        payoff = role_sign * (ptd + ipac + accrued_interest)
+        # POF_TD_PAM = PTD + Ipac + Y × Ipnr × Nt
+        # No R(CNTRL) — Ipac and Nt are signed state variables
+        payoff = ptd + ipac + accrued_interest
 
         return jnp.array(payoff, dtype=jnp.float32)
 
@@ -625,11 +621,12 @@ class PAMStateTransitionFunction(BaseStateTransitionFunction):
         time: ActusDateTime,
         risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
-        """STF_MD_PAM: Maturity - zero out all amounts.
+        """STF_MD_PAM: Maturity - zero notional and accruals, preserve rate.
+
+        Per ACTUS spec, ipnr is preserved at maturity (not zeroed).
 
         Updates:
             nt_t = 0.0
-            ipnr_t = 0.0
             ipac_t = 0.0
             feac_t = 0.0
             sd_t = t
@@ -638,7 +635,7 @@ class PAMStateTransitionFunction(BaseStateTransitionFunction):
             sd=time,
             tmd=state_pre.tmd,
             nt=jnp.array(0.0, dtype=jnp.float32),
-            ipnr=jnp.array(0.0, dtype=jnp.float32),
+            ipnr=state_pre.ipnr,
             ipac=jnp.array(0.0, dtype=jnp.float32),
             feac=jnp.array(0.0, dtype=jnp.float32),
             nsc=state_pre.nsc,
@@ -727,12 +724,12 @@ class PAMStateTransitionFunction(BaseStateTransitionFunction):
         time: ActusDateTime,
         risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
-        """STF_TD_PAM: Termination - zero out all amounts and rate."""
+        """STF_TD_PAM: Termination - zero out amounts, preserve rate."""
         return ContractState(
             sd=time,
             tmd=state_pre.tmd,
             nt=jnp.array(0.0, dtype=jnp.float32),
-            ipnr=jnp.array(0.0, dtype=jnp.float32),
+            ipnr=state_pre.ipnr,
             ipac=jnp.array(0.0, dtype=jnp.float32),
             feac=jnp.array(0.0, dtype=jnp.float32),
             nsc=state_pre.nsc,
@@ -955,131 +952,239 @@ class PrincipalAtMaturityContract(BaseContract):
             raise ValueError("PAM contract requires notional_principal (NT)")
 
         # Validate date ordering
-        if attributes.initial_exchange_date < attributes.status_date:
-            raise ValueError("initial_exchange_date (IED) must be at or after status_date")
+        # Note: IED < SD is allowed per ACTUS spec (contract already existed
+        # before the status/observation date).
 
         if attributes.maturity_date <= attributes.initial_exchange_date:
             raise ValueError("maturity_date (MD) must be after initial_exchange_date (IED)")
 
     def generate_event_schedule(self) -> EventSchedule:
-        """Generate PAM event schedule.
+        """Generate PAM event schedule per ACTUS specification.
 
-        Generates all 14 PAM event types according to ACTUS specification.
+        Schedule formula for each event type:
+            IED: Single event at initial_exchange_date (if IED >= SD)
+            IP:  S(IPANX, IPCL, MD) - from interest payment anchor
+            IPCI: S(IPANX, IPCL, IPCED) - interest capitalization until end date
+            RR:  S(RRANX, RRCL, MD) - rate reset schedule
+            RRF: S(RRANX, RRCL, MD) - if rateResetFixing defined
+            FP:  S(FEANX, FECL, MD) - fee payment schedule
+            PRD: Single event at purchase_date
+            TD:  Single event at termination_date (truncates schedule)
+            MD:  Single event at maturity_date
 
-        Returns:
-            EventSchedule with all contract events
-
-        ACTUS Reference:
-            PAM Contract Schedule from Section 7.1
+        Events before status_date are excluded.
         """
         events: list[ContractEvent] = []
+        attrs = self.attributes
+        ied = attrs.initial_exchange_date
+        md = attrs.maturity_date
+        sd = attrs.status_date
+        currency = attrs.currency or "XXX"
+        assert ied is not None and md is not None
 
-        # IED: Initial Exchange Date
-        # Note: IED is validated as non-None in __init__
-        ied = self.attributes.initial_exchange_date
-        assert ied is not None, "IED must be set"
+        bdc = attrs.business_day_convention
+        eomc = attrs.end_of_month_convention
+        cal = attrs.calendar
 
-        events.append(
-            ContractEvent(
-                event_type=EventType.IED,
-                event_time=ied,
-                payoff=jnp.array(0.0, dtype=jnp.float32),
-                currency=self.attributes.currency or "XXX",
-                state_pre=None,
-                state_post=None,
-                sequence=len(events),
-            )
+        # CS (Calculate/Shift) conventions: generate dates WITHOUT BDC,
+        # then shift event_time while preserving original date for calculations.
+        # SC (Shift/Calculate) conventions: BDC applied during schedule generation.
+        is_cs = bdc in (
+            BusinessDayConvention.CSF, BusinessDayConvention.CSMF,
+            BusinessDayConvention.CSP, BusinessDayConvention.CSMP,
         )
+        sched_bdc = BusinessDayConvention.NULL if is_cs else (bdc or BusinessDayConvention.NULL)
+
+        def _sched(anchor, cycle, end):
+            """Generate schedule with EOMC/calendar from attributes."""
+            return generate_schedule(
+                start=anchor, cycle=cycle, end=end,
+                end_of_month_convention=eomc or EndOfMonthConvention.SD,
+                business_day_convention=sched_bdc,
+                calendar=cal or Calendar.NO_CALENDAR,
+            )
+
+        def _add(etype, time, calc_time=None):
+            """Add event. For CS conventions on cycle dates, shift time and set calc_time."""
+            event_time = time
+            event_calc_time = calc_time
+            if is_cs and calc_time is None:
+                # Shift the event time for display/matching, keep original for calculation
+                shifted = adjust_to_business_day(time, bdc, cal or Calendar.NO_CALENDAR)
+                if shifted != time:
+                    event_calc_time = time
+                    event_time = shifted
+            events.append(ContractEvent(
+                event_type=etype, event_time=event_time,
+                payoff=jnp.array(0.0, dtype=jnp.float32),
+                currency=currency, sequence=0,
+                calculation_time=event_calc_time,
+            ))
+
+        # IED: only if IED >= SD
+        if ied >= sd:
+            _add(EventType.IED, ied)
+
+        # IP: Interest Payment schedule from IPANX (or IED)
+        if attrs.interest_payment_cycle:
+            ip_anchor = attrs.interest_payment_anchor or ied
+            ipced = attrs.interest_capitalization_end_date
+            ip_dates = _sched(ip_anchor, attrs.interest_payment_cycle, md)
+            # Add IPCI at IPCED if it's not already on a cycle date
+            if ipced and ipced not in ip_dates:
+                ip_dates = sorted(set(ip_dates + [ipced]))
+            # Stub handling: if MD not on cycle, add IP at MD
+            ip_cycle_str = attrs.interest_payment_cycle or ""
+            if md and md not in ip_dates and ip_dates:
+                if ip_cycle_str.endswith("+"):
+                    # Long stub: replace last cycle date with MD
+                    ip_dates[-1] = md
+                else:
+                    # Short stub (default): keep last cycle date and add MD
+                    ip_dates.append(md)
+                ip_dates = sorted(set(ip_dates))
+            for dt in ip_dates:
+                if dt < ied:
+                    continue
+                if ipced and dt <= ipced:
+                    _add(EventType.IPCI, dt)
+                else:
+                    _add(EventType.IP, dt)
+
+        # RR: Rate Reset schedule (exclude events at MD, handle long stub)
+        if attrs.rate_reset_cycle and attrs.rate_reset_anchor:
+            rr_dates = _sched(attrs.rate_reset_anchor, attrs.rate_reset_cycle, md)
+            rr_cycle_str = attrs.rate_reset_cycle or ""
+            if rr_cycle_str.endswith("+") and rr_dates and md and rr_dates[-1] != md:
+                rr_dates = rr_dates[:-1]
+            first_rr = True
+            for dt in rr_dates:
+                if md and dt >= md:
+                    break
+                # First reset is RRF when nextResetRate is provided
+                if first_rr and attrs.rate_reset_next is not None:
+                    _add(EventType.RRF, dt)
+                    first_rr = False
+                else:
+                    _add(EventType.RR, dt)
+                    first_rr = False
+
+        # FP: Fee Payment schedule
+        if attrs.fee_payment_cycle:
+            fp_anchor = attrs.fee_payment_anchor or ied
+            fp_dates = _sched(fp_anchor, attrs.fee_payment_cycle, md)
+            for dt in fp_dates:
+                if dt > ied:
+                    _add(EventType.FP, dt)
+
+        # SC: Scaling Index schedule
+        if attrs.scaling_index_cycle:
+            sc_anchor = attrs.scaling_index_anchor or ied
+            sc_dates = _sched(sc_anchor, attrs.scaling_index_cycle, md)
+            for dt in sc_dates:
+                if dt > ied:
+                    _add(EventType.SC, dt)
+
+        # PRD: Purchase date
+        if attrs.purchase_date:
+            _add(EventType.PRD, attrs.purchase_date)
+
+        # TD: Termination date
+        if attrs.termination_date:
+            _add(EventType.TD, attrs.termination_date)
 
         # MD: Maturity Date
-        # Note: MD is validated as non-None in __init__
-        md = self.attributes.maturity_date
-        assert md is not None, "MD must be set"
+        _add(EventType.MD, md)
 
-        # IP: Interest Payment events
-        if self.attributes.interest_payment_cycle:
-            ip_schedule = generate_schedule(
-                start=ied,
-                cycle=self.attributes.interest_payment_cycle,
-                end=md,
-            )
-            # Skip first (IED) and last (MD) dates - those are separate events
-            for ip_time in ip_schedule[1:-1]:
-                events.append(
-                    ContractEvent(
-                        event_type=EventType.IP,
-                        event_time=ip_time,
-                        payoff=jnp.array(0.0, dtype=jnp.float32),
-                        currency=self.attributes.currency or "XXX",
-                        state_pre=None,
-                        state_post=None,
-                        sequence=len(events),
-                    )
-                )
+        # Filter out events before SD, sort, and handle TD truncation
+        events = [e for e in events if e.event_time >= sd]
 
-            # Add final IP at maturity if there are intermediate payments
-            # (final interest payment happens at MD as part of IP schedule)
-            if len(ip_schedule) > 2:  # More than just IED and MD
-                events.append(
-                    ContractEvent(
-                        event_type=EventType.IP,
-                        event_time=md,
-                        payoff=jnp.array(0.0, dtype=jnp.float32),
-                        currency=self.attributes.currency or "XXX",
-                        state_pre=None,
-                        state_post=None,
-                        sequence=len(events),
-                    )
-                )
+        # If PRD exists, remove IED and events before PRD
+        if attrs.purchase_date:
+            events = [
+                e for e in events
+                if e.event_type != EventType.IED and e.event_time >= attrs.purchase_date
+            ]
 
-        # MD: Maturity Date event
-        events.append(
-            ContractEvent(
-                event_type=EventType.MD,
-                event_time=md,
-                payoff=jnp.array(0.0, dtype=jnp.float32),
-                currency=self.attributes.currency or "XXX",
-                state_pre=None,
-                state_post=None,
-                sequence=len(events),
-            )
-        )
+        events.sort(key=lambda e: (e.event_time.to_iso(), EVENT_SCHEDULE_PRIORITY.get(e.event_type, 99)))
 
-        # Sort events by time
-        events.sort(key=lambda e: (e.event_time.to_iso(), e.sequence))
+        # If TD exists, remove all events after TD (except TD itself)
+        if attrs.termination_date:
+            td_time = attrs.termination_date
+            events = [e for e in events if e.event_time <= td_time]
 
         # Reassign sequence numbers
-        for i, event in enumerate(events):
+        for i in range(len(events)):
             events[i] = ContractEvent(
-                event_type=event.event_type,
-                event_time=event.event_time,
-                payoff=event.payoff,
-                currency=event.currency,
-                state_pre=event.state_pre,
-                state_post=event.state_post,
+                event_type=events[i].event_type,
+                event_time=events[i].event_time,
+                payoff=events[i].payoff,
+                currency=events[i].currency,
                 sequence=i,
+                calculation_time=events[i].calculation_time,
             )
 
-        return EventSchedule(
-            events=tuple(events),
-            contract_id=self.attributes.contract_id,
-        )
+        return EventSchedule(events=tuple(events), contract_id=attrs.contract_id)
 
     def initialize_state(self) -> ContractState:
         """Initialize PAM contract state.
 
-        ACTUS Reference:
-            PAM State Initialization from Section 7.1
+        When IED < SD (contract already existed), state is initialized
+        as if STF_IED already ran: Nt, Ipnr are set from attributes,
+        and interest is accrued from IED (or IPANX) to SD.
 
         Returns:
             Initial contract state
         """
-        # Initialize at status date (before IED)
+        attrs = self.attributes
+        sd = attrs.status_date
+        ied = attrs.initial_exchange_date
+
+        # When IED < SD or PRD is set (IED excluded from schedule),
+        # initialize state as if STF_IED already ran
+        needs_post_ied = (ied and ied < sd) or attrs.purchase_date
+        if needs_post_ied:
+            role_sign = 1.0
+            if attrs.contract_role in (ContractRole.RPL, ContractRole.PFL):
+                role_sign = -1.0
+            nt = role_sign * (attrs.notional_principal or 0.0)
+            ipnr = attrs.nominal_interest_rate or 0.0
+            dcc = attrs.day_count_convention or DayCountConvention.A360
+
+            # When IED >= SD and PRD is set, the contract starts at IED.
+            # Set sd=IED so interest accrues from IED to PRD (not SD to PRD).
+            if ied and ied >= sd and attrs.purchase_date:
+                init_sd = ied
+                ipac = 0.0
+            else:
+                # IED < SD: contract already started, accrue from last IP date to SD
+                init_sd = sd
+                accrual_start = attrs.interest_payment_anchor or ied
+                if attrs.accrued_interest is not None:
+                    ipac = attrs.accrued_interest
+                elif accrual_start and accrual_start < sd:
+                    yf = year_fraction(accrual_start, sd, dcc)
+                    ipac = yf * ipnr * abs(nt)
+                else:
+                    ipac = 0.0
+
+            return ContractState(
+                sd=init_sd,
+                tmd=attrs.maturity_date or sd,
+                nt=jnp.array(nt, dtype=jnp.float32),
+                ipnr=jnp.array(ipnr, dtype=jnp.float32),
+                ipac=jnp.array(ipac, dtype=jnp.float32),
+                feac=jnp.array(0.0, dtype=jnp.float32),
+                nsc=jnp.array(1.0, dtype=jnp.float32),
+                isc=jnp.array(1.0, dtype=jnp.float32),
+            )
+
+        # Normal case: initialize before IED
         return ContractState(
-            sd=self.attributes.status_date,
-            tmd=self.attributes.maturity_date or self.attributes.status_date,
-            nt=jnp.array(0.0, dtype=jnp.float32),  # Before IED
-            ipnr=jnp.array(0.0, dtype=jnp.float32),  # Before IED
+            sd=sd,
+            tmd=attrs.maturity_date or sd,
+            nt=jnp.array(0.0, dtype=jnp.float32),
+            ipnr=jnp.array(0.0, dtype=jnp.float32),
             ipac=jnp.array(0.0, dtype=jnp.float32),
             feac=jnp.array(0.0, dtype=jnp.float32),
             nsc=jnp.array(1.0, dtype=jnp.float32),

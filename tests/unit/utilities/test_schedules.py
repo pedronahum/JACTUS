@@ -399,8 +399,8 @@ class TestEdgeCases:
         assert ActusDateTime(2024, 1, 31, 0, 0, 0) in result
         # Feb only has 29 days in 2024, so Jan 31 + 1M = Feb 29
         assert ActusDateTime(2024, 2, 29, 0, 0, 0) in result
-        # Then Feb 29 + 1M = Mar 29 (not 31, because we're adding to Feb 29)
-        assert ActusDateTime(2024, 3, 29, 0, 0, 0) in result
+        # Anchor-based: Jan 31 + 2M = Mar 31 (computed from anchor, not chained from Feb 29)
+        assert ActusDateTime(2024, 3, 31, 0, 0, 0) in result
 
     def test_year_boundary(self):
         """Handle year boundaries correctly."""

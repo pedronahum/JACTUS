@@ -10,7 +10,7 @@ import math
 from typing import Any
 
 from jactus.contracts import create_contract
-from jactus.core import ContractAttributes, EventType
+from jactus.core import ActusDateTime, ContractAttributes, EventType
 from jactus.observers import ConstantRiskFactorObserver
 
 from .actus_mapper import TimeSeriesRiskFactorObserver, parse_test_terms
@@ -28,6 +28,8 @@ EVENT_TYPE_MAP: dict[str, EventType] = {
     "MD": EventType.MD,
     "PP": EventType.PP,
     "PR": EventType.PR,
+    "PRF": EventType.PRF,
+    "IPCB": EventType.IPCB,
     "PRD": EventType.PRD,
     "PY": EventType.PY,
     "FP": EventType.FP,
@@ -70,6 +72,39 @@ def run_single_test(test_id: str, test_case: dict[str, Any]) -> list[str]:
     except Exception as e:
         return [f"Failed to parse terms: {e}"]
 
+    # For open-ended NAM contracts (no maturityDate), derive effective MD from 'to'
+    # LAM computes MD internally from amortization; NAM does not.
+    ct = kwargs.get("contract_type", "")
+    if ct == "NAM" and ("maturity_date" not in kwargs or kwargs["maturity_date"] is None):
+        to_str = test_case.get("to") or terms.get("to")
+        if to_str:
+            # Normalize format: "2013-12-01T00:00" → "2013-12-01T00:00:00"
+            if len(to_str) == 16:  # YYYY-MM-DDTHH:MM
+                to_str += ":00"
+            to_dt = ActusDateTime.from_iso(to_str)
+            # For short stub cycles, MD is one IP period before 'to'
+            ip_cycle = kwargs.get("interest_payment_cycle", "")
+            if ip_cycle and ip_cycle.endswith("-"):
+                # Short stub: subtract one cycle period from 'to'
+                from jactus.core.time import parse_cycle
+                mult, period, _ = parse_cycle(ip_cycle)
+                from dateutil.relativedelta import relativedelta
+                period_map = {
+                    "D": relativedelta(days=mult),
+                    "W": relativedelta(weeks=mult),
+                    "M": relativedelta(months=mult),
+                    "Q": relativedelta(months=3 * mult),
+                    "H": relativedelta(months=6 * mult),
+                    "Y": relativedelta(years=mult),
+                }
+                py_dt = to_dt.to_datetime() - period_map[period]
+                kwargs["maturity_date"] = ActusDateTime(
+                    py_dt.year, py_dt.month, py_dt.day,
+                    py_dt.hour, py_dt.minute, py_dt.second,
+                )
+            else:
+                kwargs["maturity_date"] = to_dt
+
     try:
         attrs = ContractAttributes(**kwargs)
     except Exception as e:
@@ -94,9 +129,18 @@ def run_single_test(test_id: str, test_case: dict[str, Any]) -> list[str]:
     if not expected_results:
         return ["No expected results in test case"]
 
+    # Apply 'to' cutoff if specified (simulation end date)
+    to_str = test_case.get("to") or terms.get("to")
+    to_date: str | None = to_str[:10] if to_str else None
+
     # Filter out AD events from both sides
     actual_events = [e for e in result.events if e.event_type != EventType.AD]
     expected_events = [e for e in expected_results if e.get("eventType") != "AD"]
+
+    # Filter by 'to' cutoff date
+    if to_date:
+        actual_events = [e for e in actual_events if e.event_time.to_iso()[:10] <= to_date]
+        expected_events = [e for e in expected_events if (e.get("eventDate", "")[:10]) <= to_date]
 
     # Build lookup: (date_str, event_type) -> actual event
     actual_lookup: dict[tuple[str, str], Any] = {}

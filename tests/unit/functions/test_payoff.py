@@ -269,9 +269,9 @@ class TestBasePayoffFunctionCall:
         result = pof(EventType.IP, state, attributes, time, observer)
 
         # calculate_payoff returns 1000.0
-        # apply_role_sign: RPL = -1 → -1000.0
-        # apply_fx_rate: no settlement currency → -1000.0
-        expected = jnp.array(-1000.0, dtype=jnp.float32)
+        # No automatic role_sign applied (each POF handles its own sign)
+        # apply_fx_rate: no settlement currency → 1000.0
+        expected = jnp.array(1000.0, dtype=jnp.float32)
         assert jnp.allclose(result, expected)
 
     def test_call_pipeline_with_fx(self):
@@ -345,9 +345,9 @@ class TestBasePayoffFunctionCall:
         result = pof(EventType.IP, state, attributes, time, observer)
 
         # calculate_payoff returns 1000.0
-        # apply_role_sign: RPL = -1 → -1000.0
-        # apply_fx_rate: EUR/USD = 1.18 → -1180.0
-        expected = jnp.array(-1180.0, dtype=jnp.float32)
+        # No automatic role_sign applied (each POF handles its own sign)
+        # apply_fx_rate: EUR/USD = 1.18 → 1180.0
+        expected = jnp.array(1180.0, dtype=jnp.float32)
         assert jnp.allclose(result, expected)
 
 
@@ -617,8 +617,8 @@ class TestPayoffFunctionEdgeCases:
 
         result = pof(EventType.IP, state, attributes, time, observer)
 
-        # 1e9 * -1 = -1e9
-        expected = jnp.array(-1e9, dtype=jnp.float32)
+        # No automatic role_sign applied (each POF handles its own sign)
+        expected = jnp.array(1e9, dtype=jnp.float32)
         assert jnp.allclose(result, expected)
 
     def test_small_fx_rate(self):

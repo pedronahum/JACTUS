@@ -66,6 +66,34 @@ _EVENT_TYPE_INDEX: dict["EventType", int] = {
 # Total number of event types (used to size dispatch tables)
 NUM_EVENT_TYPES: int = len(_EVENT_TYPE_INDEX)
 
+# ACTUS event scheduling priority: determines processing order when multiple
+# events fall on the same date. Lower number = processed first.
+# Reference: ACTUS v1.1 event sequence conventions.
+EVENT_SCHEDULE_PRIORITY: dict["EventType", int] = {
+    EventType.AD: 0,
+    EventType.IED: 1,
+    EventType.PR: 4,
+    EventType.PI: 5,
+    EventType.PP: 6,
+    EventType.PY: 7,
+    EventType.IP: 8,
+    EventType.IPCI: 9,
+    EventType.RR: 10,
+    EventType.RRF: 11,
+    EventType.IPCB: 12,
+    EventType.SC: 13,
+    EventType.PRF: 14,
+    EventType.FP: 15,
+    EventType.PRD: 16,
+    EventType.TD: 17,
+    EventType.MD: 18,
+    EventType.STD: 19,
+    EventType.XD: 20,
+    EventType.DV: 21,
+    EventType.DVF: 22,
+    EventType.CE: 23,
+}
+
 
 class ContractType(str, Enum):
     """ACTUS contract types.

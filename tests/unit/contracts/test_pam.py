@@ -587,11 +587,12 @@ class TestPAMStateTransitionFunction:
         # Status date should be MD
         assert state_post.sd == ActusDateTime(2029, 1, 15, 0, 0, 0)
 
-        # All amounts should be zero after maturity
+        # Notional and accruals should be zero after maturity
         assert float(state_post.nt) == 0.0
         assert float(state_post.ipac) == 0.0
-        assert float(state_post.ipnr) == 0.0
         assert float(state_post.feac) == 0.0
+        # Rate is preserved per ACTUS spec
+        assert float(state_post.ipnr) == pytest.approx(0.05)
 
     def test_stf_ip_resets_accrued_interest(self):
         """Test STF_IP_PAM resets accrued interest after payment."""
@@ -825,23 +826,19 @@ class TestPrincipalAtMaturityContract:
         assert "notional_principal" in str(exc_info.value).lower()
 
     def test_initialization_validates_date_ordering(self):
-        """Test PAM contract validates IED >= status_date and MD > IED."""
-        # Test IED < status_date - Pydantic catches this during attribute creation
-        with pytest.raises((ValueError, ValidationError)) as exc_info:
-            attrs = ContractAttributes(
-                contract_id="PAM-001",
-                contract_type=ContractType.PAM,
-                contract_role=ContractRole.RPA,
-                status_date=ActusDateTime(2024, 1, 15, 0, 0, 0),
-                initial_exchange_date=ActusDateTime(2024, 1, 1, 0, 0, 0),  # Before status
-                maturity_date=ActusDateTime(2029, 1, 15, 0, 0, 0),
-                currency="USD",
-                notional_principal=100000.0,
-            )
-
-        # Should contain information about IED and status_date
-        error_msg = str(exc_info.value).lower()
-        assert ("initial" in error_msg or "ied" in error_msg) and "status" in error_msg
+        """Test PAM contract validates MD > IED. IED < SD is allowed (ACTUS spec)."""
+        # IED < status_date is allowed per ACTUS spec (contract already started)
+        attrs = ContractAttributes(
+            contract_id="PAM-001",
+            contract_type=ContractType.PAM,
+            contract_role=ContractRole.RPA,
+            status_date=ActusDateTime(2024, 1, 15, 0, 0, 0),
+            initial_exchange_date=ActusDateTime(2024, 1, 1, 0, 0, 0),  # Before status
+            maturity_date=ActusDateTime(2029, 1, 15, 0, 0, 0),
+            currency="USD",
+            notional_principal=100000.0,
+        )
+        assert attrs is not None
 
         # Test MD <= IED - Pydantic catches this during attribute creation
         with pytest.raises((ValueError, ValidationError)) as exc_info:
@@ -923,10 +920,9 @@ class TestPrincipalAtMaturityContract:
 
         schedule = contract.generate_event_schedule()
 
-        # Should have: 1 IED + 2 IP (2025, 2026) + 1 IP at MD (2027) + 1 MD = 5 events
-        # Schedule generates: 2024-01-15, 2025-01-15, 2026-01-15, 2027-01-15
-        # We skip first (IED) and last (MD), take middle ones as IP, then add final IP at MD
-        assert len(schedule.events) == 5
+        # Should have: 1 IED + IP at IED (payoff=0) + 2 IP (2025, 2026) + 1 IP at MD (2027) + 1 MD = 6 events
+        # IP schedule from IED: 2024-01-15, 2025-01-15, 2026-01-15, 2027-01-15
+        assert len(schedule.events) == 6
 
         # First event should be IED
         assert schedule.events[0].event_type == EventType.IED
@@ -936,9 +932,9 @@ class TestPrincipalAtMaturityContract:
         assert schedule.events[-1].event_type == EventType.MD
         assert schedule.events[-1].event_time == ActusDateTime(2027, 1, 15, 0, 0, 0)
 
-        # There should be IP events
+        # There should be IP events (including IP at IED with payoff=0)
         ip_events = [e for e in schedule.events if e.event_type == EventType.IP]
-        assert len(ip_events) == 3  # 2025, 2026, 2027 (at MD)
+        assert len(ip_events) == 4  # IED, 2025, 2026, 2027 (at MD)
 
     def test_generate_event_schedule_no_interest_cycle(self):
         """Test PAM event schedule without interest payment cycle."""
@@ -1012,13 +1008,14 @@ class TestPrincipalAtMaturityContract:
         assert md_event.event_type == EventType.MD
         assert float(md_event.payoff) > 0  # Positive = inflow
 
-        # Should have IP events in between
+        # Should have IP events in between (including IP at IED with payoff=0)
         ip_events = [e for e in result.events if e.event_type == EventType.IP]
-        assert len(ip_events) == 5  # Annual payments for 5 years
+        assert len(ip_events) == 6  # IP at IED + 5 annual payments
 
-        # All IP events should have positive payoff (interest received by lender)
+        # IP events after IED should have positive payoff (interest received by lender)
         for ip_event in ip_events:
-            assert float(ip_event.payoff) > 0
+            if ip_event.event_time != attrs.initial_exchange_date:
+                assert float(ip_event.payoff) > 0
 
     def test_get_payoff_function(self):
         """Test get_payoff_function returns PAMPayoffFunction."""

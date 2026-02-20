@@ -61,6 +61,7 @@ TERM_NAME_MAP: dict[str, str] = {
     "priceAtTerminationDate": "price_at_termination_date",
     "scalingEffect": "scaling_effect",
     "scalingIndexAtStatusDate": "scaling_index_at_status_date",
+    "scalingIndexAtContractDealDate": "scaling_index_at_contract_deal_date",
     "marketObjectCodeOfScalingIndex": "scaling_market_object",
     "cycleOfScalingIndex": "scaling_index_cycle",
     "cycleAnchorDateOfScalingIndex": "scaling_index_anchor",
@@ -93,6 +94,8 @@ TERM_NAME_MAP: dict[str, str] = {
     "coverageOfCreditEnhancement": "coverage",
     "creditEventTypeCovered": "credit_event_type",
     "guaranteedExposure": "credit_enhancement_guarantee_extent",
+    # ANN-specific: amortizationDate is the horizon for annuity calculation
+    "amortizationDate": "amortization_date",
 }
 
 # Day count convention string mapping
@@ -162,18 +165,26 @@ def _parse_cycle(cycle_str: str) -> str:
     """Convert ACTUS ISO cycle string to JACTUS format.
 
     ACTUS format: P{n}{period}L{stub} e.g. "P1ML0", "P3ML1", "P1YL0"
-    JACTUS format: {n}{period} e.g. "1M", "3M", "1Y"
+    JACTUS format: {n}{period}{stub} e.g. "1M+", "3M-", "1Y+"
+
+    L0 = long stub  → "+"
+    L1 = short stub → "-"
     """
     if not cycle_str:
         return cycle_str
-    # Strip P prefix and L{stub} suffix
     s = cycle_str
     if s.startswith("P"):
         s = s[1:]
-    # Remove trailing L0, L1, etc.
+    # Extract stub indicator
+    stub = ""
     if "L" in s:
+        stub_part = s[s.index("L"):]
         s = s[: s.index("L")]
-    return s
+        if stub_part == "L0":
+            stub = "+"  # Long stub
+        elif stub_part == "L1":
+            stub = "-"  # Short stub
+    return s + stub
 
 
 def _parse_datetime(dt_str: str) -> ActusDateTime:
@@ -206,6 +217,10 @@ def _parse_value(key: str, value: str | Any) -> Any:
         return EOMC_MAP.get(str(value), str(value))
     if jactus_key == "calendar":
         return CALENDAR_MAP.get(str(value), str(value))
+    if jactus_key == "scaling_effect":
+        # ACTUS tests use 'O' (letter) where JACTUS enum uses '0' (digit)
+        # e.g., "IOO" -> "I00", "INO" -> "IN0"
+        return str(value).replace("O", "0")
     if jactus_key in (
         "status_date",
         "contract_deal_date",
@@ -217,6 +232,7 @@ def _parse_value(key: str, value: str | Any) -> Any:
         "purchase_date",
         "termination_date",
         "interest_capitalization_end_date",
+        "amortization_date",
         "fee_payment_anchor",
         "scaling_index_anchor",
         "interest_calculation_base_anchor",
@@ -249,6 +265,7 @@ def _parse_value(key: str, value: str | Any) -> Any:
         "price_at_termination_date",
         "penalty_rate",
         "scaling_index_at_status_date",
+        "scaling_index_at_contract_deal_date",
         "option_strike_1",
         "future_price",
         "coverage",

@@ -391,12 +391,18 @@ class BaseContract(nnx.Module, ABC):
             stf = self.get_state_transition_function(event.event_type)
             pof = self.get_payoff_function(event.event_type)
 
+            # For CS (Calculate/Shift) BDC conventions, use the original
+            # unadjusted date for calculations (year fraction, accrual).
+            # For SC (Shift/Calculate) or NULL, calculation_time is None
+            # and we use event_time as before.
+            calc_time = event.calculation_time or event.event_time
+
             # Calculate payoff BEFORE state transition (using pre-event state)
             payoff = pof(
                 event_type=event.event_type,
                 state=state,
                 attributes=self.attributes,
-                time=event.event_time,
+                time=calc_time,
                 risk_factor_observer=risk_obs,
             )
 
@@ -405,7 +411,7 @@ class BaseContract(nnx.Module, ABC):
                 event_type=event.event_type,
                 state_pre=state,
                 attributes=self.attributes,
-                time=event.event_time,
+                time=calc_time,
                 risk_factor_observer=risk_obs,
             )
 

@@ -53,6 +53,8 @@ Example:
     >>> # Payment amount automatically calculated to fully amortize loan
 """
 
+import calendar as _calendar_mod
+from datetime import timedelta
 from typing import Any
 
 import jax.numpy as jnp
@@ -63,21 +65,58 @@ from jactus.core import (
     ActusDateTime,
     ContractAttributes,
     ContractEvent,
+    ContractRole,
     ContractState,
     ContractType,
+    DayCountConvention,
     EventSchedule,
     EventType,
 )
+from jactus.core.types import BusinessDayConvention, Calendar, EndOfMonthConvention, EVENT_SCHEDULE_PRIORITY
 from jactus.functions import BaseStateTransitionFunction
 from jactus.observers import RiskFactorObserver
 from jactus.utilities import (
     calculate_actus_annuity,
     contract_role_sign,
     generate_schedule,
+    year_fraction,
 )
 
 # ANN uses the same payoff function as NAM
 ANNPayoffFunction = NAMPayoffFunction
+
+
+def _subtract_one_cycle(dt: ActusDateTime, cycle: str) -> ActusDateTime:
+    """Compute dt minus one cycle period (PRANX-)."""
+    import re
+
+    base = cycle.rstrip("+-")
+    match = re.match(r"(\d+)([DMQHYW])", base)
+    if not match:
+        return dt
+    number = int(match.group(1))
+    ptype = match.group(2)
+
+    py_dt = dt.to_datetime()
+    if ptype == "D":
+        result = py_dt - timedelta(days=number)
+    elif ptype == "W":
+        result = py_dt - timedelta(weeks=number)
+    elif ptype in ("M", "Q", "H", "Y"):
+        months_map = {"M": 1, "Q": 3, "H": 6, "Y": 12}
+        months = number * months_map[ptype]
+        new_month = py_dt.month - months
+        new_year = py_dt.year
+        while new_month <= 0:
+            new_month += 12
+            new_year -= 1
+        max_day = _calendar_mod.monthrange(new_year, new_month)[1]
+        new_day = min(py_dt.day, max_day)
+        result = py_dt.replace(year=new_year, month=new_month, day=new_day)
+    else:
+        return dt
+
+    return ActusDateTime(result.year, result.month, result.day, 0, 0, 0)
 
 
 class ANNStateTransitionFunction(BaseStateTransitionFunction):
@@ -108,6 +147,7 @@ class ANNStateTransitionFunction(BaseStateTransitionFunction):
         # Override RR and RRF with ANN-specific handlers
         table[EventType.RR] = self._stf_rr
         table[EventType.RRF] = self._stf_rrf
+        table[EventType.PRF] = self._stf_prf
         return table
 
     def transition_state(
@@ -160,33 +200,7 @@ class ANNStateTransitionFunction(BaseStateTransitionFunction):
         new_state = self._nam_stf._stf_rr(state, attrs, time, risk_factor_observer)
 
         # Then recalculate Prnxt using annuity formula with new rate
-        # Need to get remaining PR schedule from current time to maturity
-        if attrs.principal_redemption_cycle and attrs.maturity_date:
-            pr_schedule = generate_schedule(
-                start=time,
-                cycle=attrs.principal_redemption_cycle,
-                end=attrs.maturity_date,
-            )
-            # Filter to future events only
-            pr_schedule = [d for d in pr_schedule if d > time]
-
-            if pr_schedule:
-                # Calculate new payment amount
-                new_prnxt = calculate_actus_annuity(
-                    start=time,
-                    pr_schedule=pr_schedule,
-                    notional=float(new_state.nt),
-                    accrued_interest=float(new_state.ipac),
-                    rate=float(new_state.ipnr),
-                    day_count_convention=attrs.day_count_convention or attrs.day_count_convention,
-                )
-
-                # Update prnxt in state
-                role_sign = contract_role_sign(attrs.contract_role)
-                new_state = new_state.replace(
-                    prnxt=jnp.array(role_sign * new_prnxt, dtype=jnp.float32)
-                )
-
+        new_state = self._recalculate_annuity(new_state, attrs, time)
         return new_state
 
     def _stf_rrf(
@@ -210,33 +224,102 @@ class ANNStateTransitionFunction(BaseStateTransitionFunction):
         new_state = self._nam_stf._stf_rrf(state, attrs, time, risk_factor_observer)
 
         # Then recalculate Prnxt using annuity formula with fixed rate
-        if attrs.principal_redemption_cycle and attrs.maturity_date:
-            pr_schedule = generate_schedule(
-                start=time,
-                cycle=attrs.principal_redemption_cycle,
-                end=attrs.maturity_date,
-            )
-            # Filter to future events only
-            pr_schedule = [d for d in pr_schedule if d > time]
-
-            if pr_schedule:
-                # Calculate new payment amount
-                new_prnxt = calculate_actus_annuity(
-                    start=time,
-                    pr_schedule=pr_schedule,
-                    notional=float(new_state.nt),
-                    accrued_interest=float(new_state.ipac),
-                    rate=float(new_state.ipnr),
-                    day_count_convention=attrs.day_count_convention or attrs.day_count_convention,
-                )
-
-                # Update prnxt in state
-                role_sign = contract_role_sign(attrs.contract_role)
-                new_state = new_state.replace(
-                    prnxt=jnp.array(role_sign * new_prnxt, dtype=jnp.float32)
-                )
-
+        new_state = self._recalculate_annuity(new_state, attrs, time)
         return new_state
+
+    def _stf_prf(
+        self,
+        state: ContractState,
+        attrs: ContractAttributes,
+        time: ActusDateTime,
+        risk_factor_observer: RiskFactorObserver,
+        child_contract_observer: Any | None = None,
+    ) -> ContractState:
+        """STF_PRF: Principal Redemption Amount Fixing.
+
+        Accrue interest up to PRF date, then recalculate Prnxt using
+        annuity formula with current rate and remaining schedule.
+
+        Formula:
+            Ipac = Ipac + Y(Sd, t) × Ipnr × Ipcb
+            Prnxt = A(t, T, Nt, Ipac, Ipnr) (annuity formula)
+        """
+        # Accrue interest from last status date to PRF time
+        dcc = attrs.day_count_convention or DayCountConvention.A360
+        yf = year_fraction(state.sd, time, dcc)
+        ipcb = state.ipcb if state.ipcb is not None else state.nt
+        new_ipac = state.ipac + yf * state.ipnr * ipcb
+        new_state = state.replace(sd=time, ipac=new_ipac)
+
+        # Recalculate Prnxt using annuity formula
+        new_state = self._recalculate_annuity(new_state, attrs, time)
+        return new_state
+
+    def _recalculate_annuity(
+        self,
+        state: ContractState,
+        attrs: ContractAttributes,
+        time: ActusDateTime,
+    ) -> ContractState:
+        """Recalculate Prnxt using ACTUS annuity formula.
+
+        Uses PRANX- (one cycle before PR anchor) as start for the
+        initial PRF, or the last cycle date <= time for RR-triggered PRFs.
+        Always uses accrued_interest=0 since IP pays interest separately.
+        """
+        if not (attrs.principal_redemption_cycle and attrs.maturity_date):
+            return state
+
+        pr_anchor = attrs.principal_redemption_anchor or attrs.initial_exchange_date
+        pr_cycle = attrs.principal_redemption_cycle
+        # Use amortization_date for annuity calculation horizon when available
+        md = attrs.amortization_date or attrs.maturity_date
+
+        # Generate PR schedule from anchor to end
+        pr_schedule = generate_schedule(start=pr_anchor, cycle=pr_cycle, end=md)
+        pr_schedule = [d for d in pr_schedule if d <= md]
+
+        # Long stub: remove last regular date before end (longer final period)
+        if pr_cycle.endswith("+") and pr_schedule and md not in pr_schedule:
+            pr_schedule = pr_schedule[:-1]
+
+        # Ensure MD is included as final payment date
+        if md not in pr_schedule:
+            pr_schedule.append(md)
+
+        # Find start: last PR date <= time, or PRANX- if none
+        start = None
+        for d in pr_schedule:
+            if d <= time:
+                start = d
+            else:
+                break
+
+        if start is None:
+            # Initial PRF: use max(IED, PRANX-1cycle) as the annuity start
+            pranx_minus = _subtract_one_cycle(pr_anchor, pr_cycle)
+            ied = attrs.initial_exchange_date
+            start = max(ied, pranx_minus) if ied else pranx_minus
+
+        # Remaining PR dates after start
+        remaining = [d for d in pr_schedule if d > start]
+
+        if remaining:
+            new_prnxt = calculate_actus_annuity(
+                start=start,
+                pr_schedule=remaining,
+                notional=abs(float(state.nt)),
+                accrued_interest=0.0,
+                rate=float(state.ipnr),
+                day_count_convention=attrs.day_count_convention or DayCountConvention.A360,
+            )
+
+            role_sign = contract_role_sign(attrs.contract_role)
+            state = state.replace(
+                prnxt=jnp.array(role_sign * new_prnxt, dtype=jnp.float32)
+            )
+
+        return state
 
 
 class AnnuityContract(BaseContract):
@@ -281,8 +364,16 @@ class AnnuityContract(BaseContract):
             raise ValueError("initial_exchange_date required for ANN")
         if not attributes.principal_redemption_cycle:
             raise ValueError("principal_redemption_cycle required for ANN")
-        if not attributes.maturity_date:
-            raise ValueError("maturity_date required for ANN")
+
+        # Handle amortization_date: when maturity_date is absent, use amortization_date
+        if not attributes.maturity_date and attributes.amortization_date:
+            attributes = attributes.model_copy(update={"maturity_date": attributes.amortization_date})
+
+        # Derive maturity_date if not provided but PRNXT is given
+        if not attributes.maturity_date and attributes.next_principal_redemption_amount:
+            attributes = self._derive_maturity_date(attributes)
+        elif not attributes.maturity_date:
+            raise ValueError("maturity_date (or amortizationDate or nextPrincipalRedemptionPayment) required for ANN")
 
         # ANN can auto-calculate Prnxt if not provided
         # (will be calculated in initialize_state)
@@ -293,125 +384,224 @@ class AnnuityContract(BaseContract):
             child_contract_observer=child_contract_observer,
         )
 
+    @staticmethod
+    def _derive_maturity_date(attrs: ContractAttributes) -> ContractAttributes:
+        """Derive maturity_date by simulating amortization when not provided.
+
+        When maturityDate is not given but PRNXT (total payment) is, simulate
+        the amortization: each period, interest accrues on remaining notional,
+        principal = PRNXT - interest, and notional decreases. The date at which
+        notional reaches 0 is the maturity date.
+        """
+        ied = attrs.initial_exchange_date
+        assert ied is not None
+        nt = attrs.notional_principal or 0.0
+        prnxt = attrs.next_principal_redemption_amount or 0.0
+        rate = attrs.nominal_interest_rate or 0.0
+        dcc = attrs.day_count_convention or DayCountConvention.A360
+        pr_anchor = attrs.principal_redemption_anchor or ied
+        pr_cycle = attrs.principal_redemption_cycle
+        assert pr_cycle is not None
+
+        # Generate enough dates to cover full amortization (50 years)
+        eomc = attrs.end_of_month_convention or EndOfMonthConvention.SD
+        bdc = attrs.business_day_convention or BusinessDayConvention.NULL
+        cal = attrs.calendar or Calendar.NO_CALENDAR
+        far_future = ied.add_period("600M", EndOfMonthConvention.SD)
+        pr_dates = generate_schedule(
+            start=pr_anchor, cycle=pr_cycle, end=far_future,
+            end_of_month_convention=eomc, business_day_convention=bdc, calendar=cal,
+        )
+
+        # Simulate amortization
+        remaining = float(nt)
+        prev_date = ied
+        md = None
+        for dt in pr_dates:
+            interest = remaining * rate * year_fraction(prev_date, dt, dcc)
+            principal_payment = prnxt - interest
+            if principal_payment <= 0:
+                # Payment doesn't cover interest - skip
+                prev_date = dt
+                continue
+            remaining -= principal_payment
+            if remaining <= 1e-6:  # Effectively zero
+                md = dt
+                break
+            prev_date = dt
+
+        if md is None:
+            raise ValueError("Could not derive maturity_date: amortization does not converge")
+
+        # Return new attributes with derived maturity_date
+        return attrs.model_copy(update={"maturity_date": md})
+
     def generate_event_schedule(self) -> EventSchedule:
-        """Generate ANN event schedule.
+        """Generate ANN event schedule per ACTUS specification.
 
-        ANN schedule is same as NAM.
+        Same as NAM/LAM schedule, with all event types supported.
 
-        Returns:
-            Event schedule
+        Events before status_date are excluded.
         """
         events: list[ContractEvent] = []
+        attrs = self.attributes
+        ied = attrs.initial_exchange_date
+        md = attrs.maturity_date
+        sd = attrs.status_date
+        currency = attrs.currency or "XXX"
+        assert ied is not None
 
-        # 1. Initial Exchange Date
-        if self.attributes.initial_exchange_date:
-            events.append(
-                ContractEvent(
-                    event_type=EventType.IED,
-                    event_time=self.attributes.initial_exchange_date,
-                    payoff=jnp.array(0.0, dtype=jnp.float32),
-                    currency=self.attributes.currency or "XXX",
-                    sequence=len(events),
-                )
+        bdc = attrs.business_day_convention
+        eomc = attrs.end_of_month_convention
+        cal = attrs.calendar
+
+        def _sched(anchor, cycle, end):
+            return generate_schedule(
+                start=anchor, cycle=cycle, end=end,
+                end_of_month_convention=eomc or EndOfMonthConvention.SD,
+                business_day_convention=bdc or BusinessDayConvention.NULL,
+                calendar=cal or Calendar.NO_CALENDAR,
             )
 
-        # 2. Principal Redemption schedule
-        pr_events_times = []
-        if self.attributes.principal_redemption_cycle:
-            pr_schedule = generate_schedule(
-                start=self.attributes.principal_redemption_anchor
-                or self.attributes.initial_exchange_date,
-                cycle=self.attributes.principal_redemption_cycle,
-                end=self.attributes.maturity_date,
-            )
+        def _add(etype, time):
+            events.append(ContractEvent(
+                event_type=etype, event_time=time,
+                payoff=jnp.array(0.0, dtype=jnp.float32),
+                currency=currency, sequence=0,
+            ))
 
-            for pr_date in pr_schedule:
-                # Don't include maturity date in PR schedule
-                if self.attributes.maturity_date and pr_date >= self.attributes.maturity_date:
+        # IED: only if IED >= SD
+        if ied >= sd:
+            _add(EventType.IED, ied)
+
+        # PR: Principal Redemption schedule
+        if attrs.principal_redemption_cycle:
+            pr_anchor = attrs.principal_redemption_anchor or ied
+            pr_dates = _sched(pr_anchor, attrs.principal_redemption_cycle, md)
+            # Long stub: remove last PR date before MD if it's not on cycle end
+            pr_cycle_str = attrs.principal_redemption_cycle or ""
+            if pr_cycle_str.endswith("+") and pr_dates and md and pr_dates[-1] != md:
+                pr_dates = pr_dates[:-1]
+            for dt in pr_dates:
+                if md and dt >= md:
                     break
-                if pr_date > self.attributes.initial_exchange_date:
-                    pr_events_times.append(pr_date)
-                    events.append(
-                        ContractEvent(
-                            event_type=EventType.PR,
-                            event_time=pr_date,
-                            payoff=jnp.array(0.0, dtype=jnp.float32),
-                            currency=self.attributes.currency or "XXX",
-                            sequence=len(events),
-                        )
-                    )
+                if dt >= ied:
+                    _add(EventType.PR, dt)
 
-        # 3. Interest Payment schedule (ends one period before PR schedule for NAM/ANN)
-        if self.attributes.interest_payment_cycle:
-            ip_schedule = generate_schedule(
-                start=self.attributes.interest_payment_anchor
-                or self.attributes.initial_exchange_date,
-                cycle=self.attributes.interest_payment_cycle,
-                end=self.attributes.maturity_date,
-            )
+        # IP: Interest Payment schedule from IPANX (or IED)
+        if attrs.interest_payment_cycle:
+            ip_anchor = attrs.interest_payment_anchor or ied
+            ipced = attrs.interest_capitalization_end_date
+            ip_dates = _sched(ip_anchor, attrs.interest_payment_cycle, md)
+            if ipced and ipced not in ip_dates:
+                ip_dates = sorted(set(ip_dates + [ipced]))
+            ip_cycle_str = attrs.interest_payment_cycle or ""
+            if md and md not in ip_dates and ip_dates:
+                if ip_cycle_str.endswith("+"):
+                    ip_dates[-1] = md
+                else:
+                    ip_dates.append(md)
+                ip_dates = sorted(set(ip_dates))
+            for dt in ip_dates:
+                if dt < ied:
+                    continue
+                if ipced and dt <= ipced:
+                    _add(EventType.IPCI, dt)
+                else:
+                    _add(EventType.IP, dt)
 
-            # For NAM/ANN: IP schedule ends one period before last PR event
-            ip_end_time = None
-            if len(pr_events_times) > 1:
-                ip_end_time = pr_events_times[-2]  # Second to last PR event
-            elif self.attributes.maturity_date:
-                ip_end_time = self.attributes.maturity_date
+        # IPCB: Interest Calculation Base schedule (only if IPCB='NTL')
+        if attrs.interest_calculation_base == "NTL" and attrs.interest_calculation_base_cycle:
+            ipcb_anchor = attrs.interest_calculation_base_anchor or ied
+            ipcb_dates = _sched(ipcb_anchor, attrs.interest_calculation_base_cycle, md)
+            for dt in ipcb_dates:
+                if dt > ied:
+                    _add(EventType.IPCB, dt)
 
-            for ip_date in ip_schedule:
-                # Stop IP schedule before the last PR period
-                if ip_end_time and ip_date >= ip_end_time:
+        # RR: Rate Reset schedule (exclude events at MD, handle long stub)
+        rr_dates = []
+        if attrs.rate_reset_cycle and attrs.rate_reset_anchor:
+            rr_dates = _sched(attrs.rate_reset_anchor, attrs.rate_reset_cycle, md)
+            rr_cycle_str = attrs.rate_reset_cycle or ""
+            if rr_cycle_str.endswith("+") and rr_dates and md and rr_dates[-1] != md:
+                rr_dates = rr_dates[:-1]
+            first_rr = True
+            for dt in rr_dates:
+                if md and dt >= md:
                     break
-                if ip_date > self.attributes.initial_exchange_date:
-                    events.append(
-                        ContractEvent(
-                            event_type=EventType.IP,
-                            event_time=ip_date,
-                            payoff=jnp.array(0.0, dtype=jnp.float32),
-                            currency=self.attributes.currency or "XXX",
-                            sequence=len(events),
-                        )
-                    )
+                if first_rr and attrs.rate_reset_next is not None:
+                    _add(EventType.RRF, dt)
+                    first_rr = False
+                else:
+                    _add(EventType.RR, dt)
+                    first_rr = False
 
-        # 4. IPCB schedule (only if IPCB='NTL')
-        if (
-            self.attributes.interest_calculation_base == "NTL"
-            and self.attributes.interest_calculation_base_cycle
-        ):
-            ipcb_schedule = generate_schedule(
-                start=self.attributes.interest_calculation_base_anchor
-                or self.attributes.initial_exchange_date,
-                cycle=self.attributes.interest_calculation_base_cycle,
-                end=self.attributes.maturity_date,
-            )
-
-            for ipcb_date in ipcb_schedule:
-                if ipcb_date > self.attributes.initial_exchange_date:
-                    events.append(
-                        ContractEvent(
-                            event_type=EventType.IPCB,
-                            event_time=ipcb_date,
-                            payoff=jnp.array(0.0, dtype=jnp.float32),
-                            currency=self.attributes.currency or "XXX",
-                            sequence=len(events),
-                        )
-                    )
-
-        # 5. Maturity Date (if defined)
-        if self.attributes.maturity_date:
-            events.append(
-                ContractEvent(
-                    event_type=EventType.MD,
-                    event_time=self.attributes.maturity_date,
-                    payoff=jnp.array(0.0, dtype=jnp.float32),
-                    currency=self.attributes.currency or "XXX",
-                    sequence=len(events),
+        # PRF: Principal Redemption Fixing (only when PRNXT not provided)
+        if not attrs.next_principal_redemption_amount:
+            pr_anchor = attrs.principal_redemption_anchor or ied
+            # Initial PRF: one day before first PR date (only if PRANX > IED)
+            if pr_anchor > ied:
+                py_dt = pr_anchor.to_datetime() - timedelta(days=1)
+                prf_initial = ActusDateTime(
+                    py_dt.year, py_dt.month, py_dt.day, 0, 0, 0
                 )
-            )
+                _add(EventType.PRF, prf_initial)
 
-        # Sort by time and reassign sequence numbers
-        events.sort(key=lambda e: (e.event_time.to_iso(), e.sequence))
+            # PRF at each RR date (to recalculate after rate change)
+            if attrs.rate_reset_cycle and attrs.rate_reset_anchor:
+                for dt in rr_dates:
+                    if md and dt >= md:
+                        break
+                    _add(EventType.PRF, dt)
 
-        # Reassign sequence numbers after sorting
+        # FP: Fee Payment schedule
+        if attrs.fee_payment_cycle:
+            fp_anchor = attrs.fee_payment_anchor or ied
+            fp_dates = _sched(fp_anchor, attrs.fee_payment_cycle, md)
+            for dt in fp_dates:
+                if dt > ied:
+                    _add(EventType.FP, dt)
+
+        # SC: Scaling Index schedule
+        if attrs.scaling_index_cycle:
+            sc_anchor = attrs.scaling_index_anchor or ied
+            sc_dates = _sched(sc_anchor, attrs.scaling_index_cycle, md)
+            for dt in sc_dates:
+                if dt > ied:
+                    _add(EventType.SC, dt)
+
+        # PRD: Purchase date
+        if attrs.purchase_date:
+            _add(EventType.PRD, attrs.purchase_date)
+
+        # TD: Termination date
+        if attrs.termination_date:
+            _add(EventType.TD, attrs.termination_date)
+
+        # MD: Maturity Date
+        if md:
+            _add(EventType.MD, md)
+
+        # Filter out events before SD, sort
+        events = [e for e in events if e.event_time >= sd]
+
+        # If PRD exists, remove IED and non-PRD events before/at PRD
+        if attrs.purchase_date:
+            prd_time = attrs.purchase_date
+            events = [
+                e for e in events
+                if e.event_type == EventType.PRD
+                or (e.event_type != EventType.IED and e.event_time > prd_time)
+            ]
+
+        events.sort(key=lambda e: (e.event_time.to_iso(), EVENT_SCHEDULE_PRIORITY.get(e.event_type, 99)))
+
+        # If TD exists, remove all events after TD
+        if attrs.termination_date:
+            td_time = attrs.termination_date
+            events = [e for e in events if e.event_time <= td_time]
+
+        # Reassign sequence numbers
         for i in range(len(events)):
             events[i] = ContractEvent(
                 event_type=events[i].event_type,
@@ -421,7 +611,100 @@ class AnnuityContract(BaseContract):
                 sequence=i,
             )
 
-        return EventSchedule(events=events, contract_id=self.attributes.contract_id)
+        return EventSchedule(events=tuple(events), contract_id=attrs.contract_id)
+
+    def _pre_simulate_to_prd(
+        self, attrs: ContractAttributes, prnxt: jnp.ndarray
+    ) -> ContractState:
+        """Pre-simulate events from IED to PRD to get correct initial state."""
+        ied = attrs.initial_exchange_date
+        prd = attrs.purchase_date
+        sd = attrs.status_date
+        md = attrs.maturity_date
+        assert ied is not None and prd is not None
+
+        bdc = attrs.business_day_convention
+        eomc = attrs.end_of_month_convention
+        cal = attrs.calendar
+
+        def _sched(anchor, cycle, end):
+            if anchor is None or cycle is None or end is None:
+                return []
+            return generate_schedule(
+                start=anchor, cycle=cycle, end=end,
+                end_of_month_convention=eomc or EndOfMonthConvention.SD,
+                business_day_convention=bdc or BusinessDayConvention.NULL,
+                calendar=cal or Calendar.NO_CALENDAR,
+            )
+
+        pre_events: list[tuple[ActusDateTime, EventType]] = []
+        pre_events.append((ied, EventType.IED))
+
+        if attrs.principal_redemption_cycle:
+            pr_anchor = attrs.principal_redemption_anchor or ied
+            pr_dates = _sched(pr_anchor, attrs.principal_redemption_cycle, md or prd)
+            for dt in pr_dates:
+                if dt >= ied and dt <= prd:
+                    pre_events.append((dt, EventType.PR))
+
+        if attrs.interest_payment_cycle:
+            ip_anchor = attrs.interest_payment_anchor or ied
+            ipced = attrs.interest_capitalization_end_date
+            ip_dates = _sched(ip_anchor, attrs.interest_payment_cycle, md or prd)
+            for dt in ip_dates:
+                if dt < ied or dt > prd:
+                    continue
+                if ipced and dt <= ipced:
+                    pre_events.append((dt, EventType.IPCI))
+                else:
+                    pre_events.append((dt, EventType.IP))
+
+        if attrs.rate_reset_cycle and attrs.rate_reset_anchor:
+            rr_dates = _sched(attrs.rate_reset_anchor, attrs.rate_reset_cycle, md or prd)
+            first_rr = True
+            for dt in rr_dates:
+                if dt > prd:
+                    break
+                if first_rr and attrs.rate_reset_next is not None:
+                    pre_events.append((dt, EventType.RRF))
+                    first_rr = False
+                else:
+                    pre_events.append((dt, EventType.RR))
+                    first_rr = False
+
+        if attrs.interest_calculation_base == "NTL" and attrs.interest_calculation_base_cycle:
+            ipcb_anchor = attrs.interest_calculation_base_anchor or ied
+            ipcb_dates = _sched(ipcb_anchor, attrs.interest_calculation_base_cycle, md or prd)
+            for dt in ipcb_dates:
+                if dt > ied and dt <= prd:
+                    pre_events.append((dt, EventType.IPCB))
+
+        pre_events = [(t, e) for t, e in pre_events if t >= ied]
+        pre_events.sort(key=lambda e: (e[0].to_iso(), EVENT_SCHEDULE_PRIORITY.get(e[1], 99)))
+
+        state = ContractState(
+            sd=ied, tmd=md,
+            nt=jnp.array(0.0, dtype=jnp.float32),
+            ipnr=jnp.array(0.0, dtype=jnp.float32),
+            ipac=jnp.array(0.0, dtype=jnp.float32),
+            feac=jnp.array(0.0, dtype=jnp.float32),
+            nsc=jnp.array(1.0, dtype=jnp.float32),
+            isc=jnp.array(1.0, dtype=jnp.float32),
+            prnxt=prnxt,
+            ipcb=jnp.array(0.0, dtype=jnp.float32),
+        )
+
+        stf = self.get_state_transition_function(None)
+        for time, etype in pre_events:
+            state = stf.transition_state(
+                event_type=etype, state=state, attributes=attrs,
+                time=time, risk_factor_observer=self.risk_factor_observer,
+            )
+
+        if ied < sd and sd < prd:
+            state = state.replace(sd=sd, ipac=jnp.array(0.0, dtype=jnp.float32))
+
+        return state
 
     def initialize_state(self) -> ContractState:
         """Initialize ANN contract state.
@@ -429,45 +712,60 @@ class AnnuityContract(BaseContract):
         Key Feature: If Prnxt is not provided in attributes, calculate it using
         the ACTUS annuity formula to ensure constant total payments.
 
+        When IED < SD (contract already existed), state is initialized
+        as if STF_IED already ran.
+
         Returns:
             Initial contract state
         """
-        role_sign = contract_role_sign(self.attributes.contract_role)
+        attrs = self.attributes
+        sd = attrs.status_date
+        ied = attrs.initial_exchange_date
+        role_sign = contract_role_sign(attrs.contract_role)
 
         # Calculate Prnxt if not provided
-        if self.attributes.next_principal_redemption_amount is not None:
-            # Use provided value
-            prnxt = role_sign * self.attributes.next_principal_redemption_amount
+        if attrs.next_principal_redemption_amount is not None:
+            prnxt = role_sign * attrs.next_principal_redemption_amount
         else:
-            # Calculate using annuity formula
+            # Calculate using annuity formula with PRANX- as start
             if (
-                self.attributes.principal_redemption_cycle
-                and self.attributes.maturity_date
-                and self.attributes.initial_exchange_date
+                attrs.principal_redemption_cycle
+                and attrs.maturity_date
+                and ied
             ):
+                pr_anchor = attrs.principal_redemption_anchor or ied
+                pr_cycle = attrs.principal_redemption_cycle
+                # Use amortization_date for annuity calculation horizon when provided
+                annuity_end = attrs.amortization_date or attrs.maturity_date
+
                 pr_schedule = generate_schedule(
-                    start=self.attributes.principal_redemption_anchor
-                    or self.attributes.initial_exchange_date,
-                    cycle=self.attributes.principal_redemption_cycle,
-                    end=self.attributes.maturity_date,
+                    start=pr_anchor, cycle=pr_cycle, end=annuity_end,
                 )
-                # Filter to future PR events (after IED)
-                pr_schedule = [
-                    d
-                    for d in pr_schedule
-                    if d > self.attributes.initial_exchange_date
-                    and d < self.attributes.maturity_date
-                ]
+                pr_schedule = [d for d in pr_schedule if d <= annuity_end]
+
+                # Long stub: remove last regular date before end
+                if pr_cycle.endswith("+") and pr_schedule and annuity_end not in pr_schedule:
+                    pr_schedule = pr_schedule[:-1]
+                if annuity_end not in pr_schedule:
+                    pr_schedule.append(annuity_end)
+
+                # Annuity start: use the later of IED or PRANX-1cycle.
+                # When PRANX > IED by more than one cycle, PRANX-1cycle is
+                # correct (start of the regular payment schedule). But when
+                # PRANX == IED or PRANX-1cycle < IED, use IED to avoid a
+                # phantom pre-loan period that distorts the annuity formula.
+                pranx_minus = _subtract_one_cycle(pr_anchor, pr_cycle)
+                annuity_start = max(ied, pranx_minus)
 
                 if pr_schedule:
                     prnxt_amount = calculate_actus_annuity(
-                        start=self.attributes.initial_exchange_date,
+                        start=annuity_start,
                         pr_schedule=pr_schedule,
-                        notional=self.attributes.notional_principal,
-                        accrued_interest=0.0,  # No accrued interest at inception
-                        rate=self.attributes.nominal_interest_rate or 0.0,
-                        day_count_convention=self.attributes.day_count_convention
-                        or self.attributes.day_count_convention,
+                        notional=attrs.notional_principal,
+                        accrued_interest=0.0,
+                        rate=attrs.nominal_interest_rate or 0.0,
+                        day_count_convention=attrs.day_count_convention
+                        or DayCountConvention.A360,
                     )
                     prnxt = role_sign * prnxt_amount
                 else:
@@ -475,9 +773,44 @@ class AnnuityContract(BaseContract):
             else:
                 prnxt = 0.0
 
+        # PRD pre-simulation
+        if attrs.purchase_date and ied:
+            return self._pre_simulate_to_prd(attrs, jnp.array(prnxt, dtype=jnp.float32))
+
+        needs_post_ied = ied and ied < sd
+        if needs_post_ied:
+            # Contract already started - initialize post-IED state
+            nt = role_sign * (attrs.notional_principal or 0.0)
+            ipnr = attrs.nominal_interest_rate or 0.0
+            dcc = attrs.day_count_convention or DayCountConvention.A360
+
+            init_sd = sd
+            accrual_start = attrs.interest_payment_anchor or ied
+            if attrs.accrued_interest is not None:
+                ipac = attrs.accrued_interest
+            elif accrual_start and accrual_start < sd:
+                yf = year_fraction(accrual_start, sd, dcc)
+                ipac = yf * ipnr * abs(nt)
+            else:
+                ipac = 0.0
+
+            ipcb_val = abs(nt)
+            return ContractState(
+                sd=init_sd,
+                tmd=attrs.maturity_date,
+                nt=jnp.array(nt, dtype=jnp.float32),
+                ipnr=jnp.array(ipnr, dtype=jnp.float32),
+                ipac=jnp.array(ipac, dtype=jnp.float32),
+                feac=jnp.array(0.0, dtype=jnp.float32),
+                nsc=jnp.array(1.0, dtype=jnp.float32),
+                isc=jnp.array(1.0, dtype=jnp.float32),
+                prnxt=jnp.array(prnxt, dtype=jnp.float32),
+                ipcb=jnp.array(ipcb_val, dtype=jnp.float32),
+            )
+
         return ContractState(
-            sd=self.attributes.status_date,
-            tmd=self.attributes.maturity_date,
+            sd=sd,
+            tmd=attrs.maturity_date,
             nt=jnp.array(0.0, dtype=jnp.float32),  # Set at IED
             ipnr=jnp.array(0.0, dtype=jnp.float32),  # Set at IED
             ipac=jnp.array(0.0, dtype=jnp.float32),
