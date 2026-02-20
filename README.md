@@ -15,7 +15,7 @@ JACTUS is a Python library that implements the **ACTUS (Algorithmic Contract Typ
 - **Automatic Differentiation**: Built-in support for gradient-based risk analytics
 - **Type Safety**: Full type annotations with mypy support
 - **Comprehensive**: Implements the complete ACTUS standard
-- **Well Tested**: Extensive test coverage and validation against ACTUS test cases
+- **Well Tested**: 109/109 official ACTUS cross-validation test cases passing
 - **Production Ready**: Robust error handling, logging, and documentation
 
 ## What is ACTUS?
@@ -83,7 +83,7 @@ result = contract.simulate()
 # Display cash flows
 for event in result.events:
     if event.payoff != 0:
-        print(f"{event.time}: {event.type.name:4s} ${event.payoff:>10,.2f}")
+        print(f"{event.event_time}: {event.event_type.name:4s} ${event.payoff:>10,.2f}")
 
 # Output:
 # 2024-01-15: IED  $-100,000.00  (loan disbursement)
@@ -123,7 +123,7 @@ JACTUS implements **18 ACTUS contract types** covering the complete ACTUS specif
 - **CEG** - Credit Enhancement Guarantee (credit protection)
 - **CEC** - Credit Enhancement Collateral (collateral management)
 
-**Test Coverage:** 1,192 tests, 100% passing, 95%+ coverage across all contracts
+**Test Coverage:** 1,200+ unit/integration tests plus 109/109 official ACTUS cross-validation cases passing
 
 ## Documentation
 
@@ -342,9 +342,10 @@ jactus/
 │   │   └── __init__.py     # Factory pattern and registry
 │   ├── exceptions.py       # Custom exceptions
 │   └── logging_config.py   # Logging configuration
-├── tests/                  # Test suite (1,192 tests, 95%+ coverage)
+├── tests/                  # Test suite (1,200+ tests, 95%+ coverage)
 │   ├── unit/               # Unit tests for each module
 │   ├── integration/        # Integration and end-to-end tests
+│   ├── cross_validation/   # 109/109 official ACTUS test cases
 │   ├── property/           # Property-based tests (Hypothesis)
 │   └── performance/        # Performance benchmarks
 ├── docs/                   # Documentation
@@ -414,8 +415,8 @@ If you use JACTUS in your research, please cite:
 **Release**: v0.1.0 - Complete implementation of ACTUS v1.1 specification ✅
 
 - ✅ 18 contract types implemented
-- ✅ 1,192 tests passing (100%)
-- ✅ 95%+ test coverage across all contracts
+- ✅ 109/109 official ACTUS cross-validation test cases passing (PAM, LAM, NAM, ANN)
+- ✅ 1,200+ unit/integration/property tests
 - ✅ Full JAX integration with automatic differentiation
 - ✅ Production-ready with comprehensive documentation
 - ✅ Apache License 2.0
