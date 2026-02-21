@@ -20,13 +20,13 @@ financial instruments.
 JACTUS Implementation Status
 -----------------------------
 
-JACTUS implements 13 of the ACTUS contract types with full test coverage and
+JACTUS implements 18 of the ACTUS contract types with full test coverage and
 production-ready quality.
 
 Implemented Contract Types
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-**Principal Contracts (2/3)**
+**Principal Contracts (7/7)**
 
 ✅ **PAM - Principal at Maturity**
    * Status: Complete (100% coverage, 52 tests)
@@ -40,10 +40,30 @@ Implemented Contract Types
    * Features: Fixed principal payments, three amortization modes (NT, NTIED, NTL)
    * Example: ``examples/lam_example.py``
 
-⏸️ **ANN - Annuity**
-   * Status: Planned for future release
+✅ **LAX - Exotic Linear Amortizer**
+   * Status: Complete
+   * Use cases: Exotic amortization schedules, stepped payments
+   * Features: Array-based variable principal redemption schedules
+
+✅ **NAM - Negative Amortizer**
+   * Status: Complete
+   * Use cases: Negative amortization loans, payment-capped mortgages
+   * Features: Fixed payment amount with negative amortization support
+
+✅ **ANN - Annuity**
+   * Status: Complete
    * Use cases: Traditional mortgages, car loans, consumer loans
    * Features: Level payment amortization
+
+✅ **CLM - Call Money**
+   * Status: Complete
+   * Use cases: Call money markets, overnight lending
+   * Features: Undefined maturity, callable at any time
+
+✅ **UMP - Undefined Maturity Profile**
+   * Status: Complete
+   * Use cases: Revolving credit, open-ended deposits
+   * Features: No fixed maturity date, flexible cash flows
 
 **Non-Principal Contracts (3/3)**
 
@@ -109,9 +129,8 @@ Implemented Contract Types
 
 **Summary:**
 
-* ✅ **Implemented**: 13 contract types (100% coverage on 8 types)
-* ⏸️ **Planned**: 1 contract type (ANN)
-* 📊 **Total Tests**: 289 unit tests + 22 integration tests
+* ✅ **Implemented**: 18 contract types (95%+ coverage)
+* 📊 **Total Tests**: 1,192+ tests across all contract types
 * 🎯 **Overall Coverage**: 95%+ on all implemented contracts
 
 Core ACTUS Concepts
@@ -120,7 +139,7 @@ Core ACTUS Concepts
 Contract Attributes
 ^^^^^^^^^^^^^^^^^^^
 
-ACTUS defines 100+ contract attributes organized into categories:
+ACTUS defines numerous contract attributes organized into categories (JACTUS implements ~80):
 
 **Contract Identification**
 

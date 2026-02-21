@@ -29,7 +29,6 @@ Example:
     >>> # Access cashflows
     >>> df = result.to_dataframe()
     >>> timeline = result.get_cashflow_timeline()
-    >>> npv = result.calculate_npv(discount_rate=0.05)
 """
 
 from dataclasses import dataclass, field

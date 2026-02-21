@@ -116,7 +116,7 @@ class BaseContract(nnx.Module, ABC):
         ...     # ... implement other abstract methods
         >>> contract = MyContract(attributes, risk_observer)
         >>> history = contract.simulate()
-        >>> npv = contract.calculate_npv(discount_rate=0.05)
+        >>> cashflows = history.get_cashflows()
 
     References:
         ACTUS v1.1 Section 3 - Contract Types

@@ -215,7 +215,7 @@ def year_fraction(
 
 **Purpose**: Represents contract state at a point in time.
 
-**Implementation**: Flax NNX Module with JAX arrays
+**Implementation**: Frozen dataclass registered as JAX pytree
 
 **Key Fields**:
 - `sd`: Status Date (ActusDateTime)
@@ -230,7 +230,7 @@ def year_fraction(
 **Design Decisions**:
 - Immutable (new state created for each transition)
 - JAX arrays for numerical values (enables JIT, grad, vmap)
-- Flax NNX for Pytree structure
+- Registered as JAX pytree for functional transformations
 
 **File**: `src/jactus/core/states.py`
 
@@ -240,7 +240,7 @@ def year_fraction(
 
 **Implementation**: Pydantic BaseModel
 
-**Key Fields** (subset of 100+):
+**Key Fields** (subset of ~80):
 - Identification: `contract_id`, `contract_type`, `contract_role`
 - Dates: `status_date`, `initial_exchange_date`, `maturity_date`
 - Financial: `notional_principal`, `nominal_interest_rate`, `currency`
@@ -260,14 +260,14 @@ def year_fraction(
 
 **Interface**:
 ```python
-class PayoffFunction(nnx.Module):
-    def calculate_payoff(
+class PayoffFunction(Protocol):
+    def __call__(
         self,
         event_type: EventType,
         state: ContractState,
         attributes: ContractAttributes,
         time: ActusDateTime,
-        risk_factor_observer: RiskFactorObserverProtocol,
+        risk_factor_observer: RiskFactorObserver,
     ) -> jnp.ndarray:
         ...
 ```
@@ -286,13 +286,14 @@ class PayoffFunction(nnx.Module):
 
 **Interface**:
 ```python
-class StateTransitionFunction(nnx.Module):
-    def transition_state(
+class StateTransitionFunction(Protocol):
+    def __call__(
         self,
         event_type: EventType,
-        state: ContractState,
+        state_pre: ContractState,
         attributes: ContractAttributes,
         time: ActusDateTime,
+        risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
         ...
 ```
@@ -698,12 +699,12 @@ def test_lam_principal_amortizes():
 
 | Operation | Time | Details |
 |-----------|------|---------|
-| Simple contract (CSH) | ~8ms | Single event |
-| PAM 5-year quarterly | ~12ms | 22 events |
-| Stock/Commodity | ~9ms | 2 events |
-| PAM 30-year monthly | ~68ms | 362 events |
-| 100 contracts batch | ~33ms | 0.33ms avg per contract |
-| Factory creation | ~0.4ms | Per contract |
+| Simple contract (CSH) | < 10ms | Single event |
+| PAM 5-year quarterly | < 50ms | ~22 events |
+| Stock/Commodity | < 10ms | 2 events |
+| PAM 30-year monthly | < 500ms | ~362 events |
+| 100 contracts batch | < 500ms | Total for batch |
+| Factory creation | < 1ms | Per contract |
 
 ### Optimization Strategies
 
@@ -774,7 +775,7 @@ for i in range(0, len(portfolio), batch_size):
 
 - **Style**: Black formatter, Ruff linter
 - **Type Hints**: Required for all public APIs
-- **Docstrings**: Google style
+- **Docstrings**: NumPy/Sphinx style (`:param`, `Returns:`)
 - **Tests**: Aim for 90%+ coverage
 - **Performance**: Benchmark before/after changes
 

@@ -33,7 +33,7 @@ Contract Attributes
 Contract State
 ~~~~~~~~~~~~~~
 
-.. automodule:: jactus.core.state
+.. automodule:: jactus.core.states
    :members:
    :undoc-members:
    :show-inheritance:
@@ -68,15 +68,23 @@ Schedule Generation
 Business Day Conventions
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: jactus.utilities.business_days
+.. automodule:: jactus.utilities.conventions
    :members:
    :undoc-members:
    :show-inheritance:
 
-Day Count Conventions
-~~~~~~~~~~~~~~~~~~~~~
+Calendars
+~~~~~~~~~
 
-.. automodule:: jactus.utilities.day_count
+.. automodule:: jactus.utilities.calendars
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Mathematical Functions
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: jactus.utilities.math
    :members:
    :undoc-members:
    :show-inheritance:
@@ -114,6 +122,46 @@ LAM - Linear Amortizer
 ~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: jactus.contracts.lam
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+LAX - Exotic Linear Amortizer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: jactus.contracts.lax
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+NAM - Negative Amortizer
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: jactus.contracts.nam
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+ANN - Annuity
+~~~~~~~~~~~~~
+
+.. automodule:: jactus.contracts.ann
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+CLM - Call Money
+~~~~~~~~~~~~~~~~
+
+.. automodule:: jactus.contracts.clm
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+UMP - Undefined Maturity Profile
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: jactus.contracts.ump
    :members:
    :undoc-members:
    :show-inheritance:
@@ -226,7 +274,7 @@ Payoff Functions
 State Transition Functions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. automodule:: jactus.functions.state_transition
+.. automodule:: jactus.functions.state
    :members:
    :undoc-members:
    :show-inheritance:
@@ -253,7 +301,7 @@ Child Contract Observer
 Simulation Engine
 -----------------
 
-.. automodule:: jactus.engine.simulation
+.. automodule:: jactus.engine.simulator
    :members:
    :undoc-members:
    :show-inheritance:
@@ -284,6 +332,11 @@ Contract Type Summary
 
 * **PAM** - Principal at Maturity (interest-only loans, bonds)
 * **LAM** - Linear Amortizer (fixed principal amortization)
+* **LAX** - Exotic Linear Amortizer (variable amortization schedules)
+* **NAM** - Negative Amortizer (negative amortization loans)
+* **ANN** - Annuity (level payment amortization)
+* **CLM** - Call Money (callable overnight lending)
+* **UMP** - Undefined Maturity Profile (open-ended deposits, revolving credit)
 
 **Non-Principal Contracts**
 
