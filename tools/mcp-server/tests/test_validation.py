@@ -93,3 +93,68 @@ def test_validate_with_warnings():
     # JACTUS now rejects zero notional as invalid
     assert result["valid"] is False
     assert any("notional" in str(e).lower() for e in result["errors"])
+
+
+def test_validate_unknown_field_warning():
+    """Test that unknown fields produce warnings but still validate."""
+    attrs = {
+        "contract_id": "LOAN-001",
+        "contract_type": "PAM",
+        "contract_role": "RPA",
+        "status_date": "2024-01-01",
+        "initial_exchange_date": "2024-01-15",
+        "maturity_date": "2025-01-15",
+        "notional_principal": 100000.0,
+        "nominal_interest_rate": 0.05,
+        "totally_fake_field": "hello",
+    }
+
+    result = validation.validate_attributes(attrs)
+
+    assert result["valid"] is True
+    assert result["warnings"] is not None
+    assert any("totally_fake_field" in w for w in result["warnings"])
+
+
+def test_validate_unknown_field_suggestion():
+    """Test that close misspellings get 'did you mean' suggestions."""
+    attrs = {
+        "contract_id": "LOAN-001",
+        "contract_type": "PAM",
+        "contract_role": "RPA",
+        "status_date": "2024-01-01",
+        "initial_exchange_date": "2024-01-15",
+        "maturity_date": "2025-01-15",
+        "notional_principal": 100000.0,
+        "nominal_interest_rate": 0.05,
+        "cycle_of_interest_payment": "1M",  # misspelling of interest_payment_cycle
+    }
+
+    result = validation.validate_attributes(attrs)
+
+    assert result["valid"] is True
+    assert result["warnings"] is not None
+    assert any("cycle_of_interest_payment" in w for w in result["warnings"])
+    assert any("Did you mean" in w for w in result["warnings"])
+
+
+def test_validate_actus_short_name_suggestion():
+    """Test that ACTUS short names are recognized and suggest Python names."""
+    attrs = {
+        "contract_id": "LOAN-001",
+        "contract_type": "PAM",
+        "contract_role": "RPA",
+        "status_date": "2024-01-01",
+        "initial_exchange_date": "2024-01-15",
+        "maturity_date": "2025-01-15",
+        "notional_principal": 100000.0,
+        "nominal_interest_rate": 0.05,
+        "IPCL": "1M",  # ACTUS short name for interest_payment_cycle
+    }
+
+    result = validation.validate_attributes(attrs)
+
+    assert result["valid"] is True
+    assert result["warnings"] is not None
+    assert any("IPCL" in w for w in result["warnings"])
+    assert any("interest_payment_cycle" in w for w in result["warnings"])

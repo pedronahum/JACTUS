@@ -1,10 +1,49 @@
 """Contract validation tools."""
 
+import difflib
 import json
 from typing import Any
 
 from pydantic import ValidationError
 from jactus.core import ContractAttributes, ContractType, ContractRole, ActusDateTime
+from jactus.core.attributes import ATTRIBUTE_MAP
+
+
+def _detect_unknown_fields(attributes: dict[str, Any]) -> list[str]:
+    """Detect unknown fields in contract attributes and suggest corrections.
+
+    Returns a list of warning strings for any keys not recognized as valid
+    ContractAttributes fields or ACTUS short names.
+    """
+    valid_fields = set(ContractAttributes.model_fields.keys())
+    actus_short_names = ATTRIBUTE_MAP  # maps ACTUS short name -> python name
+
+    warnings = []
+    for key in attributes:
+        if key in valid_fields:
+            continue
+
+        # Check if it's an ACTUS short name
+        if key in actus_short_names:
+            python_name = actus_short_names[key]
+            warnings.append(
+                f"Unknown field '{key}'. This is an ACTUS short name "
+                f"— use the Python name '{python_name}' instead."
+            )
+            continue
+
+        # Try to find close matches among valid field names
+        close_matches = difflib.get_close_matches(
+            key, valid_fields, n=1, cutoff=0.6
+        )
+        if close_matches:
+            warnings.append(
+                f"Unknown field '{key}'. Did you mean '{close_matches[0]}'?"
+            )
+        else:
+            warnings.append(f"Unknown field '{key}' — it will be ignored.")
+
+    return warnings
 
 
 def validate_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
@@ -69,11 +108,18 @@ def validate_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
                         "errors": [f"Invalid date format for {field}: {str(e)}"],
                     }
 
+        # Detect unknown fields before Pydantic validation
+        unknown_field_warnings = _detect_unknown_fields(attributes)
+
+        # Strip unknown keys so Pydantic doesn't silently ignore them
+        valid_fields = set(ContractAttributes.model_fields.keys())
+        cleaned = {k: v for k, v in attributes.items() if k in valid_fields}
+
         # Validate with Pydantic
-        attrs = ContractAttributes(**attributes)
+        attrs = ContractAttributes(**cleaned)
 
         # Additional contract-specific validation
-        warnings = []
+        warnings = list(unknown_field_warnings)
         contract_type = attrs.contract_type.name if hasattr(attrs.contract_type, 'name') else str(attrs.contract_type)
 
         # Check for common required fields by contract type

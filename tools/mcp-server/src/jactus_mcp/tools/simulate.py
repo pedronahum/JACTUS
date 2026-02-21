@@ -7,6 +7,7 @@ from jactus.contracts import create_contract
 from jactus.core import ContractAttributes, ContractType, ContractRole, ActusDateTime
 from jactus.core.types import DayCountConvention
 from jactus.observers import ConstantRiskFactorObserver, DictRiskFactorObserver
+from jactus_mcp.tools.validation import _detect_unknown_fields
 
 logger = logging.getLogger(__name__)
 
@@ -98,8 +99,16 @@ def simulate_contract(
         Dictionary with contract_type, num_events, events list, and summary.
     """
     try:
+        # Detect unknown fields before preparation
+        unknown_field_warnings = _detect_unknown_fields(attributes)
+
         # Prepare attributes (convert strings to enums/dates)
         prepared = _prepare_attributes(attributes)
+
+        # Strip unknown keys so Pydantic doesn't silently ignore them
+        valid_fields = set(ContractAttributes.model_fields.keys())
+        prepared = {k: v for k, v in prepared.items() if k in valid_fields}
+
         contract_attrs = ContractAttributes(**prepared)
 
         # Create risk factor observer
@@ -131,7 +140,7 @@ def simulate_contract(
         payoffs = [float(e.payoff) for e in result.events]
         non_zero_payoffs = [p for p in payoffs if abs(p) > 1e-10]
 
-        return {
+        response = {
             "success": True,
             "contract_type": contract_attrs.contract_type.name,
             "num_events": len(events),
@@ -147,6 +156,9 @@ def simulate_contract(
             "initial_state": result.initial_state.to_dict() if result.initial_state else None,
             "final_state": result.final_state.to_dict() if result.final_state else None,
         }
+        if unknown_field_warnings:
+            response["warnings"] = unknown_field_warnings
+        return response
 
     except KeyError as e:
         return {
