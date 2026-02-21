@@ -256,12 +256,46 @@ def get_contract_schema(contract_type: str) -> dict[str, Any]:
     optional = {
         "contract_id": "str - Unique identifier",
         "currency": "str - ISO currency code (default: USD)",
-        "interest_payment_cycle": "str - Interest payment cycle, IPCL (e.g., '6M', '1Y')",
-        "day_count_convention": "DayCountConvention enum",
-        "business_day_convention": "BusinessDayConvention enum",
-        "premium_discount_at_ied": "float",
-        "interest_payment_anchor": "ActusDateTime - Interest payment anchor date (IPANX)",
-        "principal_redemption_anchor": "ActusDateTime - Principal redemption anchor date (PRANX)",
+        "contract_deal_date": "ActusDateTime (CDD)",
+        # Schedule cycles and anchors
+        "interest_payment_cycle": "str - Interest payment cycle (IPCL), e.g. '6M', '1Y'",
+        "interest_payment_anchor": "ActusDateTime - Interest payment anchor (IPANX)",
+        "interest_capitalization_end_date": "ActusDateTime (IPCED)",
+        "principal_redemption_cycle": "str - Principal redemption cycle (PRCL)",
+        "principal_redemption_anchor": "ActusDateTime (PRANX)",
+        "fee_payment_cycle": "str - Fee payment cycle (FECL)",
+        "fee_payment_anchor": "ActusDateTime (FEANX)",
+        "rate_reset_cycle": "str - Rate reset cycle (RRCL)",
+        "rate_reset_anchor": "ActusDateTime (RRANX)",
+        "scaling_index_cycle": "str - Scaling index cycle (SCCL)",
+        "scaling_index_anchor": "ActusDateTime (SCANX)",
+        # Conventions
+        "day_count_convention": "DayCountConvention enum (DCC)",
+        "business_day_convention": "BusinessDayConvention enum (BDC)",
+        "end_of_month_convention": "EndOfMonthConvention enum (EOMC)",
+        "calendar": "Calendar enum (CLDR)",
+        # Rate reset
+        "rate_reset_market_object": "str - Market reference for rate reset (RRMO)",
+        "rate_reset_multiplier": "float (RRMLT)",
+        "rate_reset_spread": "float (RRSP)",
+        "rate_reset_floor": "float (RRLF)",
+        "rate_reset_cap": "float (RRLC)",
+        "rate_reset_next": "float (RRNXT)",
+        # Fees
+        "fee_rate": "float (FER)",
+        "fee_basis": "FeeBasis enum (FEB)",
+        "fee_accrued": "float (FEAC)",
+        # Other
+        "premium_discount_at_ied": "float (PDIED)",
+        "accrued_interest": "float (IPAC)",
+        "purchase_date": "ActusDateTime (PRD)",
+        "price_at_purchase_date": "float (PPRD)",
+        "termination_date": "ActusDateTime (TD)",
+        "price_at_termination_date": "float (PTD)",
+        "settlement_date": "ActusDateTime (STD)",
+        "amortization_date": "ActusDateTime (AMD)",
+        "penalty_type": "str (PYTP)",
+        "penalty_rate": "float (PYRT)",
     }
 
     return {

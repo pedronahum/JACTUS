@@ -7,6 +7,7 @@ from jactus.contracts import create_contract
 from jactus.core import ContractAttributes, ContractType, ContractRole, ActusDateTime
 from jactus.core.types import DayCountConvention
 from jactus.observers import ConstantRiskFactorObserver, DictRiskFactorObserver
+from jactus_mcp.tools._utils import DATE_FIELDS, ARRAY_DATE_FIELDS
 from jactus_mcp.tools.validation import _detect_unknown_fields
 
 logger = logging.getLogger(__name__)
@@ -54,26 +55,18 @@ def _prepare_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
         if dcc_value in dcc_map:
             attrs["day_count_convention"] = dcc_map[dcc_value]
 
-    # Convert date strings to ActusDateTime
-    date_fields = [
-        "status_date",
-        "initial_exchange_date",
-        "maturity_date",
-        "interest_payment_anchor",
-        "principal_redemption_anchor",
-        "purchase_date",
-        "termination_date",
-        "interest_capitalization_end_date",
-        "interest_payment_anchor",
-        "principal_redemption_anchor",
-        "rate_reset_anchor",
-        "settlement_date",
-        "option_exercise_end_date",
-    ]
-
-    for field in date_fields:
+    # Convert single date strings to ActusDateTime
+    for field in DATE_FIELDS:
         if field in attrs and isinstance(attrs[field], str):
             attrs[field] = _parse_datetime(attrs[field])
+
+    # Convert array date fields (list of date strings → list of ActusDateTime)
+    for field in ARRAY_DATE_FIELDS:
+        if field in attrs and isinstance(attrs[field], list):
+            attrs[field] = [
+                _parse_datetime(v) if isinstance(v, str) else v
+                for v in attrs[field]
+            ]
 
     return attrs
 

@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import ValidationError
 from jactus.core import ContractAttributes, ContractType, ContractRole, ActusDateTime
 from jactus.core.attributes import ATTRIBUTE_MAP
+from jactus_mcp.tools._utils import DATE_FIELDS, ARRAY_DATE_FIELDS
 
 
 def _detect_unknown_fields(attributes: dict[str, Any]) -> list[str]:
@@ -82,30 +83,43 @@ def validate_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
                     ],
                 }
 
-        # Convert date strings to ActusDateTime if needed
-        date_fields = [
-            "status_date",
-            "initial_exchange_date",
-            "maturity_date",
-            "interest_payment_anchor",
-            "principal_redemption_anchor",
-            "purchase_date",
-            "termination_date",
-            "interest_capitalization_end_date",
-        ]
-
-        for field in date_fields:
+        # Convert single date strings to ActusDateTime
+        for field in DATE_FIELDS:
             if field in attributes and isinstance(attributes[field], str):
                 try:
-                    # Parse ISO format: YYYY-MM-DD
-                    parts = attributes[field].split("-")
-                    if len(parts) == 3:
-                        year, month, day = map(int, parts)
-                        attributes[field] = ActusDateTime(year, month, day)
+                    value = attributes[field]
+                    if "T" in value:
+                        attributes[field] = ActusDateTime.from_iso(value)
+                    else:
+                        parts = value.split("-")
+                        if len(parts) == 3:
+                            year, month, day = map(int, parts)
+                            attributes[field] = ActusDateTime(year, month, day)
                 except Exception as e:
                     return {
                         "valid": False,
                         "errors": [f"Invalid date format for {field}: {str(e)}"],
+                    }
+
+        # Convert array date fields (list of date strings → list of ActusDateTime)
+        for field in ARRAY_DATE_FIELDS:
+            if field in attributes and isinstance(attributes[field], list):
+                try:
+                    converted = []
+                    for v in attributes[field]:
+                        if isinstance(v, str):
+                            if "T" in v:
+                                converted.append(ActusDateTime.from_iso(v))
+                            else:
+                                parts = v.split("-")
+                                converted.append(ActusDateTime(int(parts[0]), int(parts[1]), int(parts[2])))
+                        else:
+                            converted.append(v)
+                    attributes[field] = converted
+                except Exception as e:
+                    return {
+                        "valid": False,
+                        "errors": [f"Invalid date format in {field}: {str(e)}"],
                     }
 
         # Detect unknown fields before Pydantic validation
