@@ -263,9 +263,10 @@ class ANNStateTransitionFunction(BaseStateTransitionFunction):
     ) -> ContractState:
         """Recalculate Prnxt using ACTUS annuity formula.
 
-        Uses PRANX- (one cycle before PR anchor) as start for the
-        initial PRF, or the last cycle date <= time for RR-triggered PRFs.
-        Always uses accrued_interest=0 since IP pays interest separately.
+        For the initial PRF (before any PR event), uses PRANX- as start with
+        accrued_interest=0. For RR-triggered PRFs, uses the PRF event time as
+        start and current accrued interest per the ACTUS spec:
+            Prnxt = A(t, T, Nt, Ipac, Ipnr)
         """
         if not (attrs.principal_redemption_cycle and attrs.maturity_date):
             return state
@@ -287,19 +288,19 @@ class ANNStateTransitionFunction(BaseStateTransitionFunction):
         if md not in pr_schedule:
             pr_schedule.append(md)
 
-        # Find start: last PR date <= time, or PRANX- if none
-        start = None
-        for d in pr_schedule:
-            if d <= time:
-                start = d
-            else:
-                break
+        # Determine if this is an initial PRF (no PR dates <= time)
+        has_pr_before = any(d <= time for d in pr_schedule)
 
-        if start is None:
+        if has_pr_before:
+            # RR-triggered PRF: use event time as start, include accrued interest
+            start = time
+            ipac = abs(float(state.ipac))
+        else:
             # Initial PRF: use max(IED, PRANX-1cycle) as the annuity start
             pranx_minus = _subtract_one_cycle(pr_anchor, pr_cycle)
             ied = attrs.initial_exchange_date
             start = max(ied, pranx_minus) if ied else pranx_minus
+            ipac = 0.0
 
         # Remaining PR dates after start
         remaining = [d for d in pr_schedule if d > start]
@@ -309,7 +310,7 @@ class ANNStateTransitionFunction(BaseStateTransitionFunction):
                 start=start,
                 pr_schedule=remaining,
                 notional=abs(float(state.nt)),
-                accrued_interest=0.0,
+                accrued_interest=ipac,
                 rate=float(state.ipnr),
                 day_count_convention=attrs.day_count_convention or DayCountConvention.A360,
             )

@@ -118,6 +118,8 @@ TERM_NAME_MAP: dict[str, str] = {
     # Exercise fields (OPTNS/FUTUR with SD >= maturity)
     "exerciseDate": "exercise_date",
     "exerciseAmount": "exercise_amount",
+    # UMP/CLM-specific
+    "xDayNotice": "x_day_notice",
     # LAX array attributes (map to JACTUS short names)
     "arrayCycleAnchorDateOfPrincipalRedemption": "array_pr_anchor",
     "arrayCycleOfPrincipalRedemption": "array_pr_cycle",
@@ -127,6 +129,8 @@ TERM_NAME_MAP: dict[str, str] = {
     "arrayCycleOfInterestPayment": "array_ip_cycle",
     "arrayRate": "array_rate",
     "arrayFixedVariable": "array_fixed_variable",
+    "arrayCycleAnchorDateOfRateReset": "array_rr_anchor",
+    "arrayCycleOfRateReset": "array_rr_cycle",
 }
 
 # Day count convention string mapping
@@ -235,17 +239,22 @@ def _parse_datetime(dt_str: str) -> ActusDateTime:
     return ActusDateTime.from_iso(dt_str)
 
 
+def _get_child_id(obj: dict) -> str:
+    """Extract a child contract ID from a contract structure object."""
+    return obj.get("contractID", obj.get("contractIdentifier", "unknown"))
+
+
 def _parse_contract_structure(value: Any) -> str:
     """Convert ACTUS contractStructure list to JACTUS string format.
 
     ACTUS test format is a list of reference objects:
     [{"object": {...}, "referenceType": "MOC"|"CNT"|"CID", "referenceRole": "UDL"|"FIL"|"SEL"|...}]
 
-    JACTUS expects:
+    JACTUS expects string IDs (not full terms) for composite contracts:
     - OPTNS/FUTUR: simple string (market object code)
-    - SWAPS: JSON {"FirstLeg": {...}, "SecondLeg": {...}}
-    - CAPFL: JSON {"Underlying": {...}}
-    - CEG: JSON {"CoveredContract": "id"} or {"CoveredContracts": [...]}
+    - SWAPS: JSON {"FirstLeg": "leg1-id", "SecondLeg": "leg2-id"}
+    - CAPFL: JSON {"Underlying": "underlier-id"}
+    - CEG: JSON {"CoveredContract": "id"} or {"CoveredContracts": ["id1", "id2"]}
     - CEC: JSON {"CoveredContract": "id", "CoveringContract": "id"}
     """
     if isinstance(value, str):
@@ -270,38 +279,45 @@ def _parse_contract_structure(value: Any) -> str:
 
         role = ref.get("referenceRole", "")
         if role == "UDL" and ref_type == "CNT":
-            # CAPFL: underlying contract
+            # CAPFL: underlying contract — embed full terms for schedule generation
             return json.dumps({"Underlying": obj})
         if role in ("COVE", "COVI"):
-            # CEG/CEC with single reference
-            if "contractIdentifier" in obj:
-                return json.dumps({"CoveredContract": obj["contractIdentifier"]})
-            return json.dumps({"CoveredContract": obj})
+            # CEG/CEC with single reference — use ID
+            child_id = obj.get("contractIdentifier", _get_child_id(obj))
+            return json.dumps({"CoveredContract": child_id})
 
-    # Multi-reference: SWAPS (FIL+SEL), CEC (COVE+COVI)
+    # Multi-reference: SWAPS (FIL+SEL) — use IDs
     if "FIL" in refs_by_role and "SEL" in refs_by_role:
+        fil_obj = refs_by_role["FIL"].get("object", {})
+        sel_obj = refs_by_role["SEL"].get("object", {})
         return json.dumps({
-            "FirstLeg": refs_by_role["FIL"].get("object", {}),
-            "SecondLeg": refs_by_role["SEL"].get("object", {}),
+            "FirstLeg": _get_child_id(fil_obj),
+            "SecondLeg": _get_child_id(sel_obj),
         })
 
-    if "COVE" in refs_by_role and "COVI" in refs_by_role:
-        cove = refs_by_role["COVE"].get("object", {})
-        covi = refs_by_role["COVI"].get("object", {})
-        covered = cove.get("contractIdentifier", cove)
-        covering = covi.get("contractIdentifier", covi)
-        return json.dumps({
-            "CoveredContract": covered,
-            "CoveringContract": covering,
-        })
-
-    # Multiple COVE references (CEG with multiple covered contracts)
+    # CEC/CEG with COVI (covering) + one or more COVE (covered) — use IDs
+    covi_refs = [r for r in value if r.get("referenceRole") == "COVI"]
     cove_refs = [r for r in value if r.get("referenceRole") == "COVE"]
+    if covi_refs and cove_refs:
+        covi_obj = covi_refs[0].get("object", {})
+        covering = covi_obj.get("contractIdentifier", _get_child_id(covi_obj))
+        covered_ids = []
+        for r in cove_refs:
+            obj = r.get("object", {})
+            covered_ids.append(obj.get("contractIdentifier", _get_child_id(obj)))
+        result = {"CoveringContract": covering}
+        if len(covered_ids) == 1:
+            result["CoveredContract"] = covered_ids[0]
+        else:
+            result["CoveredContracts"] = covered_ids
+        return json.dumps(result)
+
+    # Multiple COVE references (CEG with multiple covered contracts, no COVI)
     if cove_refs:
         ids = []
         for r in cove_refs:
             obj = r.get("object", {})
-            ids.append(obj.get("contractIdentifier", obj))
+            ids.append(obj.get("contractIdentifier", _get_child_id(obj)))
         if len(ids) == 1:
             return json.dumps({"CoveredContract": ids[0]})
         return json.dumps({"CoveredContracts": ids})
@@ -394,12 +410,12 @@ def _parse_value(key: str, value: str | Any) -> Any:
     if jactus_key == "exercise_date":
         return _parse_datetime(str(value))
     # LAX array fields: parse as lists
-    if jactus_key in ("array_pr_anchor", "array_ip_anchor"):
+    if jactus_key in ("array_pr_anchor", "array_ip_anchor", "array_rr_anchor"):
         # Array of datetime strings
         if isinstance(value, list):
             return [_parse_datetime(str(v)) for v in value]
         return [_parse_datetime(str(value))]
-    if jactus_key in ("array_pr_cycle", "array_ip_cycle"):
+    if jactus_key in ("array_pr_cycle", "array_ip_cycle", "array_rr_cycle"):
         # Array of cycle strings
         if isinstance(value, list):
             return [_parse_cycle(str(v)) for v in value]
@@ -409,11 +425,17 @@ def _parse_value(key: str, value: str | Any) -> Any:
         if isinstance(value, list):
             return [float(v) for v in value]
         return [float(value)]
-    if jactus_key in ("array_increase_decrease", "array_fixed_variable"):
+    if jactus_key == "array_increase_decrease":
         # Array of strings
         if isinstance(value, list):
             return [str(v) for v in value]
         return [str(value)]
+    if jactus_key == "array_fixed_variable":
+        # Array of strings: normalize 'FIX'->'F', 'VAR'->'V'
+        fv_map = {"FIX": "F", "VAR": "V"}
+        if isinstance(value, list):
+            return [fv_map.get(str(v), str(v)) for v in value]
+        return [fv_map.get(str(value), str(value))]
 
     # Default: return as-is
     return value

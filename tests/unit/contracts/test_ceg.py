@@ -173,28 +173,28 @@ class TestCEGInitialization:
         with pytest.raises(ValueError, match="CoveredContract"):
             CreditEnhancementGuaranteeContract(attrs, rf_observer, child_observer)
 
-    def test_ceg_requires_coverage(self, status_date, maturity_date, rf_observer, child_observer):
-        """Test that CEG requires coverage amount (CECV)."""
+    def test_ceg_defaults_coverage(self, status_date, maturity_date, rf_observer, child_observer):
+        """Test that CEG defaults coverage to 1.0 when not specified."""
         attrs = ContractAttributes(
             contract_id="CEG-001",
             contract_type=ContractType.CEG,
             contract_role=ContractRole.RPA,
             status_date=status_date,
             maturity_date=maturity_date,
-            coverage=None,  # Missing
+            coverage=None,
             credit_event_type=ContractPerformance.DL,
             credit_enhancement_guarantee_extent="NO",
             contract_structure='{"CoveredContract": "LOAN-001"}',
             currency="USD",
         )
 
-        with pytest.raises(ValueError, match="coverage.*is required"):
-            CreditEnhancementGuaranteeContract(attrs, rf_observer, child_observer)
+        ceg = CreditEnhancementGuaranteeContract(attrs, rf_observer, child_observer)
+        assert ceg.attributes.coverage == 1.0
 
-    def test_ceg_requires_credit_event_type(
+    def test_ceg_defaults_credit_event_type(
         self, status_date, maturity_date, rf_observer, child_observer
     ):
-        """Test that CEG requires credit event type (CET)."""
+        """Test that CEG defaults credit event type to 'DF' when not specified."""
         attrs = ContractAttributes(
             contract_id="CEG-001",
             contract_type=ContractType.CEG,
@@ -202,19 +202,19 @@ class TestCEGInitialization:
             status_date=status_date,
             maturity_date=maturity_date,
             coverage=0.8,
-            credit_event_type=None,  # Missing
+            credit_event_type=None,
             credit_enhancement_guarantee_extent="NO",
             contract_structure='{"CoveredContract": "LOAN-001"}',
             currency="USD",
         )
 
-        with pytest.raises(ValueError, match="credit_event_type.*is required"):
-            CreditEnhancementGuaranteeContract(attrs, rf_observer, child_observer)
+        ceg = CreditEnhancementGuaranteeContract(attrs, rf_observer, child_observer)
+        assert ceg.attributes.credit_event_type == "DF"
 
-    def test_ceg_requires_guarantee_extent(
+    def test_ceg_defaults_guarantee_extent(
         self, status_date, maturity_date, rf_observer, child_observer
     ):
-        """Test that CEG requires guarantee extent (CEGE)."""
+        """Test that CEG defaults guarantee extent to 'NO' when not specified."""
         attrs = ContractAttributes(
             contract_id="CEG-001",
             contract_type=ContractType.CEG,
@@ -223,13 +223,13 @@ class TestCEGInitialization:
             maturity_date=maturity_date,
             coverage=0.8,
             credit_event_type=ContractPerformance.DL,
-            credit_enhancement_guarantee_extent=None,  # Missing
+            credit_enhancement_guarantee_extent=None,
             contract_structure='{"CoveredContract": "LOAN-001"}',
             currency="USD",
         )
 
-        with pytest.raises(ValueError, match="credit_enhancement_guarantee_extent.*is required"):
-            CreditEnhancementGuaranteeContract(attrs, rf_observer, child_observer)
+        ceg = CreditEnhancementGuaranteeContract(attrs, rf_observer, child_observer)
+        assert ceg.attributes.credit_enhancement_guarantee_extent == "NO"
 
     def test_ceg_validates_guarantee_extent_values(
         self, status_date, maturity_date, rf_observer, child_observer

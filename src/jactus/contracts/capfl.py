@@ -36,7 +36,7 @@ from typing import Any
 
 import jax.numpy as jnp
 
-from jactus.contracts.base import BaseContract
+from jactus.contracts.base import BaseContract, SimulationHistory
 from jactus.core import (
     ActusDateTime,
     ContractAttributes,
@@ -523,11 +523,11 @@ class CapFloorContract(BaseContract):
         self,
         risk_factor_observer: RiskFactorObserver | None = None,
         child_contract_observer: ChildContractObserver | None = None,
-    ):
+    ) -> SimulationHistory:
         """Simulate CAPFL contract.
 
-        Overrides base to handle the RR-before-IP ordering: at each event,
-        RR updates the rate, then IP computes cap/floor payoff.
+        RR events are used internally for rate tracking but filtered from
+        the output since CAPFL only exposes IP events externally.
         """
         risk_obs = risk_factor_observer or self.risk_factor_observer
 
@@ -537,7 +537,42 @@ class CapFloorContract(BaseContract):
             if market_object and not self.attributes.rate_reset_market_object:
                 self.attributes.rate_reset_market_object = market_object
 
-        return super().simulate(risk_obs, child_contract_observer)
+        result = super().simulate(risk_obs, child_contract_observer)
+
+        # Filter out internal RR events — CAPFL only outputs IP events
+        # Zero out state for IP events (CAPFL is a derivative with no own notional/rate)
+        zero_state = ContractState(
+            tmd=result.initial_state.tmd,
+            sd=result.initial_state.sd,
+            nt=jnp.array(0.0, dtype=jnp.float32),
+            ipnr=jnp.array(0.0, dtype=jnp.float32),
+            ipac=jnp.array(0.0, dtype=jnp.float32),
+            feac=jnp.array(0.0, dtype=jnp.float32),
+            nsc=jnp.array(1.0, dtype=jnp.float32),
+            isc=jnp.array(1.0, dtype=jnp.float32),
+            prf=ContractPerformance.PF,
+        )
+        filtered_events = []
+        for e in result.events:
+            if e.event_type == EventType.RR:
+                continue
+            filtered_events.append(
+                ContractEvent(
+                    event_type=e.event_type,
+                    event_time=e.event_time,
+                    payoff=e.payoff,
+                    currency=e.currency,
+                    state_pre=zero_state,
+                    state_post=zero_state,
+                    sequence=e.sequence,
+                )
+            )
+        return SimulationHistory(
+            events=filtered_events,
+            states=[zero_state] * len(filtered_events),
+            initial_state=result.initial_state,
+            final_state=result.final_state,
+        )
 
 
 def _parse_dcc(dcc_str: str) -> DayCountConvention:

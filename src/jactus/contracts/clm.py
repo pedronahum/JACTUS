@@ -49,7 +49,7 @@ from typing import Any
 
 import jax.numpy as jnp
 
-from jactus.contracts.base import BaseContract
+from jactus.contracts.base import BaseContract, SimulationHistory
 from jactus.core import (
     ActusDateTime,
     ContractAttributes,
@@ -61,6 +61,7 @@ from jactus.core import (
 )
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.observers import RiskFactorObserver
+from jactus.core.types import BusinessDayConvention, Calendar, EndOfMonthConvention
 from jactus.utilities import contract_role_sign, generate_schedule, year_fraction
 
 
@@ -168,12 +169,9 @@ class CLMPayoffFunction(BasePayoffFunction):
         """POF_PR: Principal Repayment - return partial principal.
 
         For CLM, principal repayments can occur based on observed events.
-        The amount is determined by the observer.
+        No role_sign needed — state.nt is already signed.
         """
-        role_sign = contract_role_sign(attrs.contract_role)
-        # For simplicity, assume full notional repayment
-        # In practice, this would come from the observer
-        return role_sign * state.nsc * state.nt
+        return state.nsc * state.nt
 
     def _pof_md(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
@@ -181,16 +179,15 @@ class CLMPayoffFunction(BasePayoffFunction):
         """POF_MD: Maturity - return principal.
 
         Interest is paid separately by the IP event at maturity.
+        No role_sign needed — state.nt is already signed.
         """
-        role_sign = contract_role_sign(attrs.contract_role)
-        return role_sign * state.nsc * state.nt
+        return state.nsc * state.nt
 
     def _pof_fp(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
     ) -> jnp.ndarray:
         """POF_FP: Fee Payment - pay accrued fees."""
-        role_sign = contract_role_sign(attrs.contract_role)
-        return role_sign * state.feac
+        return state.feac
 
     def _pof_ip(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
@@ -198,11 +195,11 @@ class CLMPayoffFunction(BasePayoffFunction):
         """POF_IP: Interest Payment - pay accrued interest.
 
         For CLM, this typically only occurs at maturity.
+        No role_sign needed — state variables are already signed.
         """
-        role_sign = contract_role_sign(attrs.contract_role)
         yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
         accrued = yf * state.ipnr * state.nt
-        return role_sign * state.isc * (state.ipac + accrued)
+        return state.isc * (state.ipac + accrued)
 
     def _pof_ipci(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
@@ -378,12 +375,11 @@ class CLMStateTransitionFunction(BaseStateTransitionFunction):
         risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
         """STF_IPCI: Interest Capitalization - add accrued interest to notional."""
-        role_sign = contract_role_sign(attrs.contract_role)
         yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
         accrued = yf * state.ipnr * state.nt
 
-        # Add accrued interest to notional
-        new_nt = state.nt + role_sign * (state.ipac + accrued)
+        # Add accrued interest to notional (no role_sign - nt is already signed)
+        new_nt = state.nt + state.ipac + accrued
 
         return state.replace(sd=time, nt=new_nt, ipac=jnp.array(0.0, dtype=jnp.float32))
 
@@ -393,14 +389,30 @@ class CLMStateTransitionFunction(BaseStateTransitionFunction):
         attrs: ContractAttributes,
         time: ActusDateTime,
         risk_factor_observer: RiskFactorObserver,
+        observation_time: ActusDateTime | None = None,
     ) -> ContractState:
-        """STF_RR: Rate Reset - update interest rate from observer."""
-        # Get new rate from observer using the market object identifier
-        # Use market object reference from attributes if available, otherwise generic "RATE"
-        identifier = attrs.rate_reset_market_object or "RATE"
-        new_rate = risk_factor_observer.observe_risk_factor(identifier, time, state, attrs)
+        """STF_RR: Rate Reset - accrue interest, then update rate from observer."""
+        # Accrue interest up to this point
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        new_ipac = state.ipac + yf * state.ipnr * state.nt
 
-        return state.replace(sd=time, ipnr=new_rate)
+        # Get new rate from observer (use observation_time for BDC-shifted RR events)
+        identifier = attrs.rate_reset_market_object or "RATE"
+        obs_time = observation_time or time
+        observed = risk_factor_observer.observe_risk_factor(identifier, obs_time, state, attrs)
+
+        # Apply rate multiplier and spread
+        multiplier = attrs.rate_reset_multiplier if attrs.rate_reset_multiplier is not None else 1.0
+        spread = attrs.rate_reset_spread if attrs.rate_reset_spread is not None else 0.0
+        new_rate = multiplier * observed + spread
+
+        # Apply floor/cap
+        if attrs.rate_reset_floor is not None:
+            new_rate = jnp.maximum(new_rate, jnp.array(attrs.rate_reset_floor, dtype=jnp.float32))
+        if attrs.rate_reset_cap is not None:
+            new_rate = jnp.minimum(new_rate, jnp.array(attrs.rate_reset_cap, dtype=jnp.float32))
+
+        return state.replace(sd=time, ipac=new_ipac, ipnr=new_rate)
 
     def _stf_rrf(
         self,
@@ -468,16 +480,32 @@ class CallMoneyContract(BaseContract):
         """Initialize CLM contract state.
 
         CLM state is simpler than LAM - no prnxt or ipcb states.
+        When status_date >= IED, the IED event is skipped so state must be
+        initialized from contract attributes directly.
 
         Returns:
             Initial contract state
         """
+        attrs = self.attributes
+        ied = attrs.initial_exchange_date
+
+        # When SD >= IED, the IED event won't fire, so pre-initialize
+        if ied and attrs.status_date >= ied:
+            role_sign = contract_role_sign(attrs.contract_role)
+            nt = role_sign * jnp.array(attrs.notional_principal or 0.0, dtype=jnp.float32)
+            ipnr = jnp.array(attrs.nominal_interest_rate or 0.0, dtype=jnp.float32)
+            ipac = jnp.array(attrs.accrued_interest or 0.0, dtype=jnp.float32)
+        else:
+            nt = jnp.array(0.0, dtype=jnp.float32)
+            ipnr = jnp.array(0.0, dtype=jnp.float32)
+            ipac = jnp.array(0.0, dtype=jnp.float32)
+
         return ContractState(
-            sd=self.attributes.status_date,
-            tmd=self.attributes.maturity_date,  # May be None - determined dynamically
-            nt=jnp.array(0.0, dtype=jnp.float32),  # Set at IED
-            ipnr=jnp.array(0.0, dtype=jnp.float32),  # Set at IED
-            ipac=jnp.array(0.0, dtype=jnp.float32),
+            sd=attrs.status_date,
+            tmd=attrs.maturity_date,
+            nt=nt,
+            ipnr=ipnr,
+            ipac=ipac,
             feac=jnp.array(0.0, dtype=jnp.float32),
             nsc=jnp.array(1.0, dtype=jnp.float32),
             isc=jnp.array(1.0, dtype=jnp.float32),
@@ -509,6 +537,70 @@ class CallMoneyContract(BaseContract):
         """
         return CLMStateTransitionFunction()
 
+    def simulate(
+        self,
+        risk_factor_observer: RiskFactorObserver | None = None,
+        child_contract_observer: Any | None = None,
+    ) -> SimulationHistory:
+        """Simulate CLM contract with BDC-aware rate observation.
+
+        For SCP/SCF conventions, RR events use the original (unadjusted)
+        schedule date for rate observation, not the BDC-shifted event time.
+        """
+        risk_obs = risk_factor_observer or self.risk_factor_observer
+        state = self.initialize_state()
+        initial_state = state
+        events_with_states = []
+        schedule = self.get_events()
+        # Get observation date mapping (populated by generate_event_schedule)
+        obs_dates = getattr(self, "_rr_observation_dates", {})
+
+        for event in schedule.events:
+            stf = self.get_state_transition_function(event.event_type)
+            pof = self.get_payoff_function(event.event_type)
+            calc_time = event.calculation_time or event.event_time
+
+            payoff = pof.calculate_payoff(
+                event_type=event.event_type,
+                state=state,
+                attributes=self.attributes,
+                time=calc_time,
+                risk_factor_observer=risk_obs,
+            )
+
+            # For RR events, pass observation time if BDC-shifted
+            if event.event_type == EventType.RR and event.event_time.to_iso() in obs_dates:
+                obs_time = obs_dates[event.event_time.to_iso()]
+                state_post = stf._stf_rr(state, self.attributes, calc_time, risk_obs, obs_time)
+            else:
+                state_post = stf.transition_state(
+                    event_type=event.event_type,
+                    state=state,
+                    attributes=self.attributes,
+                    time=calc_time,
+                    risk_factor_observer=risk_obs,
+                )
+
+            processed_event = ContractEvent(
+                event_type=event.event_type,
+                event_time=event.event_time,
+                payoff=payoff,
+                currency=event.currency or self.attributes.currency or "XXX",
+                state_pre=state,
+                state_post=state_post,
+                sequence=event.sequence,
+            )
+
+            events_with_states.append(processed_event)
+            state = state_post
+
+        return SimulationHistory(
+            events=events_with_states,
+            states=[e.state_post for e in events_with_states if e.state_post is not None],
+            initial_state=initial_state,
+            final_state=state,
+        )
+
     def generate_event_schedule(self) -> EventSchedule:
         """Generate complete event schedule for CLM contract.
 
@@ -527,18 +619,31 @@ class CallMoneyContract(BaseContract):
         if not ied:
             return EventSchedule(events=[], contract_id=attributes.contract_id)
 
+        sd = attributes.status_date
+        bdc = attributes.business_day_convention or BusinessDayConvention.NULL
+        cal = attributes.calendar or Calendar.NO_CALENDAR
+        eomc = attributes.end_of_month_convention or EndOfMonthConvention.SD
+
+        def _sched(anchor, cycle, end):
+            return generate_schedule(
+                start=anchor, cycle=cycle, end=end,
+                end_of_month_convention=eomc,
+                business_day_convention=bdc,
+                calendar=cal,
+            )
+
         # AD: Analysis Date
         events.append(
             ContractEvent(
                 event_type=EventType.AD,
-                event_time=attributes.status_date,
+                event_time=sd,
                 payoff=jnp.array(0.0, dtype=jnp.float32),
                 currency=attributes.currency or "XXX",
             )
         )
 
         # IED: Initial Exchange Date (skip when SD >= IED)
-        if attributes.status_date < ied:
+        if sd < ied:
             events.append(
                 ContractEvent(
                     event_type=EventType.IED,
@@ -549,18 +654,15 @@ class CallMoneyContract(BaseContract):
             )
 
         # IPCI Schedule: Periodic interest capitalization
-        # Generate IPCI events using interest_payment_cycle.
-        # If interest_capitalization_end_date is set, IPCI runs up to that date.
-        # Otherwise, all periodic dates before maturity become IPCI events.
         if attributes.interest_payment_cycle and attributes.maturity_date:
             ipci_end = attributes.interest_capitalization_end_date or attributes.maturity_date
-            ipci_schedule = generate_schedule(
-                start=attributes.interest_payment_anchor or ied,
-                cycle=attributes.interest_payment_cycle,
-                end=ipci_end,
+            ipci_schedule = _sched(
+                attributes.interest_payment_anchor or ied,
+                attributes.interest_payment_cycle,
+                ipci_end,
             )
             for time in ipci_schedule:
-                if ied < time < attributes.maturity_date:
+                if time > sd and time < attributes.maturity_date:
                     events.append(
                         ContractEvent(
                             event_type=EventType.IPCI,
@@ -571,28 +673,55 @@ class CallMoneyContract(BaseContract):
                     )
 
         # RR Schedule: Rate resets
-        if attributes.rate_reset_cycle and attributes.maturity_date:
-            rr_schedule = generate_schedule(
-                start=attributes.rate_reset_anchor or ied,
-                cycle=attributes.rate_reset_cycle,
-                end=attributes.maturity_date,
-            )
-            for time in rr_schedule:
-                if ied < time <= attributes.maturity_date:
+        # For SCP/SCF conventions, RR events are BDC-adjusted but observation
+        # uses the original (unadjusted) schedule date. Store mapping.
+        self._rr_observation_dates: dict[str, ActusDateTime] = {}
+        if attributes.maturity_date:
+            if attributes.rate_reset_cycle:
+                # Generate BDC-adjusted schedule for event timing
+                rr_adjusted = _sched(
+                    attributes.rate_reset_anchor or ied,
+                    attributes.rate_reset_cycle,
+                    attributes.maturity_date,
+                )
+                # Generate unadjusted schedule for rate observation
+                rr_unadjusted = generate_schedule(
+                    start=attributes.rate_reset_anchor or ied,
+                    cycle=attributes.rate_reset_cycle,
+                    end=attributes.maturity_date,
+                    end_of_month_convention=eomc,
+                )
+                # Map adjusted→unadjusted dates
+                for adj, unadj in zip(rr_adjusted, rr_unadjusted):
+                    if adj != unadj:
+                        self._rr_observation_dates[adj.to_iso()] = unadj
+
+                for time in rr_adjusted:
+                    if time > sd and time <= attributes.maturity_date:
+                        events.append(
+                            ContractEvent(
+                                event_type=EventType.RR,
+                                event_time=time,
+                                payoff=jnp.array(0.0, dtype=jnp.float32),
+                                currency=attributes.currency or "XXX",
+                            )
+                        )
+            elif attributes.rate_reset_anchor and attributes.rate_reset_market_object:
+                # Single RR at anchor date (no cycle)
+                rr_time = attributes.rate_reset_anchor
+                if rr_time > sd and rr_time <= attributes.maturity_date:
                     events.append(
                         ContractEvent(
                             event_type=EventType.RR,
-                            event_time=time,
+                            event_time=rr_time,
                             payoff=jnp.array(0.0, dtype=jnp.float32),
                             currency=attributes.currency or "XXX",
                         )
                     )
 
         # MD: Maturity Date (if specified)
-        # For CLM, this may be None and determined by observed events
         if attributes.maturity_date:
             md = attributes.maturity_date
-            # Single IP event at maturity
             events.append(
                 ContractEvent(
                     event_type=EventType.IP,
@@ -601,7 +730,6 @@ class CallMoneyContract(BaseContract):
                     currency=attributes.currency or "XXX",
                 )
             )
-            # MD event
             events.append(
                 ContractEvent(
                     event_type=EventType.MD,

@@ -185,27 +185,27 @@ class TestCECInitialization:
         with pytest.raises(ValueError, match="CoveringContract"):
             CreditEnhancementCollateralContract(attrs, rf_observer, child_observer)
 
-    def test_cec_requires_coverage(self, status_date, maturity_date, rf_observer, child_observer):
-        """Test that CEC requires coverage amount (CECV)."""
+    def test_cec_defaults_coverage(self, status_date, maturity_date, rf_observer, child_observer):
+        """Test that CEC defaults coverage to 1.0 when not specified."""
         attrs = ContractAttributes(
             contract_id="CEC-001",
             contract_type=ContractType.CEC,
             contract_role=ContractRole.RPA,
             status_date=status_date,
             maturity_date=maturity_date,
-            coverage=None,  # Missing
+            coverage=None,
             credit_enhancement_guarantee_extent="NO",
             contract_structure='{"CoveredContract": "LOAN-001", "CoveringContract": "STK-001"}',
             currency="USD",
         )
 
-        with pytest.raises(ValueError, match="coverage.*is required"):
-            CreditEnhancementCollateralContract(attrs, rf_observer, child_observer)
+        cec = CreditEnhancementCollateralContract(attrs, rf_observer, child_observer)
+        assert cec.attributes.coverage == 1.0
 
-    def test_cec_requires_guarantee_extent(
+    def test_cec_defaults_guarantee_extent(
         self, status_date, maturity_date, rf_observer, child_observer
     ):
-        """Test that CEC requires guarantee extent (CEGE)."""
+        """Test that CEC defaults guarantee extent to 'NO' when not specified."""
         attrs = ContractAttributes(
             contract_id="CEC-001",
             contract_type=ContractType.CEC,
@@ -213,13 +213,13 @@ class TestCECInitialization:
             status_date=status_date,
             maturity_date=maturity_date,
             coverage=1.2,
-            credit_enhancement_guarantee_extent=None,  # Missing
+            credit_enhancement_guarantee_extent=None,
             contract_structure='{"CoveredContract": "LOAN-001", "CoveringContract": "STK-001"}',
             currency="USD",
         )
 
-        with pytest.raises(ValueError, match="credit_enhancement_guarantee_extent.*is required"):
-            CreditEnhancementCollateralContract(attrs, rf_observer, child_observer)
+        cec = CreditEnhancementCollateralContract(attrs, rf_observer, child_observer)
+        assert cec.attributes.credit_enhancement_guarantee_extent == "NO"
 
     def test_cec_validates_guarantee_extent_values(
         self, status_date, maturity_date, rf_observer, child_observer

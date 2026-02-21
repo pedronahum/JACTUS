@@ -43,7 +43,7 @@ from typing import Any
 
 import jax.numpy as jnp
 
-from jactus.contracts.base import BaseContract
+from jactus.contracts.base import BaseContract, SimulationHistory
 from jactus.core import (
     ActusDateTime,
     ContractAttributes,
@@ -197,15 +197,17 @@ class CreditEnhancementCollateralContract(BaseContract):
                 "contract_structure must contain 'CoveringContract' or 'CoveringContracts' key"
             )
 
-        # Validate coverage amount
+        # Default coverage to 1.0 (full coverage) if not specified
         if attributes.coverage is None:
-            raise ValueError("coverage (CECV) is required")
+            attributes.coverage = 1.0
 
-        # Validate credit enhancement guarantee extent
+        # Default credit event type to "DF" if not specified
+        if attributes.credit_event_type is None:
+            attributes.credit_event_type = "DF"
+
+        # Default guarantee extent to "NO" (notional only) if not specified
         if attributes.credit_enhancement_guarantee_extent is None:
-            raise ValueError(
-                "credit_enhancement_guarantee_extent (CEGE) is required (NO, NI, or MV)"
-            )
+            attributes.credit_enhancement_guarantee_extent = "NO"
 
         if attributes.credit_enhancement_guarantee_extent not in ["NO", "NI", "MV"]:
             raise ValueError(
@@ -491,3 +493,267 @@ class CreditEnhancementCollateralContract(BaseContract):
             CECStateTransitionFunction instance
         """
         return CECStateTransitionFunction()
+
+    def _get_child_dcc(self, child_id: str):
+        """Get day count convention for a child contract."""
+        try:
+            child_attrs = self.child_contract_observer._attributes.get(child_id)
+            if child_attrs and child_attrs.day_count_convention:
+                return child_attrs.day_count_convention
+        except (AttributeError, KeyError):
+            pass
+        from jactus.core.types import DayCountConvention
+        return DayCountConvention.A365
+
+    def _calculate_coverage_with_accrual(self, time: ActusDateTime) -> float:
+        """Calculate coverage amount with proper accrued interest for NI mode."""
+        from jactus.utilities.conventions import year_fraction
+
+        covered_ids = self._get_covered_contract_ids()
+        cege = self.attributes.credit_enhancement_guarantee_extent
+        coverage_ratio = float(self.attributes.coverage)
+        total = 0.0
+
+        for cid in covered_ids:
+            try:
+                state = self.child_contract_observer.observe_state(cid, time, None, None)
+            except (KeyError, ValueError):
+                continue
+            nt = abs(float(state.nt))
+
+            if cege == "NI":
+                ipnr = abs(float(state.ipnr)) if state.ipnr is not None else 0.0
+                ipac = abs(float(state.ipac)) if state.ipac is not None else 0.0
+                dcc = self._get_child_dcc(cid)
+                yf = year_fraction(state.sd, time, dcc)
+                accrued = ipac + yf * ipnr * nt
+                total += nt + accrued
+            else:
+                total += nt
+
+        return coverage_ratio * total
+
+    def _get_collateral_market_value(self, time: ActusDateTime) -> float:
+        """Get total collateral value from covering contracts at a given time.
+
+        For COM-backed collateral, queries market price * quantity.
+        For other types, uses the child's notional.
+        """
+        covering_ids = self._get_covering_contract_ids()
+        total = 0.0
+
+        for cid in covering_ids:
+            try:
+                child_attrs = self.child_contract_observer._attributes.get(cid)
+            except (AttributeError, KeyError):
+                child_attrs = None
+
+            # For COM contracts, get market value = quantity * market_price
+            ct_val = getattr(getattr(child_attrs, "contract_type", None), "value", str(getattr(child_attrs, "contract_type", ""))) if child_attrs else ""
+            if child_attrs and ct_val == "COM":
+                moc = getattr(child_attrs, "market_object_code", None)
+                qty = float(getattr(child_attrs, "quantity", 1) or 1)
+                if moc:
+                    try:
+                        price = float(self.risk_factor_observer.observe_risk_factor(
+                            moc, time, None, None
+                        ))
+                        total += abs(qty * price)
+                        continue
+                    except Exception:
+                        pass
+
+            # Fallback: use child state notional
+            try:
+                state = self.child_contract_observer.observe_state(cid, time, None, None)
+                total += abs(float(state.nt))
+            except (KeyError, ValueError):
+                pass
+
+        return total
+
+    def _adjust_business_day(self, time: ActusDateTime) -> ActusDateTime:
+        """Adjust date to next business day if on weekend."""
+        from jactus.core.types import Calendar
+        calendar = self.attributes.calendar
+        if calendar in (Calendar.NO_CALENDAR, None):
+            return time
+        dt = time.to_datetime()
+        while dt.weekday() >= 5:
+            from datetime import timedelta
+            dt += timedelta(days=1)
+        return ActusDateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
+
+    def _compute_settlement_time(self, xd_time: ActusDateTime) -> ActusDateTime:
+        """Compute settlement time from exercise time + settlement period."""
+        import re
+        sp = self.attributes.settlement_period
+        if not sp:
+            return self._adjust_business_day(xd_time)
+        sp_str = sp[1:] if sp.startswith("P") else sp
+        if "L" in sp_str:
+            sp_str = sp_str[:sp_str.index("L")]
+        m = re.match(r"(\d+)([DWMY])", sp_str)
+        if not m:
+            return self._adjust_business_day(xd_time)
+        n, unit = int(m.group(1)), m.group(2)
+        if n == 0:
+            return self._adjust_business_day(xd_time)
+        from dateutil.relativedelta import relativedelta
+        xd_py = xd_time.to_datetime()
+        delta_map = {
+            "D": relativedelta(days=n),
+            "W": relativedelta(weeks=n),
+            "M": relativedelta(months=n),
+            "Y": relativedelta(years=n),
+        }
+        std_py = xd_py + delta_map.get(unit, relativedelta())
+        result = ActusDateTime(std_py.year, std_py.month, std_py.day, std_py.hour, std_py.minute, std_py.second)
+        return self._adjust_business_day(result)
+
+    def simulate(
+        self,
+        risk_factor_observer: RiskFactorObserver | None = None,
+        child_contract_observer: ChildContractObserver | None = None,
+    ) -> SimulationHistory:
+        """Simulate CEC contract with comprehensive event generation.
+
+        Generates XD, STD, and MD events based on covered/covering contract
+        states and credit events observed through the child observer.
+        """
+        role_sign = self.attributes.contract_role.get_sign()
+        currency = self.attributes.currency or "USD"
+        events: list[ContractEvent] = []
+        covered_ids = self._get_covered_contract_ids()
+
+        # Determine effective maturity from covered children
+        effective_maturity = self.attributes.maturity_date
+        if effective_maturity is None:
+            for cid in covered_ids:
+                try:
+                    child_attrs = self.child_contract_observer._attributes.get(cid)
+                    if child_attrs and child_attrs.maturity_date:
+                        child_md = child_attrs.maturity_date
+                        if effective_maturity is None or child_md > effective_maturity:
+                            effective_maturity = child_md
+                except (AttributeError, KeyError):
+                    pass
+
+        # Calculate coverage at a time when children are funded
+        coverage_time = self.attributes.purchase_date or self.attributes.status_date
+        # For CNT children whose IED > status_date, try using IED
+        for cid in covered_ids:
+            try:
+                child_attrs = self.child_contract_observer._attributes.get(cid)
+                if child_attrs and child_attrs.initial_exchange_date:
+                    ied = child_attrs.initial_exchange_date
+                    if ied > coverage_time:
+                        coverage_time = ied
+                    break
+            except (AttributeError, KeyError):
+                pass
+
+        coverage_amount = self._calculate_coverage_with_accrual(coverage_time)
+        current_nt = role_sign * coverage_amount
+
+        def _make_state(
+            time: ActusDateTime,
+            nt: float,
+            prf: ContractPerformance = ContractPerformance.PF,
+        ) -> ContractState:
+            return ContractState(
+                tmd=effective_maturity or time,
+                sd=time,
+                nt=jnp.array(nt, dtype=jnp.float32),
+                ipnr=jnp.array(0.0, dtype=jnp.float32),
+                ipac=jnp.array(0.0, dtype=jnp.float32),
+                feac=jnp.array(0.0, dtype=jnp.float32),
+                nsc=jnp.array(1.0, dtype=jnp.float32),
+                isc=jnp.array(1.0, dtype=jnp.float32),
+                prf=prf,
+            )
+
+        exercised = False
+
+        # Detect credit events from child observer
+        target_perf = self.attributes.credit_event_type or "DF"
+        ce_time = None
+
+        for cid in covered_ids:
+            try:
+                child_events = self.child_contract_observer.observe_events(
+                    cid, self.attributes.status_date, None
+                )
+            except (KeyError, ValueError):
+                continue
+            for ce in child_events:
+                if ce.event_type == EventType.CE and ce.state_post is not None:
+                    prf_match = (
+                        str(ce.state_post.prf) == target_perf
+                        or (hasattr(ce.state_post.prf, "value") and ce.state_post.prf.value == target_perf)
+                    )
+                    if not prf_match:
+                        continue
+                    if effective_maturity and ce.event_time > effective_maturity:
+                        continue
+                    ce_time = ce.event_time
+                    break
+            if ce_time:
+                break
+
+        if ce_time is not None:
+            exercised = True
+            # Calculate coverage and collateral at CE time
+            ce_coverage = self._calculate_coverage_with_accrual(ce_time)
+            collateral_value = self._get_collateral_market_value(ce_time)
+            exercise_amount = min(ce_coverage, collateral_value)
+
+            xd_nt = role_sign * ce_coverage
+            xd_state = _make_state(ce_time, xd_nt)
+            events.append(ContractEvent(
+                event_type=EventType.XD,
+                event_time=ce_time,
+                payoff=jnp.array(0.0, dtype=jnp.float32),
+                currency=currency,
+                state_pre=xd_state,
+                state_post=xd_state,
+            ))
+
+            std_time = self._compute_settlement_time(ce_time)
+            std_payoff = role_sign * exercise_amount
+            std_state = _make_state(std_time, 0.0)
+            events.append(ContractEvent(
+                event_type=EventType.STD,
+                event_time=std_time,
+                payoff=jnp.array(std_payoff, dtype=jnp.float32),
+                currency=currency,
+                state_pre=xd_state,
+                state_post=std_state,
+            ))
+
+        # MD event at effective maturity (if not exercised)
+        if effective_maturity and not exercised:
+            md_state = _make_state(effective_maturity, 0.0)
+            events.append(ContractEvent(
+                event_type=EventType.MD,
+                event_time=effective_maturity,
+                payoff=jnp.array(0.0, dtype=jnp.float32),
+                currency=currency,
+                state_pre=_make_state(effective_maturity, current_nt),
+                state_post=md_state,
+            ))
+
+        events.sort(key=lambda e: (
+            e.event_time.year, e.event_time.month, e.event_time.day, e.sequence
+        ))
+
+        initial_state = _make_state(self.attributes.status_date, current_nt)
+        states = [e.state_post for e in events if e.state_post is not None]
+        final_state = states[-1] if states else initial_state
+
+        return SimulationHistory(
+            events=events,
+            states=states,
+            initial_state=initial_state,
+            final_state=final_state,
+        )

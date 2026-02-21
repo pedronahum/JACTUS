@@ -58,7 +58,7 @@ from typing import Any
 
 import jax.numpy as jnp
 
-from jactus.contracts.base import BaseContract
+from jactus.contracts.base import BaseContract, SimulationHistory
 from jactus.core import (
     ActusDateTime,
     ContractAttributes,
@@ -75,32 +75,40 @@ from jactus.utilities import contract_role_sign, generate_schedule, year_fractio
 
 def generate_array_schedule(
     anchors: list[ActusDateTime],
-    cycles: list[str],
+    cycles: list[str] | None,
     end: ActusDateTime,
     filter_values: list[str] | None = None,
     filter_target: str | None = None,
 ) -> list[ActusDateTime]:
     """Generate schedule from array of anchors and cycles.
 
+    If cycles is None or empty, each anchor date is treated as a single point event.
+    If cycles is provided, each (anchor, cycle) pair generates a recurring sub-schedule
+    bounded by the next anchor's start date (segment boundaries).
+
     Args:
         anchors: Array of anchor dates (start dates for each sub-schedule)
-        cycles: Array of cycles (one per anchor)
+        cycles: Array of cycles (one per anchor), or None for point events
         end: End date (maturity date)
         filter_values: Optional array of filter values (e.g., ARINCDEC)
         filter_target: Optional target value to filter for (e.g., "DEC")
 
     Returns:
         Union of all sub-schedules, sorted and deduplicated
-
-    Example:
-        >>> anchors = [ActusDateTime(2024, 1, 15), ActusDateTime(2025, 1, 15)]
-        >>> cycles = ["1M", "1M"]
-        >>> end = ActusDateTime(2026, 1, 15)
-        >>> generate_array_schedule(anchors, cycles, end)
-        [ActusDateTime(2024, 2, 15), ActusDateTime(2024, 3, 15), ...]
     """
-    if not anchors or not cycles:
+    if not anchors:
         return []
+
+    # Point events: no cycles, just return anchors (after filtering)
+    if not cycles:
+        all_events = []
+        for i, anchor in enumerate(anchors):
+            if filter_values is not None and filter_target is not None:
+                if filter_values[i] != filter_target:
+                    continue
+            all_events.append(anchor)
+        all_events = sorted(set(all_events))
+        return [d for d in all_events if d <= end]
 
     if len(anchors) != len(cycles):
         raise ValueError(
@@ -120,11 +128,18 @@ def generate_array_schedule(
             if filter_values[i] != filter_target:
                 continue
 
-        # Generate sub-schedule
-        sub_schedule = generate_schedule(start=anchor, cycle=cycle, end=end)
+        # Determine segment end: next anchor in the FULL array (not just filtered ones)
+        # or overall end if this is the last segment
+        segment_end = end
+        if i + 1 < len(anchors):
+            segment_end = anchors[i + 1]
 
-        # Filter to events after anchor
-        sub_schedule = [d for d in sub_schedule if d > anchor]
+        # Generate sub-schedule bounded by segment end
+        sub_schedule = generate_schedule(start=anchor, cycle=cycle, end=segment_end)
+
+        # Filter to events at or after anchor but before segment_end
+        # (segment_end is the start of the next segment, so exclude it)
+        sub_schedule = [d for d in sub_schedule if anchor <= d < segment_end]
 
         all_events.extend(sub_schedule)
 
@@ -236,38 +251,38 @@ class LAXPayoffFunction(BasePayoffFunction):
     ) -> jnp.ndarray:
         """POF_IED: Initial Exchange - disburse principal."""
         role_sign = contract_role_sign(attrs.contract_role)
-        return role_sign * state.nsc * state.nt
+        nt = attrs.notional_principal or 0.0
+        pdied = attrs.premium_discount_at_ied or 0.0
+        return jnp.array(role_sign * (-1) * (nt + pdied), dtype=jnp.float32)
 
     def _pof_pr(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
     ) -> jnp.ndarray:
         """POF_PR: Principal Redemption - pay fixed principal amount.
 
-        Same as LAM: pay Prnxt amount.
+        No role_sign — state.prnxt is already signed.
         """
-        role_sign = contract_role_sign(attrs.contract_role)
-        return role_sign * state.nsc * state.prnxt
+        return state.nsc * state.prnxt
 
     def _pof_pi(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
     ) -> jnp.ndarray:
         """POF_PI: Principal Increase - receive additional principal (negative PR).
 
-        This is like a negative principal redemption - the borrower receives more money.
+        PI payoff is the negative of PR — the sign is already handled
+        by the event type. No role_sign — state.prnxt is already signed.
         """
-        role_sign = contract_role_sign(attrs.contract_role)
-        # PI is negative PR - so we flip the sign
-        return role_sign * state.nsc * state.prnxt
+        return -state.nsc * state.prnxt
 
     def _pof_md(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
     ) -> jnp.ndarray:
-        """POF_MD: Maturity - pay remaining principal and accrued interest."""
-        role_sign = contract_role_sign(attrs.contract_role)
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
-        ipcb = state.ipcb if state.ipcb is not None else state.nt
-        accrued = yf * state.ipnr * ipcb
-        return role_sign * state.nsc * (state.nt + state.ipac + accrued)
+        """POF_MD: Maturity - pay remaining principal.
+
+        Interest is paid by the IP event at maturity, not MD.
+        No role_sign — state.nt is already signed.
+        """
+        return state.nsc * state.nt
 
     def _pof_pp(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
@@ -285,8 +300,7 @@ class LAXPayoffFunction(BasePayoffFunction):
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
     ) -> jnp.ndarray:
         """POF_FP: Fee Payment - pay accrued fees."""
-        role_sign = contract_role_sign(attrs.contract_role)
-        return role_sign * state.feac
+        return state.feac
 
     def _pof_prd(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
@@ -297,22 +311,26 @@ class LAXPayoffFunction(BasePayoffFunction):
     def _pof_td(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
     ) -> jnp.ndarray:
-        """POF_TD: Termination - pay notional and accrued interest."""
-        role_sign = contract_role_sign(attrs.contract_role)
+        """POF_TD: Termination - pay notional and accrued interest.
+
+        No role_sign — state vars are already signed.
+        """
         yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
         ipcb = state.ipcb if state.ipcb is not None else state.nt
         accrued = yf * state.ipnr * ipcb
-        return role_sign * state.nsc * (state.nt + state.ipac + accrued)
+        return state.nsc * (state.nt + state.ipac + accrued)
 
     def _pof_ip(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
     ) -> jnp.ndarray:
-        """POF_IP: Interest Payment - pay accrued interest on IPCB."""
-        role_sign = contract_role_sign(attrs.contract_role)
+        """POF_IP: Interest Payment - pay accrued interest on IPCB.
+
+        No role_sign — state vars are already signed.
+        """
         yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
         ipcb = state.ipcb if state.ipcb is not None else state.nt
         accrued = yf * state.ipnr * ipcb
-        return role_sign * state.isc * (state.ipac + accrued)
+        return state.isc * (state.ipac + accrued)
 
     def _pof_ipci(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
@@ -468,8 +486,11 @@ class LAXStateTransitionFunction(BaseStateTransitionFunction):
             # Will be set at first IPCB event
             ipcb = role_sign * jnp.array(attrs.notional_principal, dtype=jnp.float32)
 
-        # Initialize prnxt - for LAX this will be updated at PRF events
-        prnxt = jnp.array(attrs.next_principal_redemption_amount or 0.0, dtype=jnp.float32)
+        # Initialize prnxt from array or single value (signed by role)
+        prnxt_val = attrs.next_principal_redemption_amount
+        if prnxt_val is None and attrs.array_pr_next:
+            prnxt_val = attrs.array_pr_next[0]
+        prnxt = jnp.array(role_sign * (prnxt_val or 0.0), dtype=jnp.float32)
 
         return state.replace(
             sd=time,
@@ -492,17 +513,18 @@ class LAXStateTransitionFunction(BaseStateTransitionFunction):
     ) -> ContractState:
         """STF_PR: Principal Redemption - reduce notional, update IPCB if needed.
 
-        Same as LAM: reduce notional by Prnxt amount.
+        Same as LAM: Nt -= Prnxt (both are signed state variables).
         """
-        role_sign = contract_role_sign(attrs.contract_role)
         yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
 
         # Calculate accrued interest using current IPCB
         ipcb = state.ipcb if state.ipcb is not None else state.nt
         new_ipac = state.ipac + yf * state.ipnr * ipcb
 
-        # Reduce notional by fixed amount
-        new_nt = state.nt - role_sign * state.prnxt
+        # Reduce notional by prnxt (both signed, cap at remaining notional)
+        effective_prnxt = jnp.sign(state.prnxt) * jnp.minimum(
+            jnp.abs(state.prnxt), jnp.abs(state.nt))
+        new_nt = state.nt - effective_prnxt
 
         # Update IPCB if mode is 'NT'
         ipcb_mode = attrs.interest_calculation_base or "NT"
@@ -529,17 +551,16 @@ class LAXStateTransitionFunction(BaseStateTransitionFunction):
     ) -> ContractState:
         """STF_PI: Principal Increase - increase notional, update IPCB if needed.
 
-        This is the opposite of PR - the notional increases by Prnxt.
+        Opposite of PR: Nt += Prnxt (both are signed state variables).
         """
-        role_sign = contract_role_sign(attrs.contract_role)
         yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
 
         # Calculate accrued interest using current IPCB
         ipcb = state.ipcb if state.ipcb is not None else state.nt
         new_ipac = state.ipac + yf * state.ipnr * ipcb
 
-        # Increase notional by fixed amount (opposite of PR)
-        new_nt = state.nt + role_sign * state.prnxt
+        # Increase notional by prnxt (both signed)
+        new_nt = state.nt + state.prnxt
 
         # Update IPCB if mode is 'NT'
         ipcb_mode = attrs.interest_calculation_base or "NT"
@@ -714,11 +735,10 @@ class LAXStateTransitionFunction(BaseStateTransitionFunction):
         """STF_PRF: Principal Redemption Amount Fixing - update Prnxt from array.
 
         This event updates the Prnxt state variable based on the array schedule.
-        We need to find which array index corresponds to this time.
+        Prnxt is a signed state variable (role_sign applied).
         """
-        # Find the appropriate Prnxt value for this time
+        role_sign = contract_role_sign(attrs.contract_role)
         if attrs.array_pr_anchor and attrs.array_pr_next:
-            # Find the anchor index for this time
             prnxt_value = attrs.next_principal_redemption_amount or 0.0
 
             # Find which array segment we're in
@@ -726,7 +746,7 @@ class LAXStateTransitionFunction(BaseStateTransitionFunction):
                 if time >= anchor:
                     prnxt_value = attrs.array_pr_next[i]
 
-            new_prnxt = jnp.array(prnxt_value, dtype=jnp.float32)
+            new_prnxt = jnp.array(role_sign * prnxt_value, dtype=jnp.float32)
         else:
             new_prnxt = state.prnxt
 
@@ -739,21 +759,33 @@ class LAXStateTransitionFunction(BaseStateTransitionFunction):
         time: ActusDateTime,
         risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
-        """STF_RR: Rate Reset - update interest rate from observer or array."""
-        # Try to get rate from array schedule first
-        if attrs.array_rr_anchor and attrs.array_rate:
-            # Find which array segment we're in
-            rate = attrs.nominal_interest_rate or 0.0
-            for i, anchor in enumerate(attrs.array_rr_anchor):
-                if time >= anchor:
-                    rate = attrs.array_rate[i]
-            new_rate = jnp.array(rate, dtype=jnp.float32)
-        else:
-            # Get from observer
-            risk_factor = risk_factor_observer.observe(time)
-            new_rate = jnp.array(risk_factor, dtype=jnp.float32)
+        """STF_RR: Rate Reset - accrue interest, then update rate.
 
-        return state.replace(sd=time, ipnr=new_rate)
+        For LAX with array_rate, the array value acts as the spread for each segment.
+        """
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        ipcb = state.ipcb if state.ipcb is not None else state.nt
+        new_ipac = state.ipac + yf * state.ipnr * ipcb
+
+        # Get new rate from market observation
+        identifier = attrs.rate_reset_market_object or "RATE"
+        observed = risk_factor_observer.observe_risk_factor(identifier, time, state, attrs)
+        multiplier = attrs.rate_reset_multiplier if attrs.rate_reset_multiplier is not None else 1.0
+
+        # Use array_rate as spread if available, otherwise use rate_reset_spread
+        spread = attrs.rate_reset_spread if attrs.rate_reset_spread is not None else 0.0
+        if attrs.array_rate and attrs.array_rr_anchor:
+            for i, anchor in enumerate(attrs.array_rr_anchor):
+                if time >= anchor and i < len(attrs.array_rate):
+                    spread = attrs.array_rate[i]
+        new_rate = multiplier * observed + spread
+
+        if attrs.rate_reset_floor is not None:
+            new_rate = jnp.maximum(new_rate, jnp.array(attrs.rate_reset_floor, dtype=jnp.float32))
+        if attrs.rate_reset_cap is not None:
+            new_rate = jnp.minimum(new_rate, jnp.array(attrs.rate_reset_cap, dtype=jnp.float32))
+
+        return state.replace(sd=time, ipac=new_ipac, ipnr=new_rate)
 
     def _stf_rrf(
         self,
@@ -762,18 +794,25 @@ class LAXStateTransitionFunction(BaseStateTransitionFunction):
         time: ActusDateTime,
         risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
-        """STF_RRF: Rate Reset Fixing - fix interest rate from array."""
-        # Similar to RR but only from array
-        if attrs.array_rr_anchor and attrs.array_rate:
+        """STF_RRF: Rate Reset Fixing - fix interest rate from array.
+
+        Accrue interest, then set rate from array schedule.
+        """
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        ipcb = state.ipcb if state.ipcb is not None else state.nt
+        new_ipac = state.ipac + yf * state.ipnr * ipcb
+
+        if attrs.array_rate:
             rate = attrs.nominal_interest_rate or 0.0
-            for i, anchor in enumerate(attrs.array_rr_anchor):
-                if time >= anchor:
-                    rate = attrs.array_rate[i]
+            if attrs.array_rr_anchor:
+                for i, anchor in enumerate(attrs.array_rr_anchor):
+                    if time >= anchor and i < len(attrs.array_rate):
+                        rate = attrs.array_rate[i]
             new_rate = jnp.array(rate, dtype=jnp.float32)
         else:
             new_rate = state.ipnr
 
-        return state.replace(sd=time, ipnr=new_rate)
+        return state.replace(sd=time, ipac=new_ipac, ipnr=new_rate)
 
     def _stf_sc(
         self,
@@ -841,11 +880,11 @@ class ExoticLinearAmortizerContract(BaseContract):
         """
         role_sign = contract_role_sign(self.attributes.contract_role)
 
-        # Initialize Prnxt (next principal redemption amount)
-        prnxt = jnp.array(
-            role_sign * (self.attributes.next_principal_redemption_amount or 0.0),
-            dtype=jnp.float32,
-        )
+        # Initialize Prnxt from single value or first array value
+        prnxt_val = self.attributes.next_principal_redemption_amount
+        if prnxt_val is None and self.attributes.array_pr_next:
+            prnxt_val = self.attributes.array_pr_next[0]
+        prnxt = jnp.array(role_sign * (prnxt_val or 0.0), dtype=jnp.float32)
 
         return ContractState(
             sd=self.attributes.status_date,
@@ -923,34 +962,21 @@ class ExoticLinearAmortizerContract(BaseContract):
         )
 
         # PR/PI Schedule: Generated from array schedules with ARINCDEC filter
-        if (
-            attributes.array_pr_anchor
-            and attributes.array_pr_cycle
-            and attributes.array_increase_decrease
-        ):
-            # PRF: Anchor dates where Prnxt is fixed
-            prf_events = attributes.array_pr_anchor
-            for time in prf_events:
-                if ied < time <= md:
-                    events.append(
-                        ContractEvent(
-                            event_type=EventType.PRF,
-                            event_time=time,
-                            payoff=jnp.array(0.0, dtype=jnp.float32),
-                            currency=attributes.currency or "XXX",
-                        )
-                    )
+        pr_cycles = attributes.array_pr_cycle  # May be None for point events
+        if attributes.array_pr_anchor and attributes.array_increase_decrease:
+            # Note: No PRF events generated — the simulate() override injects
+            # prnxt from the array before each PR/PI event automatically.
 
             # PR: Principal Redemption (ARINCDEC='DEC')
             pr_schedule = generate_array_schedule(
                 anchors=attributes.array_pr_anchor,
-                cycles=attributes.array_pr_cycle,
+                cycles=pr_cycles,
                 end=md,
                 filter_values=attributes.array_increase_decrease,
                 filter_target="DEC",
             )
             for time in pr_schedule:
-                if ied < time <= md:
+                if ied < time < md:
                     events.append(
                         ContractEvent(
                             event_type=EventType.PR,
@@ -963,13 +989,13 @@ class ExoticLinearAmortizerContract(BaseContract):
             # PI: Principal Increase (ARINCDEC='INC')
             pi_schedule = generate_array_schedule(
                 anchors=attributes.array_pr_anchor,
-                cycles=attributes.array_pr_cycle,
+                cycles=pr_cycles,
                 end=md,
                 filter_values=attributes.array_increase_decrease,
                 filter_target="INC",
             )
             for time in pi_schedule:
-                if ied < time <= md:
+                if ied < time < md:
                     events.append(
                         ContractEvent(
                             event_type=EventType.PI,
@@ -979,11 +1005,11 @@ class ExoticLinearAmortizerContract(BaseContract):
                         )
                     )
 
-        # IP Schedule: Generated from array schedules
-        if attributes.array_ip_anchor and attributes.array_ip_cycle:
+        # IP Schedule: Generated from array schedules (cycles optional for point events)
+        if attributes.array_ip_anchor:
             ip_schedule = generate_array_schedule(
                 anchors=attributes.array_ip_anchor,
-                cycles=attributes.array_ip_cycle,
+                cycles=attributes.array_ip_cycle,  # May be None
                 end=md,
             )
             for time in ip_schedule:
@@ -998,12 +1024,14 @@ class ExoticLinearAmortizerContract(BaseContract):
                     )
 
         # RR/RRF Schedule: Generated from array schedules with ARFIXVAR filter
-        if attributes.array_rr_anchor and attributes.array_rr_cycle:
+        # Cycles are optional (point events at anchor dates if no cycles)
+        if attributes.array_rr_anchor:
+            rr_cycles = attributes.array_rr_cycle  # May be None
             if attributes.array_fixed_variable:
                 # RR: Rate Reset (ARFIXVAR='V')
                 rr_schedule = generate_array_schedule(
                     anchors=attributes.array_rr_anchor,
-                    cycles=attributes.array_rr_cycle,
+                    cycles=rr_cycles,
                     end=md,
                     filter_values=attributes.array_fixed_variable,
                     filter_target="V",
@@ -1022,7 +1050,7 @@ class ExoticLinearAmortizerContract(BaseContract):
                 # RRF: Rate Reset Fixing (ARFIXVAR='F')
                 rrf_schedule = generate_array_schedule(
                     anchors=attributes.array_rr_anchor,
-                    cycles=attributes.array_rr_cycle,
+                    cycles=rr_cycles,
                     end=md,
                     filter_values=attributes.array_fixed_variable,
                     filter_target="F",
@@ -1041,7 +1069,7 @@ class ExoticLinearAmortizerContract(BaseContract):
                 # No filter - default to RR
                 rr_schedule = generate_array_schedule(
                     anchors=attributes.array_rr_anchor,
-                    cycles=attributes.array_rr_cycle,
+                    cycles=rr_cycles,
                     end=md,
                 )
                 for time in rr_schedule:
@@ -1077,6 +1105,18 @@ class ExoticLinearAmortizerContract(BaseContract):
                             )
                         )
 
+        # IP at maturity if not already in schedule
+        ip_times = {e.event_time for e in events if e.event_type == EventType.IP}
+        if md not in ip_times:
+            events.append(
+                ContractEvent(
+                    event_type=EventType.IP,
+                    event_time=md,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
+                    currency=attributes.currency or "XXX",
+                )
+            )
+
         # MD: Maturity Date
         events.append(
             ContractEvent(
@@ -1087,7 +1127,113 @@ class ExoticLinearAmortizerContract(BaseContract):
             )
         )
 
-        # Sort events by time
-        events.sort(key=lambda e: (e.event_time, e.event_type.value))
+        # Sort events by time, then by ACTUS processing order within same time
+        # ACTUS order for LAX: PRF→IPCB→PR/PI→IPCI→IP→FP→RR/RRF→SC→MD
+        # (RR/RRF after IP so rate change takes effect in next period)
+        event_order = {
+            EventType.AD: 0,
+            EventType.IED: 1,
+            EventType.PRF: 2,
+            EventType.IPCB: 3,
+            EventType.PR: 4,
+            EventType.PI: 4,
+            EventType.IPCI: 5,
+            EventType.IP: 6,
+            EventType.FP: 7,
+            EventType.PP: 8,
+            EventType.PY: 8,
+            EventType.RR: 9,
+            EventType.RRF: 9,
+            EventType.SC: 10,
+            EventType.TD: 11,
+            EventType.MD: 12,
+        }
+        events.sort(key=lambda e: (e.event_time, event_order.get(e.event_type, 99)))
 
         return EventSchedule(events=events, contract_id=attributes.contract_id)
+
+    def _get_prnxt_for_time(self, time: ActusDateTime) -> float | None:
+        """Look up the prnxt value from array for a given event time.
+
+        Returns the prnxt from the most recent array segment anchor at or before time.
+        Returns None if no array is defined.
+        """
+        attrs = self.attributes
+        if not attrs.array_pr_anchor or not attrs.array_pr_next:
+            return None
+        # Find the most recent anchor <= time
+        prnxt_val = attrs.array_pr_next[0]
+        for i, anchor in enumerate(attrs.array_pr_anchor):
+            if time >= anchor and i < len(attrs.array_pr_next):
+                prnxt_val = attrs.array_pr_next[i]
+        return prnxt_val
+
+    def simulate(
+        self,
+        risk_factor_observer: RiskFactorObserver | None = None,
+        child_contract_observer: Any | None = None,
+    ) -> SimulationHistory:
+        """Simulate LAX contract with array-aware prnxt injection.
+
+        Before each PR/PI event, updates state.prnxt from the array schedule
+        so the correct principal amount is used without explicit PRF events.
+        """
+        from jactus.observers import ChildContractObserver
+
+        risk_obs = risk_factor_observer or self.risk_factor_observer
+        role_sign = contract_role_sign(self.attributes.contract_role)
+
+        state = self.initialize_state()
+        initial_state = state
+        events_with_states = []
+
+        schedule = self.get_events()
+
+        for event in schedule.events:
+            stf = self.get_state_transition_function(event.event_type)
+            pof = self.get_payoff_function(event.event_type)
+            calc_time = event.calculation_time or event.event_time
+
+            # Inject prnxt from array before PR/PI events
+            if event.event_type in (EventType.PR, EventType.PI, EventType.PRF):
+                prnxt_val = self._get_prnxt_for_time(calc_time)
+                if prnxt_val is not None:
+                    state = state.replace(
+                        prnxt=jnp.array(role_sign * prnxt_val, dtype=jnp.float32)
+                    )
+
+            payoff = pof(
+                event_type=event.event_type,
+                state=state,
+                attributes=self.attributes,
+                time=calc_time,
+                risk_factor_observer=risk_obs,
+            )
+
+            state_post = stf(
+                event_type=event.event_type,
+                state_pre=state,
+                attributes=self.attributes,
+                time=calc_time,
+                risk_factor_observer=risk_obs,
+            )
+
+            processed_event = ContractEvent(
+                event_type=event.event_type,
+                event_time=event.event_time,
+                payoff=payoff,
+                currency=event.currency or self.attributes.currency or "XXX",
+                state_pre=state,
+                state_post=state_post,
+                sequence=event.sequence,
+            )
+
+            events_with_states.append(processed_event)
+            state = state_post
+
+        return SimulationHistory(
+            events=events_with_states,
+            states=[e.state_post for e in events_with_states if e.state_post is not None],
+            initial_state=initial_state,
+            final_state=state,
+        )

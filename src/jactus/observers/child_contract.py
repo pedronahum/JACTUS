@@ -468,3 +468,99 @@ class MockChildContractObserver(BaseChildContractObserver):
 
         # Create new ContractAttributes with updated values
         return ContractAttributes(**attr_dict)
+
+
+class SimulatedChildContractObserver(BaseChildContractObserver):
+    """Child contract observer backed by full simulation histories.
+
+    Stores the complete event history from simulated child contracts and
+    provides time-aware state lookups (returns state at the most recent
+    event at or before the query time).
+
+    Example:
+        >>> from jactus.contracts import create_contract
+        >>> observer = SimulatedChildContractObserver()
+        >>> child_result = child_contract.simulate()
+        >>> observer.register_simulation("child1", child_result.events, child_attrs)
+        >>> state = observer.observe_state("child1", query_time)
+    """
+
+    def __init__(self) -> None:
+        """Initialize empty observer."""
+        # {id: [(time, state_post), ...]} sorted by time
+        self._histories: dict[str, list[tuple[ActusDateTime, ContractState]]] = {}
+        self._events: dict[str, list[ContractEvent]] = {}
+        self._attributes: dict[str, ContractAttributes] = {}
+
+    def register_simulation(
+        self,
+        identifier: str,
+        events: list[ContractEvent],
+        attributes: ContractAttributes | None = None,
+        initial_state: ContractState | None = None,
+    ) -> None:
+        """Register a child contract's simulation results.
+
+        Args:
+            identifier: Child contract identifier
+            events: Full list of simulated events (with state_pre/state_post)
+            attributes: Optional child contract attributes
+            initial_state: Optional initial state (for queries before first event)
+        """
+        self._events[identifier] = events
+        history = []
+        # If initial_state provided, add it at a very early time
+        if initial_state is not None:
+            history.append((initial_state.sd, initial_state))
+        for e in events:
+            if e.state_post is not None:
+                history.append((e.event_time, e.state_post))
+        self._histories[identifier] = history
+        if attributes is not None:
+            self._attributes[identifier] = attributes
+
+    def _get_events(
+        self,
+        identifier: str,
+        time: ActusDateTime,
+        attributes: ContractAttributes | None,
+    ) -> list[ContractEvent]:
+        """Return events at or after the given time."""
+        return [e for e in self._events[identifier] if e.event_time >= time]
+
+    def _get_state(
+        self,
+        identifier: str,
+        time: ActusDateTime,
+        state: ContractState | None,
+        attributes: ContractAttributes | None,
+    ) -> ContractState:
+        """Return the state at the most recent event at or before time."""
+        history = self._histories[identifier]
+        best_state = None
+        for event_time, event_state in history:
+            if event_time <= time:
+                best_state = event_state
+            else:
+                break
+        if best_state is None:
+            raise KeyError(
+                f"No state found for '{identifier}' at or before {time.to_iso()}"
+            )
+        return best_state
+
+    def _get_attribute(
+        self,
+        identifier: str,
+        attribute_name: str,
+    ) -> jnp.ndarray:
+        """Return an attribute value from the child contract."""
+        if identifier not in self._attributes:
+            raise KeyError(f"No attributes registered for '{identifier}'")
+        attrs = self._attributes[identifier]
+        value = getattr(attrs, attribute_name, None)
+        if value is None:
+            raise AttributeError(
+                f"Attribute '{attribute_name}' not found in '{identifier}'"
+            )
+        return jnp.array(float(value), dtype=jnp.float32)

@@ -234,13 +234,13 @@ class TestSWAPSEventSchedule:
         assert len(schedule.events) >= 2
 
     def test_swaps_net_settlement_merges_congruent(self):
-        """Test that DS='D' (net) merges congruent events."""
+        """Test that DS='S' (cash/net settlement) merges congruent events."""
         attrs = ContractAttributes(
             contract_id="SWAP001",
             contract_type=ContractType.SWAPS,
             contract_role=ContractRole.RFL,
             status_date=ActusDateTime(2024, 1, 1, 0, 0, 0),
-            delivery_settlement="D",  # Net settlement
+            delivery_settlement="S",  # Cash/net settlement
             contract_structure='{"FirstLeg": "LEG1", "SecondLeg": "LEG2"}',
         )
 
@@ -280,13 +280,13 @@ class TestSWAPSEventSchedule:
         assert float(ip_events[0].payoff) == pytest.approx(200.0, abs=0.01)
 
     def test_swaps_gross_settlement_keeps_separate(self):
-        """Test that DS='S' (gross) keeps events separate."""
+        """Test that DS='D' (delivery/gross) keeps events separate."""
         attrs = ContractAttributes(
             contract_id="SWAP001",
             contract_type=ContractType.SWAPS,
             contract_role=ContractRole.RFL,
             status_date=ActusDateTime(2024, 1, 1, 0, 0, 0),
-            delivery_settlement="S",  # Gross settlement
+            delivery_settlement="D",  # Delivery/gross settlement
             contract_structure='{"FirstLeg": "LEG1", "SecondLeg": "LEG2"}',
         )
 

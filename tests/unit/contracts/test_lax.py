@@ -37,9 +37,9 @@ class TestArrayScheduleGeneration:
 
         # Should have events from both sub-schedules
         assert len(schedule) > 0
-        # All events should be after anchors and before/at end
+        # All events should be at or after anchors and before/at end
         for event in schedule:
-            assert event > anchors[0]
+            assert event >= anchors[0]
             assert event <= end
 
     def test_generate_array_schedule_with_filter(self):
@@ -60,8 +60,8 @@ class TestArrayScheduleGeneration:
         # Should only have events from second sub-schedule
         assert len(schedule_dec) > 0
         for event in schedule_dec:
-            # Should be after second anchor
-            assert event > anchors[1]
+            # Should be at or after second anchor
+            assert event >= anchors[1]
 
         # Get only INC events
         schedule_inc = generate_array_schedule(
@@ -71,8 +71,8 @@ class TestArrayScheduleGeneration:
         # Should only have events from first sub-schedule
         assert len(schedule_inc) > 0
         for event in schedule_inc:
-            # Should be after first anchor but before second
-            assert event > anchors[0]
+            # Should be at or after first anchor but before second
+            assert event >= anchors[0]
 
     def test_generate_array_schedule_empty(self):
         """Test array schedule with empty arrays."""
@@ -220,7 +220,7 @@ class TestLAXEventSchedule:
         # PR events should only come from second period (DEC)
         assert len(pr_events) > 0
         for event in pr_events:
-            assert event.event_time > ActusDateTime(2025, 1, 15, 0, 0, 0)
+            assert event.event_time >= ActusDateTime(2025, 1, 15, 0, 0, 0)
 
     def test_pi_schedule_from_increase_periods(self):
         """Test that PI events are generated from ARINCDEC='INC' periods."""
@@ -254,13 +254,13 @@ class TestLAXEventSchedule:
         # PI events should only come from first period (INC) with 3M cycle
         # Starting from 2024-02-15 with 3M cycle, before maturity 2025-06-15
         assert len(pi_events) > 0
-        # All PI events should be after the first anchor
+        # All PI events should be at or after the first anchor
         for event in pi_events:
-            assert event.event_time > ActusDateTime(2024, 2, 15, 0, 0, 0)
+            assert event.event_time >= ActusDateTime(2024, 2, 15, 0, 0, 0)
             # Events can extend beyond second anchor since maturity is later
 
-    def test_prf_events_at_anchors(self):
-        """Test that PRF events are generated at anchor dates."""
+    def test_prf_handled_implicitly(self):
+        """Test that PRF is handled implicitly (prnxt injected by simulate override)."""
         attrs = ContractAttributes(
             contract_id="LAX-TEST-007",
             contract_type=ContractType.LAX,
@@ -283,15 +283,15 @@ class TestLAXEventSchedule:
 
         rf_obs = ConstantRiskFactorObserver(constant_value=0.05)
         contract = create_contract(attrs, rf_obs)
-        schedule = contract.generate_event_schedule()
 
-        # Get PRF events
-        prf_events = [e for e in schedule.events if e.event_type == EventType.PRF]
-
-        # Should have PRF events at each anchor
-        assert len(prf_events) == 2
-        assert prf_events[0].event_time == ActusDateTime(2024, 2, 15, 0, 0, 0)
-        assert prf_events[1].event_time == ActusDateTime(2025, 1, 15, 0, 0, 0)
+        # PRF is not generated as explicit events; instead, simulate()
+        # injects prnxt from the array before each PR/PI event.
+        # Verify that simulation works and PI/PR events exist.
+        result = contract.simulate()
+        pi_events = [e for e in result.events if e.event_type == EventType.PI]
+        pr_events = [e for e in result.events if e.event_type == EventType.PR]
+        assert len(pi_events) > 0
+        assert len(pr_events) > 0
 
     def test_ip_array_schedule(self):
         """Test IP schedule generation from array."""
@@ -543,8 +543,8 @@ class TestLAXPayoffs:
             EventType.PI, state, attrs, ActusDateTime(2024, 2, 15, 0, 0, 0), rf_obs
         )
 
-        # PI payoff should be prnxt (negative from borrower perspective)
-        assert float(payoff) == pytest.approx(5000.0, abs=1.0)
+        # PI payoff for RPA (lender): negative (disbursing additional principal)
+        assert float(payoff) == pytest.approx(-5000.0, abs=1.0)
 
     def test_prf_payoff_zero(self):
         """Test that PRF event has zero payoff."""

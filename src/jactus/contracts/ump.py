@@ -108,6 +108,8 @@ class UMPPayoffFunction(BasePayoffFunction):
             return self._pof_md(state, attributes, time)
         elif event_type == EventType.FP:
             return self._pof_fp(state, attributes, time)
+        elif event_type == EventType.TD:
+            return self._pof_td(state, attributes, time)
         elif event_type == EventType.IPCI:
             return self._pof_ipci(state, attributes, time)
         elif event_type == EventType.RR:
@@ -154,6 +156,18 @@ class UMPPayoffFunction(BasePayoffFunction):
         accrued = yf * state.ipnr * state.nt
         return state.nsc * (state.nt + state.ipac + accrued)
 
+    def _pof_td(
+        self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
+    ) -> jnp.ndarray:
+        """POF_TD: Termination - pay termination price + accrued interest.
+
+        Formula: Nsc × (PTD + IPAC + Y × Nrt × NT)
+        """
+        ptd = attrs.price_at_termination_date or 0.0
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        accrued = yf * state.ipnr * state.nt
+        return state.nsc * jnp.array(ptd + float(state.ipac) + float(accrued), dtype=jnp.float32)
+
     def _pof_fp(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
     ) -> jnp.ndarray:
@@ -161,6 +175,7 @@ class UMPPayoffFunction(BasePayoffFunction):
 
         No R(CNTRL) — Feac is a signed state variable.
         """
+        role_sign = contract_role_sign(attrs.contract_role)
         yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
 
         if attrs.fee_rate and attrs.fee_basis:
@@ -233,6 +248,8 @@ class UMPStateTransitionFunction(BaseStateTransitionFunction):
             return self._stf_fp(state, attributes, time, risk_factor_observer)
         elif event_type == EventType.IPCI:
             return self._stf_ipci(state, attributes, time, risk_factor_observer)
+        elif event_type == EventType.TD:
+            return self._stf_td(state, attributes, time, risk_factor_observer)
         elif event_type == EventType.RR:
             return self._stf_rr(state, attributes, time, risk_factor_observer)
         elif event_type == EventType.RRF:
@@ -335,12 +352,11 @@ class UMPStateTransitionFunction(BaseStateTransitionFunction):
         risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
         """STF_IPCI: Interest Capitalization - add accrued interest to notional."""
-        role_sign = contract_role_sign(attrs.contract_role)
         yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
         accrued = yf * state.ipnr * state.nt
 
-        # Add accrued interest to notional
-        new_nt = state.nt + role_sign * (state.ipac + accrued)
+        # Add accrued interest to notional (no role_sign - nt is already signed)
+        new_nt = state.nt + state.ipac + accrued
 
         return state.replace(sd=time, nt=new_nt, ipac=jnp.array(0.0, dtype=jnp.float32))
 
@@ -373,6 +389,21 @@ class UMPStateTransitionFunction(BaseStateTransitionFunction):
             new_rate = state.ipnr
 
         return state.replace(sd=time, ipnr=new_rate)
+
+    def _stf_td(
+        self,
+        state: ContractState,
+        attrs: ContractAttributes,
+        time: ActusDateTime,
+        risk_factor_observer: RiskFactorObserver,
+    ) -> ContractState:
+        """STF_TD: Termination - zero out notional/accrued, keep rate."""
+        return state.replace(
+            sd=time,
+            nt=jnp.array(0.0, dtype=jnp.float32),
+            ipac=jnp.array(0.0, dtype=jnp.float32),
+            feac=jnp.array(0.0, dtype=jnp.float32),
+        )
 
     def _stf_ce(
         self,
@@ -517,10 +548,11 @@ class UndefinedMaturityProfileContract(BaseContract):
         UMP schedule includes:
         - AD: Analysis date (if provided)
         - IED: Initial exchange
-        - IPCI: Interest capitalization (if IPCI cycle provided)
+        - IPCI: Interest capitalization (from interest_payment_cycle)
         - RR: Rate reset (if RR cycle provided)
         - RRF: Rate reset fixing (if RRF cycle provided)
         - FP: Fee payment (if FP cycle provided)
+        - TD: Termination (if termination_date is set)
         - MD: Maturity (from observed events or attributes)
 
         Note: PR/PI events come from observer, not from schedule.
@@ -532,6 +564,7 @@ class UndefinedMaturityProfileContract(BaseContract):
 
         attributes = self.attributes
         events: list[ContractEvent] = []
+        ied = attributes.initial_exchange_date
 
         # AD: Analysis Date (optional)
         if attributes.status_date:
@@ -545,41 +578,39 @@ class UndefinedMaturityProfileContract(BaseContract):
             )
 
         # IED: Initial Exchange Date (required)
-        if attributes.initial_exchange_date:
+        if ied and attributes.status_date < ied:
             events.append(
                 ContractEvent(
                     event_type=EventType.IED,
-                    event_time=attributes.initial_exchange_date,
+                    event_time=ied,
                     payoff=jnp.array(0.0, dtype=jnp.float32),
                     currency=attributes.currency or "XXX",
                 )
             )
 
-        # Determine maturity for schedule generation
-        # For UMP, maturity comes from observed events or fallback to maturity_date
+        # Determine end date for periodic schedules
+        # TD takes precedence over MD if set
+        td = attributes.termination_date
         md = attributes.maturity_date
-        if md is None:
-            # Without maturity, we can only generate events up to a reasonable horizon
-            # In practice, maturity would be determined from observer
-            # For now, return early schedule without IPCI/RR/etc
-            return EventSchedule(
-                events=tuple(sorted(events, key=lambda e: e.event_time)),
-                contract_id=attributes.contract_id,
-            )
+        end_date = td or md
 
-        # IPCI: Interest Capitalization (optional)
-        if attributes.interest_capitalization_end_date and attributes.interest_payment_cycle:
+        if not end_date or not ied:
+            # Without any end date, only return AD + IED
+            events = sorted(events, key=lambda e: e.event_time)
+            return EventSchedule(events=tuple(events), contract_id=attributes.contract_id)
+
+        # IPCI: Interest Capitalization from interest_payment_cycle
+        # For UMP, all interest payment dates are IPCI events (no regular IP)
+        if attributes.interest_payment_cycle:
+            ipci_anchor = attributes.interest_payment_anchor or ied
+            ipci_end = attributes.interest_capitalization_end_date or end_date
             ipci_schedule = generate_schedule(
-                start=attributes.interest_payment_anchor or attributes.initial_exchange_date,
+                start=ipci_anchor,
                 cycle=attributes.interest_payment_cycle,
-                end=attributes.interest_capitalization_end_date,
+                end=ipci_end,
             )
             for ipci_time in ipci_schedule:
-                if (
-                    attributes.initial_exchange_date
-                    < ipci_time
-                    <= attributes.interest_capitalization_end_date
-                ):
+                if ied < ipci_time < end_date and ipci_time > attributes.status_date:
                     events.append(
                         ContractEvent(
                             event_type=EventType.IPCI,
@@ -590,22 +621,14 @@ class UndefinedMaturityProfileContract(BaseContract):
                     )
 
         # RR: Rate Reset (optional)
-        if (
-            attributes.rate_reset_cycle
-            and attributes.rate_reset_anchor
-            and attributes.initial_exchange_date
-        ):
+        if attributes.rate_reset_cycle and attributes.rate_reset_anchor:
             rr_schedule = generate_schedule(
                 start=attributes.rate_reset_anchor,
                 cycle=attributes.rate_reset_cycle,
-                end=md,
+                end=end_date,
             )
             for rr_time in rr_schedule:
-                if (
-                    rr_time > attributes.initial_exchange_date
-                    and rr_time < md
-                    and rr_time not in [e.event_time for e in events]
-                ):
+                if ied < rr_time < end_date:
                     events.append(
                         ContractEvent(
                             event_type=EventType.RR,
@@ -616,22 +639,14 @@ class UndefinedMaturityProfileContract(BaseContract):
                     )
 
         # FP: Fee Payment (optional)
-        if (
-            attributes.fee_payment_cycle
-            and attributes.fee_payment_anchor
-            and attributes.initial_exchange_date
-        ):
+        if attributes.fee_payment_cycle and attributes.fee_payment_anchor:
             fp_schedule = generate_schedule(
                 start=attributes.fee_payment_anchor,
                 cycle=attributes.fee_payment_cycle,
-                end=md,
+                end=end_date,
             )
             for fp_time in fp_schedule:
-                if (
-                    fp_time > attributes.initial_exchange_date
-                    and fp_time <= md
-                    and fp_time not in [e.event_time for e in events]
-                ):
+                if ied < fp_time <= end_date:
                     events.append(
                         ContractEvent(
                             event_type=EventType.FP,
@@ -641,12 +656,14 @@ class UndefinedMaturityProfileContract(BaseContract):
                         )
                     )
 
-        # MD: Maturity (required if provided)
-        if md:
+        # TD: Termination Date (if set)
+        # UMP has no MD event — maturity is uncertain and determined by observed events.
+        # The maturity_date field is only used as upper bound for schedule generation.
+        if td:
             events.append(
                 ContractEvent(
-                    event_type=EventType.MD,
-                    event_time=md,
+                    event_type=EventType.TD,
+                    event_time=td,
                     payoff=jnp.array(0.0, dtype=jnp.float32),
                     currency=attributes.currency or "XXX",
                 )

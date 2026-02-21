@@ -45,7 +45,7 @@ from typing import Any
 
 import jax.numpy as jnp
 
-from jactus.contracts.base import BaseContract
+from jactus.contracts.base import BaseContract, SimulationHistory
 from jactus.core import (
     ActusDateTime,
     ContractAttributes,
@@ -58,6 +58,7 @@ from jactus.core import (
 )
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.observers import ChildContractObserver, RiskFactorObserver
+from jactus.utilities.schedules import generate_schedule
 
 
 class CEGPayoffFunction(BasePayoffFunction):
@@ -190,19 +191,17 @@ class CreditEnhancementGuaranteeContract(BaseContract):
                 "contract_structure must contain 'CoveredContract' or 'CoveredContracts' key"
             )
 
-        # Validate coverage amount
+        # Default coverage to 1.0 (full coverage) if not specified
         if attributes.coverage is None:
-            raise ValueError("coverage (CECV) is required")
+            attributes.coverage = 1.0
 
-        # Validate credit event type
+        # Default credit event type to "DF" (default) if not specified
         if attributes.credit_event_type is None:
-            raise ValueError("credit_event_type (CET) is required")
+            attributes.credit_event_type = "DF"
 
-        # Validate credit enhancement guarantee extent
+        # Default guarantee extent to "NO" (notional only) if not specified
         if attributes.credit_enhancement_guarantee_extent is None:
-            raise ValueError(
-                "credit_enhancement_guarantee_extent (CEGE) is required (NO, NI, or MV)"
-            )
+            attributes.credit_enhancement_guarantee_extent = "NO"
 
         if attributes.credit_enhancement_guarantee_extent not in ["NO", "NI", "MV"]:
             raise ValueError(
@@ -441,3 +440,370 @@ class CreditEnhancementGuaranteeContract(BaseContract):
             CEGStateTransitionFunction instance
         """
         return CEGStateTransitionFunction()
+
+    def simulate(
+        self,
+        risk_factor_observer: RiskFactorObserver | None = None,
+        child_contract_observer: ChildContractObserver | None = None,
+    ) -> SimulationHistory:
+        """Simulate CEG contract with comprehensive event generation.
+
+        Generates PRD, FP, XD, STD, and MD events based on covered contract
+        states and credit events observed through the child observer.
+        """
+        from datetime import timedelta
+
+        from jactus.utilities.conventions import year_fraction
+
+        role_sign = self.attributes.contract_role.get_sign()
+        currency = self.attributes.currency or "USD"
+        events: list[ContractEvent] = []
+        covered_ids = self._get_covered_contract_ids()
+
+        # Determine effective maturity (from attributes or inferred from children)
+        effective_maturity = self.attributes.maturity_date
+        if effective_maturity is None:
+            for cid in covered_ids:
+                try:
+                    child_attrs = self.child_contract_observer._attributes.get(cid)
+                    if child_attrs and child_attrs.maturity_date:
+                        child_md = child_attrs.maturity_date
+                        if effective_maturity is None or child_md > effective_maturity:
+                            effective_maturity = child_md
+                except (AttributeError, KeyError):
+                    pass
+
+        # Calculate coverage at purchase_date (children have been funded by then)
+        coverage_time = self.attributes.purchase_date or self.attributes.status_date
+        coverage_amount = self._calculate_coverage_with_accrual(coverage_time)
+        current_nt = role_sign * coverage_amount
+
+        def _make_state(
+            time: ActusDateTime,
+            nt: float,
+            prf: ContractPerformance = ContractPerformance.PF,
+        ) -> ContractState:
+            return ContractState(
+                tmd=effective_maturity or time,
+                sd=time,
+                nt=jnp.array(nt, dtype=jnp.float32),
+                ipnr=jnp.array(0.0, dtype=jnp.float32),
+                ipac=jnp.array(0.0, dtype=jnp.float32),
+                feac=jnp.array(0.0, dtype=jnp.float32),
+                nsc=jnp.array(1.0, dtype=jnp.float32),
+                isc=jnp.array(1.0, dtype=jnp.float32),
+                prf=prf,
+            )
+
+        exercised = False
+
+        # PRD event at purchase date
+        if self.attributes.purchase_date:
+            prd_time = self.attributes.purchase_date
+            prd_payoff = -role_sign * (self.attributes.price_at_purchase_date or 0.0)
+            prd_state = _make_state(prd_time, current_nt)
+            events.append(ContractEvent(
+                event_type=EventType.PRD,
+                event_time=prd_time,
+                payoff=jnp.array(prd_payoff, dtype=jnp.float32),
+                currency=currency,
+                state_pre=prd_state,
+                state_post=prd_state,
+            ))
+
+        # FP events from fee payment schedule
+        if self.attributes.fee_payment_cycle and self.attributes.fee_rate is not None:
+            fp_start = (
+                self.attributes.fee_payment_anchor
+                or self.attributes.purchase_date
+                or self.attributes.status_date
+            )
+            fp_end = effective_maturity or self.attributes.status_date
+            cycle = self.attributes.fee_payment_cycle
+            fp_dates = generate_schedule(start=fp_start, cycle=cycle, end=fp_end)
+            for fp_time in fp_dates:
+                if fp_time <= self.attributes.status_date:
+                    continue
+                # Calculate coverage at FP time for notional tracking
+                try:
+                    fp_coverage = self._calculate_coverage_with_accrual(fp_time)
+                    fp_nt = role_sign * fp_coverage
+                except Exception:
+                    fp_nt = current_nt
+                fp_state = _make_state(fp_time, fp_nt)
+                fp_payoff = role_sign * (self.attributes.fee_rate or 0.0)
+                events.append(ContractEvent(
+                    event_type=EventType.FP,
+                    event_time=fp_time,
+                    payoff=jnp.array(fp_payoff, dtype=jnp.float32),
+                    currency=currency,
+                    state_pre=fp_state,
+                    state_post=fp_state,
+                ))
+
+        # Detect credit events from child observer
+        target_perf = self.attributes.credit_event_type or "DF"
+        ce_time = None
+        exercise_amount = 0.0
+
+        for cid in covered_ids:
+            try:
+                child_events = self.child_contract_observer.observe_events(
+                    cid, self.attributes.status_date, None
+                )
+            except (KeyError, ValueError):
+                continue
+            for ce in child_events:
+                if ce.event_type == EventType.CE and ce.state_post is not None:
+                    # Check performance matches target
+                    prf_match = (
+                        str(ce.state_post.prf) == target_perf
+                        or (hasattr(ce.state_post.prf, "value") and ce.state_post.prf.value == target_perf)
+                    )
+                    if not prf_match:
+                        continue
+                    # Only consider CE events before effective maturity
+                    if effective_maturity and ce.event_time > effective_maturity:
+                        continue
+                    ce_time = ce.event_time
+                    exercise_amount = self._calculate_coverage_with_accrual(ce_time)
+                    break
+            if ce_time:
+                break
+
+        # XD and STD events if credit event detected
+        if ce_time is not None:
+            exercised = True
+            xd_nt = role_sign * exercise_amount
+            xd_state = _make_state(ce_time, xd_nt)
+            events.append(ContractEvent(
+                event_type=EventType.XD,
+                event_time=ce_time,
+                payoff=jnp.array(0.0, dtype=jnp.float32),
+                currency=currency,
+                state_pre=xd_state,
+                state_post=xd_state,
+            ))
+
+            # STD time = XD + settlementPeriod (with business day adjustment)
+            std_time = self._compute_settlement_time(ce_time)
+
+            # STD payoff = exercise amount
+            # Add accrued interest only if settlement period is non-zero
+            # (business day shifts from P0D don't create an accrual period)
+            std_payoff = role_sign * exercise_amount
+            raw_delay = self._get_settlement_period_days()
+            if raw_delay > 0:
+                # Compute accrual using raw settlement end (before bday adjustment)
+                raw_end = self._compute_raw_settlement_end(ce_time)
+                accrual = self._compute_accrual_between(ce_time, raw_end)
+                std_payoff += role_sign * accrual
+
+            std_state = _make_state(std_time, 0.0)
+            events.append(ContractEvent(
+                event_type=EventType.STD,
+                event_time=std_time,
+                payoff=jnp.array(std_payoff, dtype=jnp.float32),
+                currency=currency,
+                state_pre=xd_state,
+                state_post=std_state,
+            ))
+
+        # MD event at effective maturity (if not exercised)
+        if effective_maturity and not exercised:
+            md_state = _make_state(effective_maturity, 0.0)
+            events.append(ContractEvent(
+                event_type=EventType.MD,
+                event_time=effective_maturity,
+                payoff=jnp.array(0.0, dtype=jnp.float32),
+                currency=currency,
+                state_pre=_make_state(effective_maturity, current_nt),
+                state_post=md_state,
+            ))
+
+        # Sort events
+        events.sort(key=lambda e: (
+            e.event_time.year, e.event_time.month, e.event_time.day, e.sequence
+        ))
+
+        # Filter out FP events at or after STD if exercised
+        if exercised and ce_time:
+            std_time = self._compute_settlement_time(ce_time)
+            events = [
+                e for e in events
+                if e.event_time < std_time
+                or e.event_type in (EventType.XD, EventType.STD)
+            ]
+
+        initial_state = _make_state(self.attributes.status_date, current_nt)
+        states = [e.state_post for e in events if e.state_post is not None]
+        final_state = states[-1] if states else initial_state
+
+        return SimulationHistory(
+            events=events,
+            states=states,
+            initial_state=initial_state,
+            final_state=final_state,
+        )
+
+    def _get_child_dcc(self, child_id: str):
+        """Get day count convention for a child contract."""
+        try:
+            child_attrs = self.child_contract_observer._attributes.get(child_id)
+            if child_attrs and child_attrs.day_count_convention:
+                return child_attrs.day_count_convention
+        except (AttributeError, KeyError):
+            pass
+        from jactus.core.types import DayCountConvention
+        return DayCountConvention.A365
+
+    def _calculate_coverage_with_accrual(self, time: ActusDateTime) -> float:
+        """Calculate coverage amount with proper accrued interest for NI mode.
+
+        For NO mode: sum of abs(nt) * coverage
+        For NI mode: sum of (abs(nt) + accrued_interest) * coverage
+        For MV mode: same as NO (approximation)
+        """
+        from jactus.utilities.conventions import year_fraction
+
+        covered_ids = self._get_covered_contract_ids()
+        cege = self.attributes.credit_enhancement_guarantee_extent
+        coverage_ratio = float(self.attributes.coverage)
+        total = 0.0
+
+        for cid in covered_ids:
+            try:
+                state = self.child_contract_observer.observe_state(cid, time, None, None)
+            except (KeyError, ValueError):
+                continue
+            nt = abs(float(state.nt))
+
+            if cege == "NI":
+                ipnr = abs(float(state.ipnr)) if state.ipnr is not None else 0.0
+                ipac = abs(float(state.ipac)) if state.ipac is not None else 0.0
+                dcc = self._get_child_dcc(cid)
+                yf = year_fraction(state.sd, time, dcc)
+                accrued = ipac + yf * ipnr * nt
+                total += nt + accrued
+            else:
+                # NO or MV mode: notional only
+                total += nt
+
+        return coverage_ratio * total
+
+    def _compute_accrual_between(
+        self, start: ActusDateTime, end: ActusDateTime,
+    ) -> float:
+        """Compute total accrued interest on covered contracts between two times."""
+        from jactus.utilities.conventions import year_fraction
+
+        covered_ids = self._get_covered_contract_ids()
+        total = 0.0
+        for cid in covered_ids:
+            try:
+                state = self.child_contract_observer.observe_state(cid, start, None, None)
+            except (KeyError, ValueError):
+                continue
+            nt = abs(float(state.nt))
+            ipnr = abs(float(state.ipnr)) if state.ipnr is not None else 0.0
+            dcc = self._get_child_dcc(cid)
+            yf = year_fraction(start, end, dcc)
+            total += yf * ipnr * nt
+        return total
+
+    def _get_settlement_period_days(self) -> int:
+        """Parse settlement period and return the number of days (0 for P0D)."""
+        import re
+        sp = self.attributes.settlement_period
+        if not sp:
+            return 0
+        sp = sp[1:] if sp.startswith("P") else sp
+        if "L" in sp:
+            sp = sp[:sp.index("L")]
+        m = re.match(r"(\d+)([DWMY])", sp)
+        if not m:
+            return 0
+        n, unit = int(m.group(1)), m.group(2)
+        if unit == "D":
+            return n
+        if unit == "W":
+            return n * 7
+        # For M/Y, approximate
+        return n * 30 if unit == "M" else n * 365
+
+    def _compute_raw_settlement_end(self, xd_time: ActusDateTime) -> ActusDateTime:
+        """Compute settlement end date without business day adjustment."""
+        import re
+        sp = self.attributes.settlement_period
+        if not sp:
+            return xd_time
+        sp_str = sp[1:] if sp.startswith("P") else sp
+        if "L" in sp_str:
+            sp_str = sp_str[:sp_str.index("L")]
+        m = re.match(r"(\d+)([DWMY])", sp_str)
+        if not m:
+            return xd_time
+        n, unit = int(m.group(1)), m.group(2)
+        if n == 0:
+            return xd_time
+        from dateutil.relativedelta import relativedelta
+        xd_py = xd_time.to_datetime()
+        delta_map = {
+            "D": relativedelta(days=n),
+            "W": relativedelta(weeks=n),
+            "M": relativedelta(months=n),
+            "Y": relativedelta(years=n),
+        }
+        end_py = xd_py + delta_map.get(unit, relativedelta())
+        return ActusDateTime(end_py.year, end_py.month, end_py.day, end_py.hour, end_py.minute, end_py.second)
+
+    def _adjust_business_day(self, time: ActusDateTime) -> ActusDateTime:
+        """Adjust date to next business day if it falls on a weekend.
+
+        Only applies when the contract has a non-trivial calendar (e.g., MF).
+        """
+        from jactus.core.types import Calendar
+        calendar = self.attributes.calendar
+        if calendar in (Calendar.NO_CALENDAR, None):
+            return time
+        dt = time.to_datetime()
+        while dt.weekday() >= 5:  # Saturday=5, Sunday=6
+            from datetime import timedelta
+            dt += timedelta(days=1)
+        return ActusDateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
+
+    def _compute_settlement_time(self, xd_time: ActusDateTime) -> ActusDateTime:
+        """Compute settlement time from exercise time + settlement period."""
+        settlement_period = self.attributes.settlement_period
+        if not settlement_period:
+            return self._adjust_business_day(xd_time)
+
+        # Parse settlement period (e.g., "P0D", "P5DL0")
+        import re
+        sp = settlement_period
+        if sp.startswith("P"):
+            sp = sp[1:]
+        if "L" in sp:
+            sp = sp[:sp.index("L")]
+        m = re.match(r"(\d+)([DWMY])", sp)
+        if not m:
+            return self._adjust_business_day(xd_time)
+
+        n, unit = int(m.group(1)), m.group(2)
+        if n == 0:
+            return self._adjust_business_day(xd_time)
+
+        from dateutil.relativedelta import relativedelta
+        xd_py = xd_time.to_datetime()
+        delta_map = {
+            "D": relativedelta(days=n),
+            "W": relativedelta(weeks=n),
+            "M": relativedelta(months=n),
+            "Y": relativedelta(years=n),
+        }
+        std_py = xd_py + delta_map.get(unit, relativedelta())
+        result = ActusDateTime(
+            std_py.year, std_py.month, std_py.day,
+            std_py.hour, std_py.minute, std_py.second,
+        )
+        return self._adjust_business_day(result)

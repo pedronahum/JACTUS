@@ -104,7 +104,11 @@ class TestUMPEventSchedule:
         assert EventType.MD not in event_types
 
     def test_ump_schedule_with_maturity(self):
-        """Test schedule generation with maturity date."""
+        """Test schedule generation with maturity date as upper bound.
+
+        UMP contracts do not generate MD events — maturity_date is only
+        used as an upper bound for periodic schedule generation.
+        """
         attrs = ContractAttributes(
             contract_id="UMP-TEST-004",
             contract_type=ContractType.UMP,
@@ -125,7 +129,8 @@ class TestUMPEventSchedule:
         event_types = [e.event_type for e in schedule.events]
         assert EventType.AD in event_types
         assert EventType.IED in event_types
-        assert EventType.MD in event_types
+        # UMP has no MD — maturity is uncertain
+        assert EventType.MD not in event_types
 
     def test_ump_ipci_schedule(self):
         """Test IPCI schedule generation."""
@@ -452,11 +457,10 @@ class TestUMPSimulation:
         schedule = contract.generate_event_schedule()
         assert len(schedule.events) > 0
 
-        # Should have IED, IPCI events, and MD
+        # Should have IED and IPCI events (no MD for UMP)
         event_types = [e.event_type for e in schedule.events]
         assert EventType.IED in event_types
         assert EventType.IPCI in event_types
-        assert EventType.MD in event_types
 
     def test_ump_with_ipci_simulation(self):
         """Test UMP with interest capitalization."""

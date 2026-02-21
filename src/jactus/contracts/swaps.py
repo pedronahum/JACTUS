@@ -40,7 +40,7 @@ from typing import Any
 
 import jax.numpy as jnp
 
-from jactus.contracts.base import BaseContract
+from jactus.contracts.base import BaseContract, SimulationHistory
 from jactus.core import (
     ActusDateTime,
     ContractAttributes,
@@ -88,7 +88,7 @@ def merge_congruent_events(event1: ContractEvent, event2: ContractEvent) -> Cont
     Congruent events have:
         - Same event time
         - Same event type
-        - Compatible for netting (IED, IP, PR)
+        - Compatible for netting (IED, IP, PR, MD)
 
     Formula: f(z) = f(x) + f(y) where τ=t=s
 
@@ -97,26 +97,36 @@ def merge_congruent_events(event1: ContractEvent, event2: ContractEvent) -> Cont
         event2: Second event (from second leg)
 
     Returns:
-        Merged event with summed payoffs
-
-    Example:
-        >>> e1 = ContractEvent(EventType.IP, time, payoff=1000.0, currency="USD")
-        >>> e2 = ContractEvent(EventType.IP, time, payoff=-800.0, currency="USD")
-        >>> merged = merge_congruent_events(e1, e2)
-        >>> merged.payoff
-        200.0  # Net payment
+        Merged event with summed payoffs and aggregated state
     """
-    # Sum payoffs
     net_payoff = event1.payoff + event2.payoff
 
-    # Create merged event
+    # Create merged state_post with aggregated values
+    merged_state_post = None
+    if event1.state_post is not None and event2.state_post is not None:
+        s1 = event1.state_post
+        s2 = event2.state_post
+        merged_state_post = ContractState(
+            sd=s1.sd,
+            tmd=s1.tmd,
+            nt=jnp.array(float(s1.nt) + float(s2.nt), dtype=jnp.float32),
+            ipnr=jnp.array(0.0, dtype=jnp.float32),
+            ipac=jnp.array(0.0, dtype=jnp.float32),
+            feac=jnp.array(0.0, dtype=jnp.float32),
+            nsc=jnp.array(1.0, dtype=jnp.float32),
+            isc=jnp.array(1.0, dtype=jnp.float32),
+            prf=s1.prf,
+        )
+    elif event1.state_post is not None:
+        merged_state_post = event1.state_post
+
     return ContractEvent(
         event_type=event1.event_type,
         event_time=event1.event_time,
         payoff=net_payoff,
-        currency=event1.currency,  # Assume same currency
-        state_pre=event1.state_pre,  # Use first leg's state
-        state_post=event1.state_post,
+        currency=event1.currency,
+        state_pre=event1.state_pre,
+        state_post=merged_state_post,
         sequence=event1.sequence,
     )
 
@@ -299,10 +309,10 @@ class GenericSwapContract(BaseContract):
         first_events = first_leg_events
         second_events = second_leg_events
 
-        if ds_mode == "D":
-            # Net settlement: Merge congruent events
+        if ds_mode == "S":
+            # Cash settlement (net): Merge congruent events by summing payoffs
             # Congruent = same time and type (IED, IP, PR)
-            congruent_types = {EventType.IED, EventType.IP, EventType.PR}
+            congruent_types = {EventType.IED, EventType.IP, EventType.PR, EventType.MD}
 
             # Build time->event maps
             first_map: dict[tuple[ActusDateTime, EventType], ContractEvent] = {}
@@ -339,11 +349,74 @@ class GenericSwapContract(BaseContract):
                     events.append(e2)
 
         else:
-            # Gross settlement: Keep all events separate
+            # Delivery/gross settlement (D): Keep all events separate
             events.extend(first_events)
             events.extend(second_events)
 
-        # Add any parent-level events (analysis dates, termination, etc.)
+        currency = self.attributes.currency or "USD"
+        role_sign = self.attributes.contract_role.get_sign()
+
+        # Filter by purchase date: exclude events before PRD
+        if self.attributes.purchase_date:
+            prd_time = self.attributes.purchase_date
+            events = [e for e in events if e.event_time > prd_time]
+            # Add PRD event
+            prd_payoff = role_sign * (self.attributes.price_at_purchase_date or 0.0)
+            zero_state = ContractState(
+                tmd=self.attributes.maturity_date or prd_time,
+                sd=prd_time,
+                nt=jnp.array(0.0, dtype=jnp.float32),
+                ipnr=jnp.array(0.0, dtype=jnp.float32),
+                ipac=jnp.array(0.0, dtype=jnp.float32),
+                feac=jnp.array(0.0, dtype=jnp.float32),
+                nsc=jnp.array(1.0, dtype=jnp.float32),
+                isc=jnp.array(1.0, dtype=jnp.float32),
+                prf=ContractPerformance.PF,
+            )
+            events.append(
+                ContractEvent(
+                    event_type=EventType.PRD,
+                    event_time=prd_time,
+                    payoff=jnp.array(prd_payoff, dtype=jnp.float32),
+                    currency=currency,
+                    state_pre=zero_state,
+                    state_post=zero_state,
+                )
+            )
+
+        # Filter by termination date: keep events before TD and non-MD events at TD
+        if self.attributes.termination_date:
+            td_time = self.attributes.termination_date
+            events = [
+                e for e in events
+                if e.event_time < td_time
+                or (e.event_time == td_time and e.event_type != EventType.MD)
+            ]
+            # Add TD event
+            td_payoff = role_sign * (self.attributes.price_at_termination_date or 0.0)
+            td_state = ContractState(
+                tmd=td_time,
+                sd=td_time,
+                nt=jnp.array(0.0, dtype=jnp.float32),
+                ipnr=jnp.array(0.0, dtype=jnp.float32),
+                ipac=jnp.array(0.0, dtype=jnp.float32),
+                feac=jnp.array(0.0, dtype=jnp.float32),
+                nsc=jnp.array(1.0, dtype=jnp.float32),
+                isc=jnp.array(1.0, dtype=jnp.float32),
+                prf=ContractPerformance.PF,
+            )
+            events.append(
+                ContractEvent(
+                    event_type=EventType.TD,
+                    event_time=td_time,
+                    payoff=jnp.array(td_payoff, dtype=jnp.float32),
+                    currency=currency,
+                    state_pre=td_state,
+                    state_post=td_state,
+                )
+            )
+
+        # Add analysis date events
         if self.attributes.analysis_dates:
             for ad_time in self.attributes.analysis_dates:
                 events.append(
@@ -351,19 +424,9 @@ class GenericSwapContract(BaseContract):
                         event_type=EventType.AD,
                         event_time=ad_time,
                         payoff=0.0,
-                        currency=self.attributes.currency or "USD",
+                        currency=currency,
                     )
                 )
-
-        if self.attributes.termination_date:
-            events.append(
-                ContractEvent(
-                    event_type=EventType.TD,
-                    event_time=self.attributes.termination_date,
-                    payoff=0.0,
-                    currency=self.attributes.currency or "USD",
-                )
-            )
 
         # Sort events by time
         events.sort(
@@ -465,3 +528,28 @@ class GenericSwapContract(BaseContract):
             GenericSwapStateTransitionFunction instance
         """
         return GenericSwapStateTransitionFunction()
+
+    def simulate(
+        self,
+        risk_factor_observer: RiskFactorObserver | None = None,
+        child_contract_observer: ChildContractObserver | None = None,
+    ) -> SimulationHistory:
+        """Simulate SWAPS contract by passing through child contract events.
+
+        For SWAPS, event payoffs and states come directly from child contract
+        simulations. The schedule events already contain pre-computed data,
+        so we pass them through instead of recalculating via POF/STF.
+        """
+        initial_state = self.initialize_state()
+        schedule = self.get_events()
+
+        events = list(schedule.events)
+        states = [e.state_post for e in events if e.state_post is not None]
+        final_state = states[-1] if states else initial_state
+
+        return SimulationHistory(
+            events=events,
+            states=states,
+            initial_state=initial_state,
+            final_state=final_state,
+        )

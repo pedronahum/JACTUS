@@ -120,6 +120,9 @@ class ContractAttributes(BaseModel):
     option_exercise_end_date: ActusDateTime | None = Field(
         None, description="Last date option can be exercised (OPXED)"
     )
+    x_day_notice: str | None = Field(
+        None, description="Notice period for call/put (XDN)"
+    )
     exercise_date: ActusDateTime | None = Field(
         None, description="Date of option/derivative exercise (XD)"
     )
