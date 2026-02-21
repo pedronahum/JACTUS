@@ -1,0 +1,135 @@
+{
+    "csh01": {
+        "identifier": "csh01",
+        "terms": {
+            "contractType": "CSH",
+            "statusDate": "2015-07-15T00:00:00",
+            "contractRole": "RPA",
+            "contractID": "csh01",
+            "currency": "CHF",
+            "notionalPrincipal": "1000"
+        },
+        "to": "2015-08-15T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+            {
+                "time": "2015-07-30T00:00:00",
+                "type": "AD",
+                "value": 0
+            }
+        ],
+        "results": [
+            {
+                "eventDate": "2015-07-30T00:00",
+                "eventType": "AD",
+                "payoff": 0,
+                "notionalPrincipal": 1000,
+                "nominalInterestRate": 0,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            }
+        ]
+    },
+    "csh02": {
+        "identifier": "csh02",
+        "terms": {
+            "contractType": "CSH",
+            "statusDate": "2015-07-15T00:00:00",
+            "contractRole": "RPL",
+            "contractID": "csh02",
+            "currency": "USD",
+            "notionalPrincipal": "1200"
+        },
+        "to": "2015-08-15T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+            {
+                "time": "2015-07-31T00:00:00",
+                "type": "AD",
+                "value": 0
+            }
+        ],
+        "results": [
+            {
+                "eventDate": "2015-07-31T00:00",
+                "eventType": "AD",
+                "payoff": 0,
+                "notionalPrincipal": -1200,
+                "nominalInterestRate": 0,
+                "accruedInterest": 0,
+                "currency": "USD"
+            }
+        ]
+    },
+    "csh03": {
+        "identifier": "csh03",
+        "terms": {
+            "contractType": "CSH",
+            "statusDate": "2015-07-31T00:00:00",
+            "contractRole": "RPA",
+            "contractID": "csh03",
+            "currency": "CHF",
+            "notionalPrincipal": "2000"
+        },
+        "to": "2015-09-15T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+            {
+                "time": "2015-08-20T00:00:00",
+                "type": "AD",
+                "value": 0
+            }
+        ],
+        "results": [
+            {
+                "eventDate": "2015-08-20T00:00",
+                "eventType": "AD",
+                "payoff": 0,
+                "notionalPrincipal": 2000,
+                "nominalInterestRate": 0,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            }
+        ]
+    },
+    "csh04": {
+        "identifier": "csh04",
+        "terms": {
+            "contractType": "CSH",
+            "statusDate": "2015-07-31T00:00:00",
+            "contractRole": "RPL",
+            "contractID": "csh04",
+            "currency": "USD",
+            "notionalPrincipal": "2500"
+        },
+        "to": "2015-09-15T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+            {
+                "time": "2015-08-20T23:59:59",
+                "type": "AD",
+                "value": 0
+            }
+        ],
+        "results": [
+            {
+                "eventDate": "2015-08-20T23:59:59",
+                "eventType": "AD",
+                "payoff": 0,
+                "notionalPrincipal": -2500,
+                "nominalInterestRate": 0,
+                "accruedInterest": 0,
+                "currency": "USD"
+            }
+        ]
+    }
+}
+

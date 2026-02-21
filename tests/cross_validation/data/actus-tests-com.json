@@ -1,0 +1,160 @@
+{
+    "com01": {
+        "identifier": "com01",
+        "terms": {
+            "contractType": "COM",
+            "contractID": "com01",
+            "statusDate": "2014-12-30T00:00:00",
+            "contractDealDate": "2014-12-15T00:00:00",
+            "purchaseDate": "2015-03-30T00:00:00",
+            "priceAtPurchaseDate": "700",
+            "contractRole": "RPL",
+            "currency": "USD",
+            "quantity": "2",
+            "unit": "BRL"
+        },
+        "to": "2015-04-30T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2015-03-30T00:00:00",
+                "eventType": "PRD",
+                "payoff": 1400,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0,
+                "accruedInterest": 0,
+                "currency": "USD"
+            }
+        ]
+    },
+    "com02": {
+        "identifier": "com02",
+        "terms": {
+            "contractType": "COM",
+            "contractID": "com02",
+            "statusDate": "2014-12-30T00:00:00",
+            "contractDealDate": "2014-12-15T00:00:00",
+            "terminationDate": "2015-11-30T00:00:00",
+            "priceAtTerminationDate": "900",
+            "contractRole": "RPA",
+            "currency": "USD",
+            "marketValueObserved": "50",
+            "quantity": "2",
+            "unit": "BRL"
+        },
+        "to": "2015-12-30T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2015-11-30T00:00:00",
+                "eventType": "TD",
+                "payoff": 1800,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0,
+                "accruedInterest": 0,
+                "currency": "USD"
+            }
+        ]
+    },
+    "com03": {
+        "identifier": "com03",
+        "terms": {
+            "contractType": "COM",
+            "contractID": "com03",
+            "statusDate": "2014-12-30T00:00:00",
+            "contractDealDate": "2014-12-15T00:00:00",
+            "purchaseDate": "2015-03-30T00:00:00",
+            "priceAtPurchaseDate": "700",
+            "terminationDate": "2016-02-20T00:00:00",
+            "priceAtTerminationDate": "900",
+            "contractRole": "RPA",
+            "currency": "USD",
+            "marketValueObserved": "100",
+            "quantity": "3",
+            "unit": "BRL"
+        },
+        "to": "2016-03-30T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2015-03-30T00:00:00",
+                "eventType": "PRD",
+                "payoff": -2100,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2016-02-20T00:00:00",
+                "eventType": "TD",
+                "payoff": 2700,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0,
+                "accruedInterest": 0,
+                "currency": "USD"
+            }
+        ]
+    },
+    "com04": {
+        "identifier": "com04",
+        "terms": {
+            "contractType": "COM",
+            "contractID": "com04",
+            "statusDate": "2014-12-30T00:00:00",
+            "contractDealDate": "2014-12-15T00:00:00",
+            "purchaseDate": "2015-03-30T00:00:00",
+            "priceAtPurchaseDate": "700",
+            "terminationDate": "2016-02-20T00:00:00",
+            "priceAtTerminationDate": "900",
+            "contractRole": "RPL",
+            "currency": "GBP",
+            "marketValueObserved": "100",
+            "quantity": "3",
+            "unit": "BRL"
+        },
+        "to": "2016-03-30T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2015-03-30T00:00:00",
+                "eventType": "PRD",
+                "payoff": 2100,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0,
+                "accruedInterest": 0,
+                "currency": "GBP"
+            },
+            {
+                "eventDate": "2016-02-20T00:00:00",
+                "eventType": "TD",
+                "payoff": -2700,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0,
+                "accruedInterest": 0,
+                "currency": "GBP"
+            }
+        ]
+    }
+}
+

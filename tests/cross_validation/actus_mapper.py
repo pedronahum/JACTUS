@@ -83,7 +83,7 @@ TERM_NAME_MAP: dict[str, str] = {
     "calendar": "calendar",
     # Derivative-specific
     "settlementPeriod": "settlement_period",
-    "deliverySettlement": "delivery_type",
+    "deliverySettlement": "delivery_settlement",
     "optionType": "option_type",
     "optionStrike1": "option_strike_1",
     "optionExerciseType": "option_exercise_type",
@@ -96,6 +96,37 @@ TERM_NAME_MAP: dict[str, str] = {
     "guaranteedExposure": "credit_enhancement_guarantee_extent",
     # ANN-specific: amortizationDate is the horizon for annuity calculation
     "amortizationDate": "amortization_date",
+    # FX-specific
+    "notionalPrincipal2": "notional_principal_2",
+    "currency2": "currency_2",
+    "settlementCurrency": "settlement_currency",
+    # Commodity/equity-specific
+    "quantity": "quantity",
+    "unit": "unit",
+    "marketObjectCode": "market_object_code",
+    # Dividend
+    "cycleOfDividend": "dividend_cycle",
+    "cycleOfDividendPayment": "dividend_cycle",
+    "cycleAnchorDateOfDividend": "dividend_anchor",
+    "cycleAnchorDateOfDividendPayment": "dividend_anchor",
+    "marketObjectCodeOfDividends": "market_object_code_of_dividends",
+    # Additional derivative fields
+    "optionStrike2": "option_strike_2",
+    # SWPPV-specific
+    "nominalInterestRate2": "nominal_interest_rate_2",
+    "fixingPeriod": "fixing_period",
+    # Exercise fields (OPTNS/FUTUR with SD >= maturity)
+    "exerciseDate": "exercise_date",
+    "exerciseAmount": "exercise_amount",
+    # LAX array attributes (map to JACTUS short names)
+    "arrayCycleAnchorDateOfPrincipalRedemption": "array_pr_anchor",
+    "arrayCycleOfPrincipalRedemption": "array_pr_cycle",
+    "arrayNextPrincipalRedemptionPayment": "array_pr_next",
+    "arrayIncreaseDecrease": "array_increase_decrease",
+    "arrayCycleAnchorDateOfInterestPayment": "array_ip_anchor",
+    "arrayCycleOfInterestPayment": "array_ip_cycle",
+    "arrayRate": "array_rate",
+    "arrayFixedVariable": "array_fixed_variable",
 }
 
 # Day count convention string mapping
@@ -140,6 +171,10 @@ ROLE_MAP: dict[str, ContractRole] = {
     "ST": ContractRole.ST,
     "BUY": ContractRole.BUY,
     "SEL": ContractRole.SEL,
+    "RFL": ContractRole.RFL,
+    "PFL": ContractRole.PFL,
+    "RF": ContractRole.RFL,
+    "PF": ContractRole.PFL,
 }
 
 # End-of-month convention mapping
@@ -152,6 +187,7 @@ EOMC_MAP: dict[str, EndOfMonthConvention] = {
 CALENDAR_MAP: dict[str, Calendar] = {
     "NC": Calendar.NO_CALENDAR,
     "NoCalendar": Calendar.NO_CALENDAR,
+    "NOCALENDAR": Calendar.NO_CALENDAR,
     "MF": Calendar.MONDAY_TO_FRIDAY,
     "MondayToFriday": Calendar.MONDAY_TO_FRIDAY,
     "TARGET": Calendar.TARGET,
@@ -199,6 +235,81 @@ def _parse_datetime(dt_str: str) -> ActusDateTime:
     return ActusDateTime.from_iso(dt_str)
 
 
+def _parse_contract_structure(value: Any) -> str:
+    """Convert ACTUS contractStructure list to JACTUS string format.
+
+    ACTUS test format is a list of reference objects:
+    [{"object": {...}, "referenceType": "MOC"|"CNT"|"CID", "referenceRole": "UDL"|"FIL"|"SEL"|...}]
+
+    JACTUS expects:
+    - OPTNS/FUTUR: simple string (market object code)
+    - SWAPS: JSON {"FirstLeg": {...}, "SecondLeg": {...}}
+    - CAPFL: JSON {"Underlying": {...}}
+    - CEG: JSON {"CoveredContract": "id"} or {"CoveredContracts": [...]}
+    - CEC: JSON {"CoveredContract": "id", "CoveringContract": "id"}
+    """
+    if isinstance(value, str):
+        return value
+    if not isinstance(value, list) or len(value) == 0:
+        return json.dumps(value)
+
+    # Build role->object mapping
+    refs_by_role: dict[str, Any] = {}
+    for ref in value:
+        role = ref.get("referenceRole", "")
+        refs_by_role[role] = ref
+
+    # Single MOC reference (OPTNS/FUTUR): extract market object code
+    if len(value) == 1:
+        ref = value[0]
+        ref_type = ref.get("referenceType", "")
+        obj = ref.get("object", {})
+
+        if ref_type == "MOC":
+            return obj.get("marketObjectCode", json.dumps(obj))
+
+        role = ref.get("referenceRole", "")
+        if role == "UDL" and ref_type == "CNT":
+            # CAPFL: underlying contract
+            return json.dumps({"Underlying": obj})
+        if role in ("COVE", "COVI"):
+            # CEG/CEC with single reference
+            if "contractIdentifier" in obj:
+                return json.dumps({"CoveredContract": obj["contractIdentifier"]})
+            return json.dumps({"CoveredContract": obj})
+
+    # Multi-reference: SWAPS (FIL+SEL), CEC (COVE+COVI)
+    if "FIL" in refs_by_role and "SEL" in refs_by_role:
+        return json.dumps({
+            "FirstLeg": refs_by_role["FIL"].get("object", {}),
+            "SecondLeg": refs_by_role["SEL"].get("object", {}),
+        })
+
+    if "COVE" in refs_by_role and "COVI" in refs_by_role:
+        cove = refs_by_role["COVE"].get("object", {})
+        covi = refs_by_role["COVI"].get("object", {})
+        covered = cove.get("contractIdentifier", cove)
+        covering = covi.get("contractIdentifier", covi)
+        return json.dumps({
+            "CoveredContract": covered,
+            "CoveringContract": covering,
+        })
+
+    # Multiple COVE references (CEG with multiple covered contracts)
+    cove_refs = [r for r in value if r.get("referenceRole") == "COVE"]
+    if cove_refs:
+        ids = []
+        for r in cove_refs:
+            obj = r.get("object", {})
+            ids.append(obj.get("contractIdentifier", obj))
+        if len(ids) == 1:
+            return json.dumps({"CoveredContract": ids[0]})
+        return json.dumps({"CoveredContracts": ids})
+
+    # Fallback: serialize as-is
+    return json.dumps(value)
+
+
 def _parse_value(key: str, value: str | Any) -> Any:
     """Parse a single ACTUS test term value to the appropriate JACTUS type."""
     if value is None or value == "":
@@ -221,6 +332,8 @@ def _parse_value(key: str, value: str | Any) -> Any:
         # ACTUS tests use 'O' (letter) where JACTUS enum uses '0' (digit)
         # e.g., "IOO" -> "I00", "INO" -> "IN0"
         return str(value).replace("O", "0")
+    if jactus_key == "contract_structure":
+        return _parse_contract_structure(value)
     if jactus_key in (
         "status_date",
         "contract_deal_date",
@@ -237,6 +350,7 @@ def _parse_value(key: str, value: str | Any) -> Any:
         "scaling_index_anchor",
         "interest_calculation_base_anchor",
         "option_exercise_end_date",
+        "dividend_anchor",
     ):
         return _parse_datetime(str(value))
     if jactus_key in (
@@ -246,6 +360,7 @@ def _parse_value(key: str, value: str | Any) -> Any:
         "fee_payment_cycle",
         "scaling_index_cycle",
         "interest_calculation_base_cycle",
+        "dividend_cycle",
     ):
         return _parse_cycle(str(value))
     if jactus_key in (
@@ -267,10 +382,38 @@ def _parse_value(key: str, value: str | Any) -> Any:
         "scaling_index_at_status_date",
         "scaling_index_at_contract_deal_date",
         "option_strike_1",
+        "option_strike_2",
         "future_price",
         "coverage",
+        "notional_principal_2",
+        "quantity",
+        "nominal_interest_rate_2",
+        "exercise_amount",
     ):
         return float(value)
+    if jactus_key == "exercise_date":
+        return _parse_datetime(str(value))
+    # LAX array fields: parse as lists
+    if jactus_key in ("array_pr_anchor", "array_ip_anchor"):
+        # Array of datetime strings
+        if isinstance(value, list):
+            return [_parse_datetime(str(v)) for v in value]
+        return [_parse_datetime(str(value))]
+    if jactus_key in ("array_pr_cycle", "array_ip_cycle"):
+        # Array of cycle strings
+        if isinstance(value, list):
+            return [_parse_cycle(str(v)) for v in value]
+        return [_parse_cycle(str(value))]
+    if jactus_key in ("array_pr_next", "array_rate"):
+        # Array of floats
+        if isinstance(value, list):
+            return [float(v) for v in value]
+        return [float(value)]
+    if jactus_key in ("array_increase_decrease", "array_fixed_variable"):
+        # Array of strings
+        if isinstance(value, list):
+            return [str(v) for v in value]
+        return [str(value)]
 
     # Default: return as-is
     return value

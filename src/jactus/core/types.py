@@ -50,6 +50,8 @@ class EventType(str, Enum):
     STD = "STD"  # Settlement
     XD = "XD"  # Exercise Date
     CE = "CE"  # Credit Event
+    IPFX = "IPFX"  # Interest Payment Fixed Leg (swaps)
+    IPFL = "IPFL"  # Interest Payment Floating Leg (swaps)
 
     @property
     def index(self) -> int:
@@ -92,6 +94,8 @@ EVENT_SCHEDULE_PRIORITY: dict["EventType", int] = {
     EventType.DV: 21,
     EventType.DVF: 22,
     EventType.CE: 23,
+    EventType.IPFX: 24,
+    EventType.IPFL: 25,
 }
 
 

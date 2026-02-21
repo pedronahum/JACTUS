@@ -420,7 +420,7 @@ class BaseContract(nnx.Module, ABC):
                 event_type=event.event_type,
                 event_time=event.event_time,
                 payoff=payoff,
-                currency=self.attributes.currency or "XXX",
+                currency=event.currency or self.attributes.currency or "XXX",
                 state_pre=state,
                 state_post=state_post,
                 sequence=event.sequence,

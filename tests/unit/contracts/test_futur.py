@@ -214,18 +214,22 @@ class TestFuturePayoffs:
         # Simulate to maturity
         state = contract.initialize_state()
 
-        # Apply MD state transition
+        # Apply MD state transition (just updates sd, no settlement calc)
         stf = contract.get_state_transition_function(EventType.MD)
         maturity_time = attrs.maturity_date
         state_md = stf.transition_state(EventType.MD, state, attrs, maturity_time, rf_obs)
 
+        # Apply XD state transition (calculates settlement amount)
+        stf_xd = contract.get_state_transition_function(EventType.XD)
+        state_xd = stf_xd.transition_state(EventType.XD, state_md, attrs, maturity_time, rf_obs)
+
         # Calculate STD payoff
         pof = contract.get_payoff_function(EventType.STD)
         settlement_time = attrs.settlement_date
-        payoff = pof.calculate_payoff(EventType.STD, state_md, attrs, settlement_time, rf_obs)
+        payoff = pof.calculate_payoff(EventType.STD, state_xd, attrs, settlement_time, rf_obs)
 
-        # Payoff = (Spot - Futures) * Notional = (110 - 100) * 10 = 100
-        assert float(payoff) == pytest.approx(100.0, abs=0.01)
+        # Payoff = R(CNTRL) × Xa = 1 × (110 - 100) = 10 (per-unit settlement)
+        assert float(payoff) == pytest.approx(10.0, abs=0.01)
 
     def test_future_negative_settlement(self):
         """Test FUTUR settlement when spot < futures price (long loss)."""
@@ -249,18 +253,22 @@ class TestFuturePayoffs:
         # Simulate to maturity
         state = contract.initialize_state()
 
-        # Apply MD state transition
+        # Apply MD state transition (just updates sd)
         stf = contract.get_state_transition_function(EventType.MD)
         maturity_time = attrs.maturity_date
         state_md = stf.transition_state(EventType.MD, state, attrs, maturity_time, rf_obs)
 
+        # Apply XD state transition (calculates settlement amount)
+        stf_xd = contract.get_state_transition_function(EventType.XD)
+        state_xd = stf_xd.transition_state(EventType.XD, state_md, attrs, maturity_time, rf_obs)
+
         # Calculate STD payoff
         pof = contract.get_payoff_function(EventType.STD)
         settlement_time = attrs.settlement_date
-        payoff = pof.calculate_payoff(EventType.STD, state_md, attrs, settlement_time, rf_obs)
+        payoff = pof.calculate_payoff(EventType.STD, state_xd, attrs, settlement_time, rf_obs)
 
-        # Payoff = (Spot - Futures) * Notional = (90 - 100) * 10 = -100 (loss)
-        assert float(payoff) == pytest.approx(-100.0, abs=0.01)
+        # Payoff = R(CNTRL) × Xa = 1 × (90 - 100) = -10 (per-unit loss)
+        assert float(payoff) == pytest.approx(-10.0, abs=0.01)
 
     def test_future_zero_settlement(self):
         """Test FUTUR settlement when spot = futures price (no profit/loss)."""
@@ -302,7 +310,7 @@ class TestFutureStateTransitions:
     """Test FUTUR state transition functions."""
 
     def test_future_maturity_state_transition(self):
-        """Test FUTUR maturity state transition calculates settlement amount."""
+        """Test FUTUR XD state transition calculates settlement amount."""
         attrs = ContractAttributes(
             contract_id="FUTUR001",
             contract_type=ContractType.FUTUR,
@@ -321,16 +329,20 @@ class TestFutureStateTransitions:
 
         state = contract.initialize_state()
 
-        # Apply MD state transition
-        stf = contract.get_state_transition_function(EventType.MD)
+        # MD just updates status date - no settlement calc
+        stf_md = contract.get_state_transition_function(EventType.MD)
         maturity_time = attrs.maturity_date
-        state_md = stf.transition_state(EventType.MD, state, attrs, maturity_time, rf_obs)
+        state_md = stf_md.transition_state(EventType.MD, state, attrs, maturity_time, rf_obs)
+
+        # XD calculates settlement amount
+        stf_xd = contract.get_state_transition_function(EventType.XD)
+        state_xd = stf_xd.transition_state(EventType.XD, state_md, attrs, maturity_time, rf_obs)
 
         # Settlement amount should be Spot - Futures = 110 - 100 = 10
-        assert float(state_md.xa) == pytest.approx(10.0, abs=0.01)
+        assert float(state_xd.xa) == pytest.approx(10.0, abs=0.01)
 
     def test_future_maturity_negative_settlement(self):
-        """Test FUTUR maturity with negative settlement amount."""
+        """Test FUTUR XD with negative settlement amount."""
         attrs = ContractAttributes(
             contract_id="FUTUR001",
             contract_type=ContractType.FUTUR,
@@ -349,13 +361,17 @@ class TestFutureStateTransitions:
 
         state = contract.initialize_state()
 
-        # Apply MD state transition
-        stf = contract.get_state_transition_function(EventType.MD)
+        # MD just updates status date
+        stf_md = contract.get_state_transition_function(EventType.MD)
         maturity_time = attrs.maturity_date
-        state_md = stf.transition_state(EventType.MD, state, attrs, maturity_time, rf_obs)
+        state_md = stf_md.transition_state(EventType.MD, state, attrs, maturity_time, rf_obs)
+
+        # XD calculates settlement amount
+        stf_xd = contract.get_state_transition_function(EventType.XD)
+        state_xd = stf_xd.transition_state(EventType.XD, state_md, attrs, maturity_time, rf_obs)
 
         # Settlement amount should be Spot - Futures = 85 - 100 = -15
-        assert float(state_md.xa) == pytest.approx(-15.0, abs=0.01)
+        assert float(state_xd.xa) == pytest.approx(-15.0, abs=0.01)
 
 
 class TestFutureSimulation:
@@ -391,8 +407,8 @@ class TestFutureSimulation:
         std_cf = next((cf for cf in cashflows.events if cf.event_type == EventType.STD), None)
         assert std_cf is not None
 
-        # Settlement = (1850 - 1800) * 100 = 5000 profit
-        assert float(std_cf.payoff) == pytest.approx(5000.0, abs=0.01)
+        # Settlement = Xa = 1850 - 1800 = 50 (per-unit, R(CNTRL) × Xa)
+        assert float(std_cf.payoff) == pytest.approx(50.0, abs=0.01)
 
     def test_simulate_index_future(self):
         """Test complete simulation of an index future (S&P 500)."""
@@ -420,8 +436,8 @@ class TestFutureSimulation:
         std_cf = next((cf for cf in cashflows.events if cf.event_type == EventType.STD), None)
         assert std_cf is not None
 
-        # Settlement = (4400 - 4500) * 50 = -5000 (loss)
-        assert float(std_cf.payoff) == pytest.approx(-5000.0, abs=0.01)
+        # Settlement = Xa = 4400 - 4500 = -100 (per-unit, R(CNTRL) × Xa)
+        assert float(std_cf.payoff) == pytest.approx(-100.0, abs=0.01)
 
     def test_simulate_stock_future(self):
         """Test simulation of a single-stock future."""
@@ -449,8 +465,8 @@ class TestFutureSimulation:
         std_cf = next((cf for cf in cashflows.events if cf.event_type == EventType.STD), None)
         assert std_cf is not None
 
-        # Settlement = (155 - 150) * 100 = 500 profit
-        assert float(std_cf.payoff) == pytest.approx(500.0, abs=0.01)
+        # Settlement = Xa = 155 - 150 = 5 (per-unit, R(CNTRL) × Xa)
+        assert float(std_cf.payoff) == pytest.approx(5.0, abs=0.01)
 
 
 class TestFutureFactory:
@@ -507,11 +523,14 @@ class TestFutureEdgeCases:
         contract = FutureContract(attrs, rf_obs)
 
         state = contract.initialize_state()
-        stf = contract.get_state_transition_function(EventType.MD)
-        state_md = stf.transition_state(EventType.MD, state, attrs, attrs.maturity_date, rf_obs)
+        # MD just updates sd; XD calculates settlement
+        stf_md = contract.get_state_transition_function(EventType.MD)
+        state_md = stf_md.transition_state(EventType.MD, state, attrs, attrs.maturity_date, rf_obs)
+        stf_xd = contract.get_state_transition_function(EventType.XD)
+        state_xd = stf_xd.transition_state(EventType.XD, state_md, attrs, attrs.maturity_date, rf_obs)
 
         # Settlement should be 300 - 100 = 200
-        assert float(state_md.xa) == pytest.approx(200.0, abs=0.01)
+        assert float(state_xd.xa) == pytest.approx(200.0, abs=0.01)
 
     def test_future_same_purchase_and_maturity(self):
         """Test FUTUR where purchase and maturity are same day."""

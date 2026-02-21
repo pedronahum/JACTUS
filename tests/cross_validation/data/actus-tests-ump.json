@@ -1,0 +1,812 @@
+{
+    "ump01": {
+        "identifier": "ump01",
+        "terms": {
+            "contractID": "ump01",
+            "contractType": "UMP",
+            "statusDate": "2012-12-15T00:00:00",
+            "contractRole": "RPA",
+            "currency": "USD",
+            "contractDealDate": "2012-12-15T00:00:00",
+            "initialExchangeDate": "2013-01-01T00:00:00",
+            "notionalPrincipal": "  1000",
+            "dayCountConvention": "30E360",
+            "xDayNotice": "P1M"
+        },
+        "to": "2014-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2013-01-01T00:00:00",
+                "eventType": "IED",
+                "payoff": -1000,
+                "currency": "USD",
+                "notionalPrincipal": 1000,
+                "nominalInterestRate": 0,
+                "accruedInterest": 0
+            }
+        ]
+    },
+    "ump02": {
+        "identifier": "ump02",
+        "terms": {
+            "contractID": "ump02",
+            "contractType": "UMP",
+            "statusDate": "2012-12-15T00:00:00",
+            "contractRole": "RPA",
+            "currency": "USD",
+            "contractDealDate": "2012-12-15T00:00:00",
+            "initialExchangeDate": "2013-01-01T00:00:00",
+            "notionalPrincipal": "  1000",
+            "cycleAnchorDateOfInterestPayment": "2013-01-25T00:00:00",
+            "cycleOfInterestPayment": "P1ML1",
+            "nominalInterestRate": "0.01",
+            "dayCountConvention": "30E360",
+            "xDayNotice": "P1M"
+        },
+        "to": "2014-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2013-01-01T00:00:00",
+                "eventType": "IED",
+                "payoff": -1000,
+                "currency": "USD",
+                "notionalPrincipal": 1000,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-01-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1000.66666666666,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-02-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1001.50055555555,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-03-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1002.33513935185,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-04-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1003.17041863464,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-05-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1004.0063939835,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-06-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1004.84306597849,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-07-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1005.68043520014,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-08-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1006.51850222947,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-09-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1007.357267648,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-10-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1008.1967320377,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-11-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1009.03689598107,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-12-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1009.87776006105,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            }
+        ]
+    },
+    "ump03": {
+        "identifier": "ump03",
+        "terms": {
+            "contractID": "ump03",
+            "contractType": "UMP",
+            "statusDate": "2012-12-15T00:00:00",
+            "contractRole": "RPA",
+            "currency": "USD",
+            "contractDealDate": "2012-12-15T00:00:00",
+            "initialExchangeDate": "2013-01-01T00:00:00",
+            "notionalPrincipal": "  1000",
+            "cycleAnchorDateOfInterestPayment": "2013-01-25T00:00:00",
+            "cycleOfInterestPayment": "P1ML1",
+            "nominalInterestRate": "0.01",
+            "dayCountConvention": "AA",
+            "xDayNotice": "P1M"
+        },
+        "to": "2014-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2013-01-01T00:00:00",
+                "eventType": "IED",
+                "payoff": -1000,
+                "currency": "USD",
+                "notionalPrincipal": 1000,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-01-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1000.65753424657,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-02-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1001.50740776881,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-03-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1002.27568742408,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-04-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1003.1269352682,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-05-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1003.9514231602,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-06-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1004.80409423192,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-07-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1005.62996061074,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-08-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1006.48405728962,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-09-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1007.33887936567,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-10-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1008.16682912953,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-11-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1009.02308040907,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2013-12-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 1009.85241444776,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            }
+        ]
+    },
+    "ump04": {
+        "identifier": "ump04",
+        "terms": {
+            "contractID": "ump04",
+            "contractType": "UMP",
+            "statusDate": "2012-12-15T00:00:00",
+            "contractRole": "RPL",
+            "currency": "USD",
+            "contractDealDate": "2012-12-15T00:00:00",
+            "initialExchangeDate": "2013-01-01T00:00:00",
+            "notionalPrincipal": "  1000",
+            "cycleAnchorDateOfInterestPayment": "2014-01-01T00:00:00",
+            "cycleOfInterestPayment": "P1YL1",
+            "nominalInterestRate": "0.01",
+            "dayCountConvention": "30E360",
+            "xDayNotice": "P1M"
+        },
+        "to": "2018-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2013-01-01T00:00:00",
+                "eventType": "IED",
+                "payoff": 1000,
+                "currency": "USD",
+                "notionalPrincipal": -1000,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2014-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": -1010,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2015-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": -1020.1,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2016-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": -1030.301,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2017-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": -1040.60401,
+                "nominalInterestRate": 0.01,
+                "accruedInterest": 0
+            }
+        ]
+    },
+    "ump05": {
+        "identifier": "ump05",
+        "terms": {
+            "contractID": "ump05",
+            "contractType": "UMP",
+            "statusDate": "2012-12-15T00:00:00",
+            "contractRole": "RPA",
+            "currency": "USD",
+            "contractDealDate": "2012-12-15T00:00:00",
+            "initialExchangeDate": "2013-01-01T00:00:00",
+            "notionalPrincipal": "  1000",
+            "cycleAnchorDateOfInterestPayment": "2014-01-01T00:00:00",
+            "cycleOfInterestPayment": "P1YL1",
+            "nominalInterestRate": "-0.005",
+            "dayCountConvention": "30E360",
+            "xDayNotice": "P1M"
+        },
+        "to": "2018-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2013-01-01T00:00:00",
+                "eventType": "IED",
+                "payoff": -1000,
+                "currency": "USD",
+                "notionalPrincipal": 1000,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2014-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 995,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2015-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 990.025,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2016-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 985.074875,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2017-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 980.149500625,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            }
+        ]
+    },
+    "ump06": {
+        "identifier": "ump06",
+        "terms": {
+            "contractID": "ump06",
+            "contractType": "UMP",
+            "statusDate": "2012-12-15T00:00:00",
+            "contractRole": "RPA",
+            "currency": "USD",
+            "contractDealDate": "2012-12-15T00:00:00",
+            "initialExchangeDate": "2013-01-01T00:00:00",
+            "notionalPrincipal": "100000",
+            "cycleAnchorDateOfInterestPayment": "2014-01-01T00:00:00",
+            "cycleOfInterestPayment": "P1YL1",
+            "nominalInterestRate": "-0.005",
+            "dayCountConvention": "30E360",
+            "xDayNotice": "P1M"
+        },
+        "to": "2020-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2013-01-01T00:00:00",
+                "eventType": "IED",
+                "payoff": -100000,
+                "currency": "USD",
+                "notionalPrincipal": 100000,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2014-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 99500,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2015-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 99002.5,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2016-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 98507.4875,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2017-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 98014.9500625,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2018-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 97524.8753121875,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2019-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 97037.2509356265,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            }
+        ]
+    },
+    "ump07": {
+        "identifier": "ump07",
+        "terms": {
+            "contractID": "ump07",
+            "contractType": "UMP",
+            "statusDate": "2012-12-15T00:00:00",
+            "contractRole": "RPA",
+            "currency": "USD",
+            "contractDealDate": "2012-12-15T00:00:00",
+            "initialExchangeDate": "2013-01-01T00:00:00",
+            "notionalPrincipal": "100000",
+            "cycleAnchorDateOfInterestPayment": "2014-01-01T00:00:00",
+            "cycleOfInterestPayment": "P1YL1",
+            "nominalInterestRate": "-0.005",
+            "dayCountConvention": "AA",
+            "xDayNotice": "P1M"
+        },
+        "to": "2020-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2013-01-01T00:00:00",
+                "eventType": "IED",
+                "payoff": -100000,
+                "currency": "USD",
+                "notionalPrincipal": 100000,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2014-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 99500,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2015-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 99002.5,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2016-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 98507.4875,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2017-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 98014.9500625,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2018-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 97524.8753121875,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2019-01-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 97037.2509356265,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            }
+        ]
+    },
+    "ump08": {
+        "identifier": "ump08",
+        "terms": {
+            "contractID": "ump08",
+            "contractType": "UMP",
+            "statusDate": "2014-05-12T00:00:00",
+            "contractRole": "RPA",
+            "currency": "USD",
+            "contractDealDate": "2014-05-12T00:00:00",
+            "initialExchangeDate": "2014-05-13T00:00:00",
+            "notionalPrincipal": "100000",
+            "cycleAnchorDateOfInterestPayment": "2014-12-31T00:00:00",
+            "cycleOfInterestPayment": "P1YL1",
+            "nominalInterestRate": "-0.005",
+            "dayCountConvention": "AA",
+            "xDayNotice": "P1M"
+        },
+        "to": "2020-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2014-05-13T00:00:00",
+                "eventType": "IED",
+                "payoff": -100000,
+                "currency": "USD",
+                "notionalPrincipal": 100000,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2014-12-31T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 99682.1917808219,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2015-12-31T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 99183.7808219178,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2016-12-31T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 98687.8582055625,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2017-12-31T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 98194.422608219,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2018-12-31T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 97703.4504951779,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2019-12-31T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 97214.933242702,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            }
+        ]
+    },
+    "ump09": {
+        "identifier": "ump09",
+        "terms": {
+            "contractID": "ump09",
+            "contractType": "UMP",
+            "statusDate": "2014-05-12T00:00:00",
+            "contractRole": "RPA",
+            "currency": "USD",
+            "contractDealDate": "2014-05-12T00:00:00",
+            "initialExchangeDate": "2014-05-13T00:00:00",
+            "notionalPrincipal": "100000",
+            "cycleAnchorDateOfInterestPayment": "2014-12-31T00:00:00",
+            "cycleOfInterestPayment": "P1YL1",
+            "nominalInterestRate": "-0.005",
+            "dayCountConvention": "AA",
+            "terminationDate": "2017-05-13T00:00:00",
+            "priceAtTerminationDate": "90000",
+            "xDayNotice": "P1M"
+        },
+        "to": "2020-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2014-05-13T00:00:00",
+                "eventType": "IED",
+                "payoff": -100000,
+                "currency": "USD",
+                "notionalPrincipal": 100000,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2014-12-31T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 99682.1917808219,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2015-12-31T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 99183.7808219178,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2016-12-31T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 98687.8582055625,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2017-05-13T00:00:00",
+                "eventType": "TD",
+                "payoff": 89820.2025273646,
+                "currency": "USD",
+                "notionalPrincipal": 0,
+                "nominalInterestRate": -0.005,
+                "accruedInterest": 0
+            }
+        ]
+    }
+}
+

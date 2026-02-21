@@ -1,0 +1,1756 @@
+{
+    "clm01": {
+        "identifier": "clm01",
+        "terms": {
+            "contractID": "clm01",
+            "contractType": "CLM",
+            "statusDate": "2015-08-20T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "endOfMonthConvention": "SD",
+            "cycleOfInterestPayment": "P1ML1",
+            "nominalInterestRate": "0.12",
+            "dayCountConvention": "AA",
+            "currency": "CHF",
+            "contractDealDate": "2015-07-18T00:00:00",
+            "initialExchangeDate": "2015-08-20T00:00:00",
+            "maturityDate": "2015-09-20T00:00:00",
+            "notionalPrincipal": "1000",
+            "xDayNotice": "P1M"
+        },
+        "to": "2015-09-20T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "IP",
+                "payoff": 10.1917808219178,
+                "notionalPrincipal": 1000,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "MD",
+                "payoff": 1000,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            }
+        ]
+    },
+    "clm02": {
+        "identifier": "clm02",
+        "terms": {
+            "contractID": "clm02",
+            "contractType": "CLM",
+            "statusDate": "2015-07-20T00:00:00",
+            "contractRole": "RPL",
+            "calendar": "NC",
+            "endOfMonthConvention": "SD",
+            "cycleOfInterestPayment": "P10DL1",
+            "nominalInterestRate": "0.12",
+            "dayCountConvention": "AA",
+            "currency": "CHF",
+            "contractDealDate": "2015-07-18T00:00:00",
+            "initialExchangeDate": "2015-07-20T00:00:00",
+            "maturityDate": "2015-09-20T00:00:00",
+            "notionalPrincipal": "1000",
+            "xDayNotice": "P2M"
+        },
+        "to": "2015-09-20T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2015-07-30T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1003.28767123288,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            },
+            {
+                "eventDate": "2015-08-09T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1006.58615124789,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            },
+            {
+                "eventDate": "2015-08-19T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1009.89547558076,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            },
+            {
+                "eventDate": "2015-08-29T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1013.21567988404,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            },
+            {
+                "eventDate": "2015-09-08T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1016.54679992749,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            },
+            {
+                "eventDate": "2015-09-18T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1019.88887159849,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "IP",
+                "payoff": -0.670611860777087,
+                "notionalPrincipal": -1019.88887159849,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "MD",
+                "payoff": -1019.88887159849,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            }
+        ]
+    },
+    "clm03": {
+        "identifier": "clm03",
+        "terms": {
+            "contractID": "clm03",
+            "contractType": "CLM",
+            "statusDate": "2015-08-05T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "endOfMonthConvention": "SD",
+            "cycleOfInterestPayment": "P15DL1",
+            "nominalInterestRate": "0.12",
+            "dayCountConvention": "AA",
+            "currency": "USD",
+            "contractDealDate": "2015-07-18T00:00:00",
+            "initialExchangeDate": "2015-07-20T00:00:00",
+            "maturityDate": "2015-09-20T00:00:00",
+            "notionalPrincipal": "1000",
+            "xDayNotice": "P2M"
+        },
+        "to": "2015-09-20T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2015-08-19T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1004.60273972603,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-03T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1009.55694501783,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-18T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1014.53558200696,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "IP",
+                "payoff": 0.667091889538821,
+                "notionalPrincipal": 1014.53558200696,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "MD",
+                "payoff": 1014.53558200696,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            }
+        ]
+    },
+    "clm04": {
+        "identifier": "clm04",
+        "terms": {
+            "contractID": "clm04",
+            "contractType": "CLM",
+            "statusDate": "2015-08-19T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "endOfMonthConvention": "SD",
+            "cycleOfInterestPayment": "P15DL1",
+            "nominalInterestRate": "0.12",
+            "dayCountConvention": "AA",
+            "accruedInterest": "0",
+            "currency": "USD",
+            "contractDealDate": "2015-07-18T00:00:00",
+            "initialExchangeDate": "2015-07-20T00:00:00",
+            "maturityDate": "2015-09-20T00:00:00",
+            "notionalPrincipal": "1005",
+            "xDayNotice": "P1M"
+        },
+        "to": "2015-09-20T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2015-09-03T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1009.9561643835616,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-18T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1014.9367701257271,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "IP",
+                "payoff": 0.6673556844662315,
+                "notionalPrincipal": 1014.9367701257271,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "MD",
+                "payoff": 1014.9367701257271,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            }
+        ]
+    },
+    "clm05": {
+        "identifier": "clm05",
+        "terms": {
+            "contractID": "clm05",
+            "contractType": "CLM",
+            "statusDate": "2015-08-05T00:00:00",
+            "contractRole": "RPL",
+            "calendar": "NC",
+            "endOfMonthConvention": "SD",
+            "cycleOfInterestPayment": "P10DL1",
+            "nominalInterestRate": "0.12",
+            "dayCountConvention": "AA",
+            "currency": "USD",
+            "contractDealDate": "2015-07-18T00:00:00",
+            "initialExchangeDate": "2015-07-20T00:00:00",
+            "maturityDate": "2015-09-20T00:00:00",
+            "notionalPrincipal": "1000",
+            "xDayNotice": "P3W",
+            "cycleOfRateReset": "P15DL1",
+            "marketObjectCodeOfRateReset": "USD_Treasury"
+        },
+        "to": "2015-09-20T00:00:00",
+        "dataObserved": {
+            "USD_Treasury": {
+                "identifier": "USD_Treasury",
+                "data": [
+                    {
+                        "timestamp": "2015-08-19T00:00:00",
+                        "value": "0.00897530864197531"
+                    },
+                    {
+                        "timestamp": "2015-09-03T00:00:00",
+                        "value": "0.00897530864197531"
+                    },
+                    {
+                        "timestamp": "2015-09-18T00:00:00",
+                        "value": "0.00897530864197531"
+                    }
+                ]
+            }
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2015-08-09T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1001.31506849315,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-08-19T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1004.60706323888,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-08-19T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": -1004.60706323888,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-08-29T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1004.85409497742,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-03T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": -1004.85409497742,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": -0.123546241679111,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-08T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1005.10118746077,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-18T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1005.34834070389,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-18T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": -1005.34834070389,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "IP",
+                "payoff": -0.0494428035644668,
+                "notionalPrincipal": -1005.34834070389,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "MD",
+                "payoff": -1005.34834070389,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            }
+        ]
+    },
+    "clm06": {
+        "identifier": "clm06",
+        "terms": {
+            "contractID": "clm06",
+            "contractType": "CLM",
+            "statusDate": "2015-08-05T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "endOfMonthConvention": "SD",
+            "cycleOfInterestPayment": "P2WL1",
+            "nominalInterestRate": "0.12",
+            "dayCountConvention": "AA",
+            "currency": "USD",
+            "contractDealDate": "2015-07-18T00:00:00",
+            "initialExchangeDate": "2015-07-20T00:00:00",
+            "maturityDate": "2015-09-20T00:00:00",
+            "notionalPrincipal": "1000",
+            "xDayNotice": "P1M",
+            "cycleAnchorDateOfRateReset": "2015-08-01T00:00:00",
+            "cycleOfRateReset": "P15DL1",
+            "marketObjectCodeOfRateReset": "USD_Treasury"
+        },
+        "to": "2015-09-20T00:00:00",
+        "dataObserved": {
+            "USD_Treasury": {
+                "identifier": "USD_Treasury",
+                "data": [
+                    {
+                        "timestamp": "2015-08-16T00:00:00",
+                        "value": "0.00897530864197531"
+                    },
+                    {
+                        "timestamp": "2015-08-31T00:00:00",
+                        "value": "0.00897530864197531"
+                    },
+                    {
+                        "timestamp": "2015-09-15T00:00:00",
+                        "value": "0.00897530864197531"
+                    }
+                ]
+            }
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2015-08-16T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1000,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 3.61643835616438,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-08-17T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1003.64102824285,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-08-31T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1003.98654011113,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-08-31T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1003.98654011113,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-14T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1004.33217092477,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-15T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1004.33217092477,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0.0246964142825065,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "IP",
+                "payoff": 0.148178485695039,
+                "notionalPrincipal": 1004.33217092477,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "MD",
+                "payoff": 1004.33217092477,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            }
+        ]
+    },
+    "clm07": {
+        "identifier": "clm07",
+        "terms": {
+            "contractID": "clm07",
+            "contractType": "CLM",
+            "statusDate": "2015-08-05T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "endOfMonthConvention": "SD",
+            "cycleOfInterestPayment": "P5DL1",
+            "nominalInterestRate": "0.12",
+            "dayCountConvention": "AA",
+            "currency": "USD",
+            "contractDealDate": "2015-07-18T00:00:00",
+            "initialExchangeDate": "2015-07-20T00:00:00",
+            "notionalPrincipal": "1000",
+            "xDayNotice": "P31D",
+            "cycleAnchorDateOfRateReset": "2015-08-01T00:00:00",
+            "cycleOfRateReset": "P15DL1",
+            "marketObjectCodeOfRateReset": "USD_Treasury"
+        },
+        "to": "2015-09-30T00:00:00",
+        "dataObserved": {
+            "USD_Treasury": {
+                "identifier": "USD_Treasury",
+                "data": [
+                    {
+                        "timestamp": "2015-08-16T00:00:00",
+                        "value": "0.00897530864197531"
+                    },
+                    {
+                        "timestamp": "2015-08-31T00:00:00",
+                        "value": "0.00897530864197531"
+                    },
+                    {
+                        "timestamp": "2015-09-15T00:00:00",
+                        "value": "0.00897530864197531"
+                    }
+                ]
+            }
+        },
+        "eventsObserved": [
+            {
+                "time": "2015-09-20T00:00:00",
+                "type": "XD",
+                "value": 0
+            }
+        ],
+        "results": [
+            {
+                "eventDate": "2015-08-09T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1001.31506849315,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-08-14T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1002.96106586602,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-08-16T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1002.96106586602,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0.659481248788613,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-08-19T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1003.6945352117,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-08-24T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1003.81793888616,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-08-29T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1003.94135773304,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-08-31T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1003.94135773304,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0.0493736084608095,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-03T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1004.06479175419,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-08T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1004.18824095148,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-13T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1004.31170532679,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-15T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1004.31170532679,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0.0493918220715423,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-18T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1004.43518488197,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "XD",
+                "payoff": 0,
+                "notionalPrincipal": 1004.43518488197,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-10-21T00:00:00",
+                "eventType": "IP",
+                "payoff": 0.0493978947680831,
+                "notionalPrincipal": 1004.43518488197,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-10-21T00:00:00",
+                "eventType": "STD",
+                "payoff": 1004.43518488197,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "USD"
+            }
+        ]
+    },
+    "clm08": {
+        "identifier": "clm08",
+        "terms": {
+            "contractID": "clm08",
+            "contractType": "CLM",
+            "statusDate": "2015-08-05T00:00:00",
+            "contractRole": "RPL",
+            "calendar": "NC",
+            "endOfMonthConvention": "SD",
+            "cycleAnchorDateOfInterestPayment": "2015-08-01T00:00:00",
+            "cycleOfInterestPayment": "P10DL1",
+            "nominalInterestRate": "0.12",
+            "dayCountConvention": "AA",
+            "currency": "EUR",
+            "contractDealDate": "2015-07-18T00:00:00",
+            "initialExchangeDate": "2015-07-20T00:00:00",
+            "notionalPrincipal": "1000",
+            "xDayNotice": "P31D",
+            "cycleAnchorDateOfRateReset": "2015-08-01T00:00:00",
+            "cycleOfRateReset": "P15DL1",
+            "marketObjectCodeOfRateReset": "EUR_Prim"
+        },
+        "to": "2015-10-21T00:00:00",
+        "dataObserved": {
+            "EUR_Prim": {
+                "identifier": "EUR_Prim",
+                "data": [
+                    {
+                        "timestamp": "2015-08-16T00:00:00",
+                        "value": "0.00897530864197531"
+                    },
+                    {
+                        "timestamp": "2015-08-31T00:00:00",
+                        "value": "0.00897530864197531"
+                    },
+                    {
+                        "timestamp": "2015-09-15T00:00:00",
+                        "value": "0.00897530864197531"
+                    }
+                ]
+            }
+        },
+        "eventsObserved": [
+            {
+                "time": "2015-09-20T00:00:00",
+                "type": "XD",
+                "value": 0
+            }
+        ],
+        "results": [
+            {
+                "eventDate": "2015-08-11T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1001.97260273973,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-08-16T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": -1001.97260273973,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": -1.647078251079,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-08-21T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1003.74287295465,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-08-31T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1003.98969218977,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-08-31T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": -1003.98969218977,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-09-10T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1004.23657211746,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-09-15T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": -1004.23657211746,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": -0.123470317593336,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "XD",
+                "payoff": 0,
+                "notionalPrincipal": -1004.23657211746,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-10-21T00:00:00",
+                "eventType": "IP",
+                "payoff": -0.246940635186671,
+                "notionalPrincipal": -1004.23657211746,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-10-21T00:00:00",
+                "eventType": "STD",
+                "payoff": -1004.23657211746,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            }
+        ]
+    },
+    "clm09": {
+        "identifier": "clm09",
+        "terms": {
+            "contractID": "clm09",
+            "contractType": "CLM",
+            "statusDate": "2015-08-05T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "MF",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "EOM",
+            "cycleAnchorDateOfInterestPayment": "2015-09-30T00:00:00",
+            "cycleOfInterestPayment": "P2ML1",
+            "nominalInterestRate": "0.12",
+            "dayCountConvention": "AA",
+            "currency": "EUR",
+            "contractDealDate": "2015-07-18T00:00:00",
+            "initialExchangeDate": "2015-07-20T00:00:00",
+            "notionalPrincipal": "1000",
+            "xDayNotice": "P0D",
+            "cycleAnchorDateOfRateReset": "2015-08-01T00:00:00",
+            "cycleOfRateReset": "P15DL1",
+            "marketObjectCodeOfRateReset": "EUR_Prim"
+        },
+        "to": "2016-05-20T00:00:00",
+        "dataObserved": {
+            "EUR_Prim": {
+                "identifier": "EUR_Prim",
+                "data": [
+                    {
+                        "timestamp": "2015-08-16T00:00:00",
+                        "value": "0.008975308642"
+                    },
+                    {
+                        "timestamp": "2015-08-31T00:00:00",
+                        "value": "0.008975308642"
+                    },
+                    {
+                        "timestamp": "2015-09-15T00:00:00",
+                        "value": "0.008975308642"
+                    },
+                    {
+                        "timestamp": "2015-09-30T00:00:00",
+                        "value": "0.008975308642"
+                    },
+                    {
+                        "timestamp": "2015-10-15T00:00:00",
+                        "value": "0.008975308642"
+                    },
+                    {
+                        "timestamp": "2015-10-30T00:00:00",
+                        "value": "0.008975308642"
+                    },
+                    {
+                        "timestamp": "2015-11-14T00:00:00",
+                        "value": "0.008975308642"
+                    },
+                    {
+                        "timestamp": "2015-11-29T00:00:00",
+                        "value": "0.008975308642"
+                    },
+                    {
+                        "timestamp": "2015-12-14T00:00:00",
+                        "value": "0.008975308642"
+                    },
+                    {
+                        "timestamp": "2015-12-29T00:00:00",
+                        "value": "0.008975308642"
+                    },
+                    {
+                        "timestamp": "2016-01-13T00:00:00",
+                        "value": "0.008975308642"
+                    },
+                    {
+                        "timestamp": "2016-01-28T00:00:00",
+                        "value": "0.008975308642"
+                    },
+                    {
+                        "timestamp": "2016-02-12T00:00:00",
+                        "value": "0.008975308642"
+                    },
+                    {
+                        "timestamp": "2016-02-27T00:00:00",
+                        "value": "0.008975308642"
+                    },
+                    {
+                        "timestamp": "2016-03-13T00:00:00",
+                        "value": "0.008975308642"
+                    },
+                    {
+                        "timestamp": "2016-03-28T00:00:00",
+                        "value": "0.008975308642"
+                    },
+                    {
+                        "timestamp": "2016-04-12T00:00:00",
+                        "value": "0.008975308642"
+                    },
+                    {
+                        "timestamp": "2016-04-27T00:00:00",
+                        "value": "0.008975308642"
+                    },
+                    {
+                        "timestamp": "2016-05-12T00:00:00",
+                        "value": "0.008975308642"
+                    }
+                ]
+            }
+        },
+        "eventsObserved": [
+            {
+                "time": "2016-05-20T00:00:00",
+                "type": "XD",
+                "value": 0
+            }
+        ],
+        "results": [
+            {
+                "eventDate": "2015-08-17T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1000,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 3.94520547945205,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-08-31T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1000,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 4.28946389311686,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-09-15T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1000,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 4.65831219347201,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-09-30T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1005.02716049383,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-09-30T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1005.02716049383,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-10-15T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1005.02716049383,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0.37070255995891,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-10-30T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1005.02716049383,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0.741405119917821,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-11-16T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1005.02716049383,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 1.16153468787125,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-11-30T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1006.53468423766,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-11-30T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1006.53468423766,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-12-14T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1006.53468423766,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0.346508033694264,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-12-29T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1006.53468423766,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0.717766641223832,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2016-01-13T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1006.53468423766,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 1.08821375452882,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2016-01-28T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1006.53468423766,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 1.45845799427825,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2016-02-01T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1008.0918740292,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2016-02-12T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1008.0918740292,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0.271932493982714,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2016-02-29T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1008.0918740292,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0.692191802865091,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2016-03-14T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1008.0918740292,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 1.03828770429764,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2016-03-28T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1008.0918740292,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 1.38438360573018,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2016-03-31T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1009.55042104238,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2016-04-12T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1009.55042104238,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0.297082839950542,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2016-04-27T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1009.55042104238,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0.668436389888719,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2016-05-12T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": 1009.55042104238,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 1.0397899398269,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2016-05-20T00:00:00",
+                "eventType": "XD",
+                "payoff": 0,
+                "notionalPrincipal": 1009.55042104238,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 1.23784516646059,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2016-05-20T00:00:00",
+                "eventType": "IP",
+                "payoff": 1.23784516646059,
+                "notionalPrincipal": 1009.55042104238,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2016-05-20T00:00:00",
+                "eventType": "STD",
+                "payoff": 1009.55042104238,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            }
+        ]
+    },
+    "clm10": {
+        "identifier": "clm10",
+        "terms": {
+            "contractID": "clm10",
+            "contractType": "CLM",
+            "statusDate": "2015-08-05T00:00:00",
+            "contractRole": "RPL",
+            "calendar": "MF",
+            "businessDayConvention": "SCP",
+            "endOfMonthConvention": "EOM",
+            "cycleAnchorDateOfInterestPayment": "2015-08-01T00:00:00",
+            "cycleOfInterestPayment": "P2WL1",
+            "nominalInterestRate": "0.12",
+            "dayCountConvention": "AA",
+            "currency": "EUR",
+            "contractDealDate": "2015-07-18T00:00:00",
+            "initialExchangeDate": "2015-07-20T00:00:00",
+            "maturityDate": "2015-09-20T00:00:00",
+            "notionalPrincipal": "1000",
+            "xDayNotice": "P9M",
+            "cycleAnchorDateOfRateReset": "2015-08-01T00:00:00",
+            "cycleOfRateReset": "P15DL1",
+            "marketObjectCodeOfRateReset": "EUR_Prim"
+        },
+        "to": "2015-09-20T00:00:00",
+        "dataObserved": {
+            "EUR_Prim": {
+                "identifier": "EUR_Prim",
+                "data": [
+                    {
+                        "timestamp": "2015-08-16T00:00:00",
+                        "value": "0.00897530864197531"
+                    },
+                    {
+                        "timestamp": "2015-08-31T00:00:00",
+                        "value": "0.00897530864197531"
+                    },
+                    {
+                        "timestamp": "2015-09-15T00:00:00",
+                        "value": "0.00897530864197531"
+                    }
+                ]
+            }
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2015-08-14T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1002.95890410959,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-08-14T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": -1002.95890410959,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-08-28T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1003.30418115089,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-08-31T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": -1003.30418115089,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": -0.0740134083913441,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-09-11T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1003.64957705672,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-09-15T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": -1003.64957705672,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": -0.0987185175065425,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "IP",
+                "payoff": -0.172757405636449,
+                "notionalPrincipal": -1003.64957705672,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "MD",
+                "payoff": -1003.64957705672,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0.00897530864197531,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            }
+        ]
+    },
+    "clm11": {
+        "identifier": "clm11",
+        "terms": {
+            "contractID": "clm11",
+            "contractType": "CLM",
+            "statusDate": "2015-08-05T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "endOfMonthConvention": "SD",
+            "cycleAnchorDateOfInterestPayment": "2015-08-01T00:00:00",
+            "cycleOfInterestPayment": "P8DL1",
+            "nominalInterestRate": "0.12",
+            "dayCountConvention": "AA",
+            "currency": "EUR",
+            "contractDealDate": "2015-07-18T00:00:00",
+            "initialExchangeDate": "2015-07-20T00:00:00",
+            "maturityDate": "2015-09-20T00:00:00",
+            "notionalPrincipal": "1000",
+            "xDayNotice": "P9M"
+        },
+        "to": "2015-09-20T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2015-08-09T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1001.31506849315,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-08-17T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1003.94866428974,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-08-25T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1006.58918680403,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-09-02T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1009.23665425426,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-09-10T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1011.89108490654,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-09-18T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1014.55249707506,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "IP",
+                "payoff": 0.667103011775384,
+                "notionalPrincipal": 1014.55249707506,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "MD",
+                "payoff": 1014.55249707506,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            }
+        ]
+    },
+    "clm12": {
+        "identifier": "clm12",
+        "terms": {
+            "contractID": "clm12",
+            "contractType": "CLM",
+            "statusDate": "2015-08-20T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "endOfMonthConvention": "SD",
+            "cycleOfInterestPayment": "P1ML1",
+            "nominalInterestRate": "0.12",
+            "dayCountConvention": "AA",
+            "currency": "CHF",
+            "contractDealDate": "2015-07-18T00:00:00",
+            "initialExchangeDate": "2015-08-22T00:00:00",
+            "maturityDate": "2015-09-20T00:00:00",
+            "notionalPrincipal": "1000",
+            "xDayNotice": "P2M"
+        },
+        "to": "2015-09-20T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2015-08-22T00:00:00",
+                "eventType": "IED",
+                "payoff": -1000,
+                "notionalPrincipal": 1000,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            },
+            {
+                "eventDate": "2015-08-22T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": 1000,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "IP",
+                "payoff": 9.53424657534247,
+                "notionalPrincipal": 1000,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "MD",
+                "payoff": 1000,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            }
+        ]
+    },
+    "clm13": {
+        "identifier": "clm13",
+        "terms": {
+            "contractID": "clm13",
+            "contractType": "CLM",
+            "statusDate": "2015-08-20T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "endOfMonthConvention": "SD",
+            "nominalInterestRate": "0.12",
+            "dayCountConvention": "AA",
+            "currency": "CHF",
+            "contractDealDate": "2015-07-18T00:00:00",
+            "initialExchangeDate": "2015-08-22T00:00:00",
+            "notionalPrincipal": "1000",
+            "xDayNotice": "P0D"
+        },
+        "to": "2015-09-24T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+            {
+                "time": "2015-09-24T00:00:00",
+                "type": "XD",
+                "value": 0
+            }
+        ],
+        "results": [
+            {
+                "eventDate": "2015-08-22T00:00:00",
+                "eventType": "IED",
+                "payoff": -1000,
+                "notionalPrincipal": 1000,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            },
+            {
+                "eventDate": "2015-09-24T00:00:00",
+                "eventType": "XD",
+                "payoff": 0,
+                "notionalPrincipal": 1000,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 10.8493150684932,
+                "currency": "CHF"
+            },
+            {
+                "eventDate": "2015-09-24T00:00:00",
+                "eventType": "IP",
+                "payoff": 10.8493150684932,
+                "notionalPrincipal": 1000,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            },
+            {
+                "eventDate": "2015-09-24T00:00:00",
+                "eventType": "STD",
+                "payoff": 1000,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "CHF"
+            }
+        ]
+    },
+    "clm14": {
+        "identifier": "clm14",
+        "terms": {
+            "contractID": "clm14",
+            "contractType": "CLM",
+            "statusDate": "2015-08-05T00:00:00",
+            "contractRole": "RPL",
+            "calendar": "NC",
+            "endOfMonthConvention": "SD",
+            "cycleAnchorDateOfInterestPayment": "2015-08-01T00:00:00",
+            "cycleOfInterestPayment": "P10DL1",
+            "nominalInterestRate": "0.12",
+            "dayCountConvention": "AA",
+            "currency": "USD",
+            "contractDealDate": "2015-07-18T00:00:00",
+            "initialExchangeDate": "2015-07-20T00:00:00",
+            "notionalPrincipal": "1000",
+            "xDayNotice": "P0D",
+            "cycleAnchorDateOfRateReset": "2015-10-01T00:00:00",
+            "cycleOfRateReset": "P1WL1",
+            "marketObjectCodeOfRateReset": "USD_Treasury"
+        },
+        "to": "2015-09-20T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+            {
+                "time": "2015-09-20T00:00:00",
+                "type": "XD",
+                "value": 0
+            }
+        ],
+        "results": [
+            {
+                "eventDate": "2015-08-11T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1001.97260273973,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-08-21T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1005.26675924188,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-08-31T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1008.57174584761,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-10T00:00:00",
+                "eventType": "IPCI",
+                "payoff": 0,
+                "notionalPrincipal": -1011.88759816273,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "XD",
+                "payoff": 0,
+                "notionalPrincipal": -1011.88759816273,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": -3.3267537473843,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "IP",
+                "payoff": -3.3267537473843,
+                "notionalPrincipal": -1011.88759816273,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-20T00:00:00",
+                "eventType": "STD",
+                "payoff": -1011.88759816273,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            }
+        ]
+    },
+    "clm15": {
+        "identifier": "clm15",
+        "terms": {
+            "contractID": "clm15",
+            "contractType": "CLM",
+            "statusDate": "2015-08-20T00:00:00",
+            "contractRole": "RPL",
+            "calendar": "NC",
+            "endOfMonthConvention": "SD",
+            "nominalInterestRate": "0.12",
+            "dayCountConvention": "AA",
+            "currency": "USD",
+            "contractDealDate": "2015-07-18T00:00:00",
+            "initialExchangeDate": "2015-08-22T00:00:00",
+            "maturityDate": "2015-12-31T00:00:00",
+            "notionalPrincipal": "1000",
+            "xDayNotice": "P31D",
+            "cycleAnchorDateOfRateReset": "2015-09-01T00:00:00",
+            "marketObjectCodeOfRateReset": "USD_Treasury"
+        },
+        "to": "2015-12-31T00:00:00",
+        "dataObserved": {
+            "USD_Treasury": {
+                "identifier": "USD_Treasury",
+                "data": [
+                    {
+                        "timestamp": "2015-09-01T00:00:00",
+                        "value": "0.00962962963"
+                    }
+                ]
+            }
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2015-08-22T00:00:00",
+                "eventType": "IED",
+                "payoff": 1000,
+                "notionalPrincipal": -1000,
+                "nominalInterestRate": 0.12,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-09-01T00:00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "notionalPrincipal": -1000,
+                "nominalInterestRate": 0.00962962962962963,
+                "accruedInterest": -3.28767123287671,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-12-31T00:00:00",
+                "eventType": "IP",
+                "payoff": -6.4799594116,
+                "notionalPrincipal": -1000,
+                "nominalInterestRate": 0.00962962962962963,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-12-31T00:00:00",
+                "eventType": "MD",
+                "payoff": -1000,
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0.00962962962962963,
+                "accruedInterest": 0,
+                "currency": "USD"
+            }
+        ]
+    }
+}
+

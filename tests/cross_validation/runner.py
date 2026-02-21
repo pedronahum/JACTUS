@@ -41,6 +41,8 @@ EVENT_TYPE_MAP: dict[str, EventType] = {
     "XD": EventType.XD,
     "STD": EventType.STD,
     "DV": EventType.DV,
+    "IPFX": EventType.IPFX,
+    "IPFL": EventType.IPFL,
 }
 
 
@@ -105,6 +107,18 @@ def run_single_test(test_id: str, test_case: dict[str, Any]) -> list[str]:
             else:
                 kwargs["maturity_date"] = to_dt
 
+    # Apply defaults for fields required by JACTUS but not always in ACTUS tests
+    if ct == "FXOUT" and "delivery_settlement" not in kwargs:
+        kwargs["delivery_settlement"] = "S"  # Default to gross settlement for FXOUT
+
+    # For STK without maturity/termination, use 'to' as end date for DV schedule
+    if ct == "STK" and "maturity_date" not in kwargs and "termination_date" not in kwargs:
+        to_str = test_case.get("to") or terms.get("to")
+        if to_str:
+            if len(to_str) == 16:
+                to_str += ":00"
+            kwargs["maturity_date"] = ActusDateTime.from_iso(to_str)
+
     try:
         attrs = ContractAttributes(**kwargs)
     except Exception as e:
@@ -142,19 +156,20 @@ def run_single_test(test_id: str, test_case: dict[str, Any]) -> list[str]:
         actual_events = [e for e in actual_events if e.event_time.to_iso()[:10] <= to_date]
         expected_events = [e for e in expected_events if (e.get("eventDate", "")[:10]) <= to_date]
 
-    # Build lookup: (date_str, event_type) -> actual event
-    actual_lookup: dict[tuple[str, str], Any] = {}
+    # Build lookup: (date_str, event_type) -> list of actual events
+    # Use list to handle duplicates (e.g., FXOUT with two MD events on same date)
+    actual_lookup: dict[tuple[str, str], list[Any]] = {}
     for e in actual_events:
         key = (e.event_time.to_iso()[:10], e.event_type.value)
-        actual_lookup[key] = e
+        actual_lookup.setdefault(key, []).append(e)
 
     # Build expected lookup
-    expected_lookup: dict[tuple[str, str], dict] = {}
+    expected_lookup: dict[tuple[str, str], list[dict]] = {}
     for e in expected_events:
         date_str = e.get("eventDate", "")[:10]
         etype = e.get("eventType", "")
         key = (date_str, etype)
-        expected_lookup[key] = e
+        expected_lookup.setdefault(key, []).append(e)
 
     # Find matched, missing, and extra events
     matched_keys = set(actual_lookup.keys()) & set(expected_lookup.keys())
@@ -172,51 +187,66 @@ def run_single_test(test_id: str, test_case: dict[str, Any]) -> list[str]:
     # Compare matched events
     for key in sorted(matched_keys):
         date_str, etype = key
-        actual = actual_lookup[key]
-        expected = expected_lookup[key]
+        actual_list = actual_lookup[key]
+        expected_list = expected_lookup[key]
 
-        # Payoff
-        expected_payoff = expected.get("payoff")
-        if expected_payoff is not None:
-            actual_payoff = float(actual.payoff)
-            exp_payoff = float(expected_payoff)
-            if not _values_close(actual_payoff, exp_payoff):
-                errors.append(
-                    f"{etype} @ {date_str}: payoff mismatch: "
-                    f"got {actual_payoff:.4f}, expected {exp_payoff:.4f}"
-                )
+        # Match events by position (sorted by payoff for multi-event keys)
+        if len(actual_list) > 1 or len(expected_list) > 1:
+            actual_list = sorted(actual_list, key=lambda e: float(e.payoff))
+            expected_list = sorted(expected_list, key=lambda e: float(e.get("payoff", 0)))
 
-        # Notional principal (post-event state)
-        expected_nt = expected.get("notionalPrincipal")
-        if expected_nt is not None and actual.state_post is not None:
-            actual_nt = abs(float(actual.state_post.nt))
-            exp_nt = abs(float(expected_nt))
-            if not _values_close(actual_nt, exp_nt):
-                errors.append(
-                    f"{etype} @ {date_str}: notional mismatch: "
-                    f"got {actual_nt:.4f}, expected {exp_nt:.4f}"
-                )
+        for i, (actual, expected) in enumerate(zip(actual_list, expected_list)):
+            suffix = f" [{i}]" if len(actual_list) > 1 else ""
 
-        # Nominal interest rate (post-event state)
-        expected_ipnr = expected.get("nominalInterestRate")
-        if expected_ipnr is not None and actual.state_post is not None:
-            actual_ipnr = float(actual.state_post.ipnr)
-            exp_ipnr = float(expected_ipnr)
-            if not math.isclose(actual_ipnr, exp_ipnr, abs_tol=1e-6):
-                errors.append(
-                    f"{etype} @ {date_str}: rate mismatch: "
-                    f"got {actual_ipnr:.8f}, expected {exp_ipnr:.8f}"
-                )
+            # Payoff
+            expected_payoff = expected.get("payoff")
+            if expected_payoff is not None:
+                actual_payoff = float(actual.payoff)
+                exp_payoff = float(expected_payoff)
+                if not _values_close(actual_payoff, exp_payoff):
+                    errors.append(
+                        f"{etype} @ {date_str}{suffix}: payoff mismatch: "
+                        f"got {actual_payoff:.4f}, expected {exp_payoff:.4f}"
+                    )
 
-        # Accrued interest (post-event state)
-        expected_ipac = expected.get("accruedInterest")
-        if expected_ipac is not None and actual.state_post is not None:
-            actual_ipac = float(actual.state_post.ipac)
-            exp_ipac = float(expected_ipac)
-            if not _values_close(actual_ipac, exp_ipac):
-                errors.append(
-                    f"{etype} @ {date_str}: accrued interest mismatch: "
-                    f"got {actual_ipac:.4f}, expected {exp_ipac:.4f}"
-                )
+            # Notional principal (post-event state)
+            expected_nt = expected.get("notionalPrincipal")
+            if expected_nt is not None and actual.state_post is not None:
+                actual_nt = abs(float(actual.state_post.nt))
+                exp_nt = abs(float(expected_nt))
+                if not _values_close(actual_nt, exp_nt):
+                    errors.append(
+                        f"{etype} @ {date_str}{suffix}: notional mismatch: "
+                        f"got {actual_nt:.4f}, expected {exp_nt:.4f}"
+                    )
+
+            # Nominal interest rate (post-event state)
+            expected_ipnr = expected.get("nominalInterestRate")
+            if expected_ipnr is not None and actual.state_post is not None:
+                actual_ipnr = float(actual.state_post.ipnr)
+                exp_ipnr = float(expected_ipnr)
+                if not math.isclose(actual_ipnr, exp_ipnr, abs_tol=1e-6):
+                    errors.append(
+                        f"{etype} @ {date_str}{suffix}: rate mismatch: "
+                        f"got {actual_ipnr:.8f}, expected {exp_ipnr:.8f}"
+                    )
+
+            # Accrued interest (post-event state)
+            expected_ipac = expected.get("accruedInterest")
+            if expected_ipac is not None and actual.state_post is not None:
+                actual_ipac = float(actual.state_post.ipac)
+                exp_ipac = float(expected_ipac)
+                if not _values_close(actual_ipac, exp_ipac):
+                    errors.append(
+                        f"{etype} @ {date_str}{suffix}: accrued interest mismatch: "
+                        f"got {actual_ipac:.4f}, expected {exp_ipac:.4f}"
+                    )
+
+        # Report count mismatch
+        if len(actual_list) != len(expected_list):
+            errors.append(
+                f"{etype} @ {date_str}: count mismatch: "
+                f"got {len(actual_list)}, expected {len(expected_list)}"
+            )
 
     return errors

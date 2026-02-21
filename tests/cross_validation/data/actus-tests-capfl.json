@@ -1,0 +1,380 @@
+{
+  "capfl01": {
+    "identifier": "capfl01",
+    "terms": {
+      "contractType": "CAPFL",
+      "contractID": "capfl01",
+      "contractRole": "BUY",
+      "contractStructure": [
+        {
+          "object": {
+            "contractType": "PAM",
+            "contractID": "capfl-underlying",
+            "contractDealDate": "2012-12-28T00:00:00",
+            "initialExchangeDate": "2013-01-01T00:00:00",
+            "currency": "USD",
+            "statusDate": "2012-12-30T00:00:00",
+            "notionalPrincipal": "1000",
+            "dayCountConvention": "A365",
+            "nominalInterestRate": "0.05",
+            "maturityDate": "2014-01-01T00:00:00",
+            "cycleAnchorDateOfInterestPayment": "2013-04-01T00:00:00",
+            "cycleOfInterestPayment": "P3ML1",
+            "cycleAnchorDateOfRateReset": "2013-04-01T00:00:00",
+            "cycleOfRateReset": "P3ML1",
+            "marketObjectCodeOfRateReset": "LIBORUSD1M"
+          },
+          "referenceType": "CNT",
+          "referenceRole": "UDL"
+        }
+      ],
+      "currency": "USD",
+      "contractDealDate": "2012-12-28T00:00:00",
+      "statusDate": "2012-12-30T00:00:00",
+      "lifeCap": "0.07"
+    },
+    "to": "2014-01-01T00:00:00",
+    "dataObserved": {
+      "LIBORUSD1M": {
+        "identifier": "LIBORUSD1M",
+        "data": [
+          {
+            "timestamp": "2013-04-01T00:00:00",
+            "value": "0.1"
+          },
+          {
+            "timestamp": "2013-07-01T00:00:00",
+            "value": "0.01"
+          },
+          {
+            "timestamp": "2013-10-01T00:00:00",
+            "value": "0.04"
+          }
+        ]
+      }
+    },
+    "eventsObserved": [],
+    "results": [
+      {
+        "eventDate": "2013-04-01T00:00:00",
+        "eventType": "IP",
+        "payoff": 0,
+        "currency": "USD",
+        "notionalPrincipal": 0,
+        "nominalInterestRate": 0,
+        "accruedInterest": 0
+      },
+      {
+        "eventDate": "2013-07-01T00:00:00",
+        "eventType": "IP",
+        "payoff": 7.479452054794521,
+        "currency": "USD",
+        "notionalPrincipal": 0,
+        "nominalInterestRate": 0,
+        "accruedInterest": 0
+      },
+      {
+        "eventDate": "2013-10-01T00:00:00",
+        "eventType": "IP",
+        "payoff": 0,
+        "currency": "USD",
+        "notionalPrincipal": 0,
+        "nominalInterestRate": 0,
+        "accruedInterest": 0
+      },
+      {
+        "eventDate": "2014-01-01T00:00:00",
+        "eventType": "IP",
+        "payoff": 0,
+        "currency": "USD",
+        "notionalPrincipal": 0,
+        "nominalInterestRate": 0,
+        "accruedInterest": 0
+      }
+    ]
+  },
+  "capfl02": {
+    "identifier": "capfl02",
+    "terms": {
+      "contractType": "CAPFL",
+      "contractID": "capfl02",
+      "contractRole": "BUY",
+      "contractStructure": [
+        {
+          "object": {
+            "contractType": "PAM",
+            "contractID": "capfl-underlying",
+            "contractDealDate": "2012-12-28T00:00:00",
+            "initialExchangeDate": "2013-01-01T00:00:00",
+            "currency": "USD",
+            "statusDate": "2012-12-30T00:00:00",
+            "notionalPrincipal": "1000",
+            "dayCountConvention": "A365",
+            "nominalInterestRate": "0.05",
+            "maturityDate": "2014-01-01T00:00:00",
+            "cycleAnchorDateOfInterestPayment": "2013-04-01T00:00:00",
+            "cycleOfInterestPayment": "P3ML1",
+            "cycleAnchorDateOfRateReset": "2013-04-01T00:00:00",
+            "cycleOfRateReset": "P3ML1",
+            "marketObjectCodeOfRateReset": "LIBORUSD1M"
+          },
+          "referenceType": "CNT",
+          "referenceRole": "UDL"
+        }
+      ],
+      "currency": "USD",
+      "contractDealDate": "2012-12-28T00:00:00",
+      "statusDate": "2012-12-30T00:00:00",
+      "lifeFloor": "0.02"
+    },
+    "to": "2014-01-01T00:00:00",
+    "dataObserved": {
+      "LIBORUSD1M": {
+        "identifier": "LIBORUSD1M",
+        "data": [
+          {
+            "timestamp": "2013-04-01T00:00:00",
+            "value": "0.1"
+          },
+          {
+            "timestamp": "2013-07-01T00:00:00",
+            "value": "0.01"
+          },
+          {
+            "timestamp": "2013-10-01T00:00:00",
+            "value": "0.04"
+          }
+        ]
+      }
+    },
+    "eventsObserved": [],
+    "results": [
+      {
+        "eventDate": "2013-04-01T00:00:00",
+        "eventType": "IP",
+        "payoff": 0,
+        "currency": "USD",
+        "notionalPrincipal": 0,
+        "nominalInterestRate": 0,
+        "accruedInterest": 0
+      },
+      {
+        "eventDate": "2013-07-01T00:00:00",
+        "eventType": "IP",
+        "payoff": 0,
+        "currency": "USD",
+        "notionalPrincipal": 0,
+        "nominalInterestRate": 0,
+        "accruedInterest": 0
+      },
+      {
+        "eventDate": "2013-10-01T00:00:00",
+        "eventType": "IP",
+        "payoff": 2.520547945205481,
+        "currency": "USD",
+        "notionalPrincipal": 0,
+        "nominalInterestRate": 0,
+        "accruedInterest": 0
+      },
+      {
+        "eventDate": "2014-01-01T00:00:00",
+        "eventType": "IP",
+        "payoff": 0,
+        "currency": "USD",
+        "notionalPrincipal": 0,
+        "nominalInterestRate": 0,
+        "accruedInterest": 0
+      }
+    ]
+  },
+  "capfl03": {
+    "identifier": "capfl03",
+    "terms": {
+      "contractType": "CAPFL",
+      "contractID": "capfl03",
+      "contractRole": "BUY",
+      "contractStructure": [
+        {
+          "object": {
+            "contractType": "PAM",
+            "contractID": "capfl-underlying",
+            "contractDealDate": "2012-12-28T00:00:00",
+            "initialExchangeDate": "2013-01-01T00:00:00",
+            "currency": "USD",
+            "statusDate": "2012-12-30T00:00:00",
+            "notionalPrincipal": "1000",
+            "dayCountConvention": "A365",
+            "nominalInterestRate": "0.05",
+            "maturityDate": "2014-01-01T00:00:00",
+            "cycleAnchorDateOfInterestPayment": "2013-04-01T00:00:00",
+            "cycleOfInterestPayment": "P3ML1",
+            "cycleAnchorDateOfRateReset": "2013-04-01T00:00:00",
+            "cycleOfRateReset": "P3ML1",
+            "marketObjectCodeOfRateReset": "LIBORUSD1M"
+          },
+          "referenceType": "CNT",
+          "referenceRole": "UDL"
+        }
+      ],
+      "currency": "USD",
+      "contractDealDate": "2012-12-28T00:00:00",
+      "statusDate": "2012-12-30T00:00:00",
+      "lifeCap": "0.07",
+      "lifeFloor": "0.02"
+    },
+    "to": "2014-01-01T00:00:00",
+    "dataObserved": {
+      "LIBORUSD1M": {
+        "identifier": "LIBORUSD1M",
+        "data": [
+          {
+            "timestamp": "2013-04-01T00:00:00",
+            "value": "0.1"
+          },
+          {
+            "timestamp": "2013-07-01T00:00:00",
+            "value": "0.01"
+          },
+          {
+            "timestamp": "2013-10-01T00:00:00",
+            "value": "0.04"
+          }
+        ]
+      }
+    },
+    "eventsObserved": [],
+    "results": [
+      {
+        "eventDate": "2013-04-01T00:00:00",
+        "eventType": "IP",
+        "payoff": 0,
+        "currency": "USD",
+        "notionalPrincipal": 0,
+        "nominalInterestRate": 0,
+        "accruedInterest": 0
+      },
+      {
+        "eventDate": "2013-07-01T00:00:00",
+        "eventType": "IP",
+        "payoff": 7.479452054794521,
+        "currency": "USD",
+        "notionalPrincipal": 0,
+        "nominalInterestRate": 0,
+        "accruedInterest": 0
+      },
+      {
+        "eventDate": "2013-10-01T00:00:00",
+        "eventType": "IP",
+        "payoff": 2.520547945205481,
+        "currency": "USD",
+        "notionalPrincipal": 0,
+        "nominalInterestRate": 0,
+        "accruedInterest": 0
+      },
+      {
+        "eventDate": "2014-01-01T00:00:00",
+        "eventType": "IP",
+        "payoff": 0,
+        "currency": "USD",
+        "notionalPrincipal": 0,
+        "nominalInterestRate": 0,
+        "accruedInterest": 0
+      }
+    ]
+  },
+  "capfl04": {
+    "identifier": "capfl04",
+    "terms": {
+      "contractType": "CAPFL",
+      "contractID": "capfl04",
+      "contractRole": "SEL",
+      "contractStructure": [
+        {
+          "object": {
+            "contractType": "PAM",
+            "contractID": "capfl-underlying",
+            "contractDealDate": "2012-12-28T00:00:00",
+            "initialExchangeDate": "2013-01-01T00:00:00",
+            "currency": "USD",
+            "statusDate": "2012-12-30T00:00:00",
+            "notionalPrincipal": "1000",
+            "dayCountConvention": "A365",
+            "nominalInterestRate": "0.05",
+            "maturityDate": "2014-01-01T00:00:00",
+            "cycleAnchorDateOfInterestPayment": "2013-04-01T00:00:00",
+            "cycleOfInterestPayment": "P3ML1",
+            "cycleAnchorDateOfRateReset": "2013-04-01T00:00:00",
+            "cycleOfRateReset": "P3ML1",
+            "marketObjectCodeOfRateReset": "LIBORUSD1M"
+          },
+          "referenceType": "CNT",
+          "referenceRole": "UDL"
+        }
+      ],
+      "currency": "USD",
+      "contractDealDate": "2012-12-28T00:00:00",
+      "statusDate": "2012-12-30T00:00:00",
+      "lifeCap": "0.07",
+      "lifeFloor": "0.02"
+    },
+    "to": "2014-01-01T00:00:00",
+    "dataObserved": {
+      "LIBORUSD1M": {
+        "identifier": "LIBORUSD1M",
+        "data": [
+          {
+            "timestamp": "2013-04-01T00:00:00",
+            "value": "0.1"
+          },
+          {
+            "timestamp": "2013-07-01T00:00:00",
+            "value": "0.01"
+          },
+          {
+            "timestamp": "2013-10-01T00:00:00",
+            "value": "0.04"
+          }
+        ]
+      }
+    },
+    "eventsObserved": [],
+    "results": [
+      {
+        "eventDate": "2013-04-01T00:00:00",
+        "eventType": "IP",
+        "payoff": 0,
+        "currency": "USD",
+        "notionalPrincipal": 0,
+        "nominalInterestRate": 0,
+        "accruedInterest": 0
+      },
+      {
+        "eventDate": "2013-07-01T00:00:00",
+        "eventType": "IP",
+        "payoff": -7.479452054794521,
+        "currency": "USD",
+        "notionalPrincipal": 0,
+        "nominalInterestRate": 0,
+        "accruedInterest": 0
+      },
+      {
+        "eventDate": "2013-10-01T00:00:00",
+        "eventType": "IP",
+        "payoff": -2.520547945205481,
+        "currency": "USD",
+        "notionalPrincipal": 0,
+        "nominalInterestRate": 0,
+        "accruedInterest": 0
+      },
+      {
+        "eventDate": "2014-01-01T00:00:00",
+        "eventType": "IP",
+        "payoff": 0,
+        "currency": "USD",
+        "notionalPrincipal": 0,
+        "nominalInterestRate": 0,
+        "accruedInterest": 0
+      }
+    ]
+  }
+}

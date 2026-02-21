@@ -1,0 +1,3247 @@
+{
+    "lax01": {
+        "identifier": "lax01",
+        "terms": {
+            "contractType": "LAX",
+            "contractID": "lax01",
+            "creatorID": "LEI01",
+            "counterpartyID": "LEI02",
+            "statusDate": "2020-01-01T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "currency": "EUR",
+            "contractDealDate": "2020-01-01T00:00:00",
+            "initialExchangeDate": "2020-01-02T00:00:00",
+            "maturityDate": "2024-12-31T00:00:00",
+            "notionalPrincipal": "100",
+            "arrayCycleAnchorDateOfInterestPayment": "2021-01-01T00:00:00",
+            "arrayCycleOfInterestPayment": "P1YL1",
+            "nominalInterestRate": "0.05",
+            "dayCountConvention": "30E360",
+            "arrayCycleAnchorDateOfPrincipalRedemption": "2021-01-01T00:00:00",
+            "arrayCycleOfPrincipalRedemption": "P1YL1",
+            "arrayNextPrincipalRedemptionPayment": 20,
+            "arrayIncreaseDecrease": "DEC"
+        },
+        "to": "2024-12-31T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2020-01-02T00:00",
+                "eventType": "IED",
+                "payoff": "-100.0",
+                "currency": "EUR",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.98611111111111"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "4.98611111111111",
+                "currency": "EUR",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "4.0",
+                "currency": "EUR",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "3.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "3.0",
+                "currency": "EUR",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "2.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "2.0",
+                "currency": "EUR",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-12-31T00:00",
+                "eventType": "IP",
+                "payoff": "0.997222222222222",
+                "currency": "EUR",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-12-31T00:00",
+                "eventType": "MD",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            }
+        ]
+    },
+    "lax02": {
+        "identifier": "lax02",
+        "terms": {
+            "contractType": "LAX",
+            "contractID": "lax02",
+            "creatorID": "LEI01",
+            "counterpartyID": "LEI02",
+            "statusDate": "2020-01-01T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "currency": "EUR",
+            "contractDealDate": "2020-01-01T00:00:00",
+            "initialExchangeDate": "2020-01-02T00:00:00",
+            "maturityDate": "2024-12-31T00:00:00",
+            "notionalPrincipal": "120",
+            "arrayCycleAnchorDateOfInterestPayment": "2021-01-01T00:00:00",
+            "arrayCycleOfInterestPayment": "P1YL1",
+            "nominalInterestRate": "0.05",
+            "dayCountConvention": "30E360",
+            "arrayCycleAnchorDateOfPrincipalRedemption": "2021-01-01T00:00:00",
+            "arrayCycleOfPrincipalRedemption": "P1YL1",
+            "arrayNextPrincipalRedemptionPayment": 20,
+            "arrayIncreaseDecrease": "DEC"
+        },
+        "to": "2024-12-31T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2020-01-02T00:00",
+                "eventType": "IED",
+                "payoff": "-120.0",
+                "currency": "EUR",
+                "notionalPrincipal": "120.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "5.98333333333333"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "5.98333333333333",
+                "currency": "EUR",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "5.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "5.0",
+                "currency": "EUR",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "4.0",
+                "currency": "EUR",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "3.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "3.0",
+                "currency": "EUR",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-12-31T00:00",
+                "eventType": "IP",
+                "payoff": "1.99444444444444",
+                "currency": "EUR",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-12-31T00:00",
+                "eventType": "MD",
+                "payoff": "40.0",
+                "currency": "EUR",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            }
+        ]
+    },
+    "lax03": {
+        "identifier": "lax03",
+        "terms": {
+            "contractType": "LAX",
+            "contractID": "lax03",
+            "creatorID": "LEI01",
+            "counterpartyID": "LEI02",
+            "statusDate": "2020-01-01T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "currency": "EUR",
+            "contractDealDate": "2020-01-01T00:00:00",
+            "initialExchangeDate": "2020-01-02T00:00:00",
+            "maturityDate": "2024-12-31T00:00:00",
+            "notionalPrincipal": " 80",
+            "arrayCycleAnchorDateOfInterestPayment": "2021-01-01T00:00:00",
+            "arrayCycleOfInterestPayment": "P1YL1",
+            "nominalInterestRate": "0.05",
+            "dayCountConvention": "30E360",
+            "arrayCycleAnchorDateOfPrincipalRedemption": "2021-01-01T00:00:00",
+            "arrayCycleOfPrincipalRedemption": "P1YL1",
+            "arrayNextPrincipalRedemptionPayment": 20,
+            "arrayIncreaseDecrease": "DEC"
+        },
+        "to": "2024-12-31T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2020-01-02T00:00",
+                "eventType": "IED",
+                "payoff": "-80.0",
+                "currency": "EUR",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "3.98888888888888"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "3.98888888888888",
+                "currency": "EUR",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "3.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "3.0",
+                "currency": "EUR",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "2.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "2.0",
+                "currency": "EUR",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "1.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "1.0",
+                "currency": "EUR",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-12-31T00:00",
+                "eventType": "IP",
+                "payoff": "0.0",
+                "currency": "EUR",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-12-31T00:00",
+                "eventType": "MD",
+                "payoff": "0.0",
+                "currency": "EUR",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            }
+        ]
+    },
+    "lax04": {
+        "identifier": "lax04",
+        "terms": {
+            "contractType": "LAX",
+            "contractID": "lax04",
+            "creatorID": "LEI01",
+            "counterpartyID": "LEI02",
+            "statusDate": "2020-01-01T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "currency": "EUR",
+            "contractDealDate": "2020-01-01T00:00:00",
+            "initialExchangeDate": "2020-01-02T00:00:00",
+            "notionalPrincipal": "100",
+            "arrayCycleAnchorDateOfInterestPayment": "2021-01-01T00:00:00",
+            "arrayCycleOfInterestPayment": "P1YL1",
+            "nominalInterestRate": "0.05",
+            "dayCountConvention": "30E360",
+            "arrayCycleAnchorDateOfPrincipalRedemption": "2021-01-01T00:00:00",
+            "arrayCycleOfPrincipalRedemption": "P1YL1",
+            "arrayNextPrincipalRedemptionPayment": 20,
+            "arrayIncreaseDecrease": "DEC"
+        },
+        "to": "2025-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2020-01-02T00:00",
+                "eventType": "IED",
+                "payoff": "-100.0",
+                "currency": "EUR",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.98611111111111"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "4.98611111111111",
+                "currency": "EUR",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "4.0",
+                "currency": "EUR",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "3.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "3.0",
+                "currency": "EUR",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "2.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "2.0",
+                "currency": "EUR",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "1.0",
+                "currency": "EUR",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "MD",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            }
+        ]
+    },
+    "lax05": {
+        "identifier": "lax05",
+        "terms": {
+            "contractType": "LAX",
+            "contractID": "lax05",
+            "creatorID": "LEI01",
+            "counterpartyID": "LEI02",
+            "statusDate": "2020-01-01T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "currency": "EUR",
+            "contractDealDate": "2020-01-01T00:00:00",
+            "initialExchangeDate": "2020-01-02T00:00:00",
+            "premiumDiscountAtIED": "-10",
+            "notionalPrincipal": "100",
+            "arrayCycleAnchorDateOfInterestPayment": "2021-01-01T00:00:00",
+            "arrayCycleOfInterestPayment": "P1YL1",
+            "nominalInterestRate": "0.05",
+            "dayCountConvention": "30E360",
+            "arrayCycleAnchorDateOfPrincipalRedemption": "2021-01-01T00:00:00",
+            "arrayCycleOfPrincipalRedemption": "P1YL1",
+            "arrayNextPrincipalRedemptionPayment": 20,
+            "arrayIncreaseDecrease": "DEC"
+        },
+        "to": "2025-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2020-01-02T00:00",
+                "eventType": "IED",
+                "payoff": -90,
+                "currency": "EUR",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "PR",
+                "payoff": 20,
+                "currency": "EUR",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.98611111111111"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "IP",
+                "payoff": 4.98611111111111,
+                "currency": "EUR",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "PR",
+                "payoff": 20,
+                "currency": "EUR",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "IP",
+                "payoff": 4,
+                "currency": "EUR",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "PR",
+                "payoff": 20,
+                "currency": "EUR",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "3.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "IP",
+                "payoff": 3,
+                "currency": "EUR",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "PR",
+                "payoff": 20,
+                "currency": "EUR",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "2.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "IP",
+                "payoff": 2,
+                "currency": "EUR",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "IP",
+                "payoff": 1,
+                "currency": "EUR",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "MD",
+                "payoff": 20,
+                "currency": "EUR",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            }
+        ]
+    },
+    "lax06": {
+        "identifier": "lax06",
+        "terms": {
+            "contractType": "LAX",
+            "contractID": "lax06",
+            "creatorID": "LEI01",
+            "counterpartyID": "LEI02",
+            "statusDate": "2020-01-01T00:00:00",
+            "contractRole": "RPL",
+            "calendar": "NC",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "currency": "EUR",
+            "contractDealDate": "2020-01-01T00:00:00",
+            "initialExchangeDate": "2020-01-02T00:00:00",
+            "notionalPrincipal": "100",
+            "arrayCycleAnchorDateOfInterestPayment": "2021-01-01T00:00:00",
+            "arrayCycleOfInterestPayment": "P1YL1",
+            "nominalInterestRate": "0.05",
+            "dayCountConvention": "30E360",
+            "arrayCycleAnchorDateOfPrincipalRedemption": "2021-01-01T00:00:00",
+            "arrayCycleOfPrincipalRedemption": "P1YL1",
+            "arrayNextPrincipalRedemptionPayment": 20,
+            "arrayIncreaseDecrease": "DEC"
+        },
+        "to": "2025-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2020-01-02T00:00",
+                "eventType": "IED",
+                "payoff": 100,
+                "currency": "EUR",
+                "notionalPrincipal": -100,
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "PR",
+                "payoff": -20,
+                "currency": "EUR",
+                "notionalPrincipal": -80,
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "-4.98611111111111"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "IP",
+                "payoff": -4.98611111111111,
+                "currency": "EUR",
+                "notionalPrincipal": -80,
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "PR",
+                "payoff": -20,
+                "currency": "EUR",
+                "notionalPrincipal": -60,
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "-4.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "IP",
+                "payoff": -4,
+                "currency": "EUR",
+                "notionalPrincipal": -60,
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "PR",
+                "payoff": -20,
+                "currency": "EUR",
+                "notionalPrincipal": -40,
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "-3.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "IP",
+                "payoff": -3,
+                "currency": "EUR",
+                "notionalPrincipal": -40,
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "PR",
+                "payoff": -20,
+                "currency": "EUR",
+                "notionalPrincipal": -20,
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "-2.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "IP",
+                "payoff": -2,
+                "currency": "EUR",
+                "notionalPrincipal": -20,
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "IP",
+                "payoff": -1,
+                "currency": "EUR",
+                "notionalPrincipal": -20,
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "MD",
+                "payoff": -20,
+                "currency": "EUR",
+                "notionalPrincipal": 0,
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            }
+        ]
+    },
+    "lax07": {
+        "identifier": "lax07",
+        "terms": {
+            "contractType": "LAX",
+            "contractID": "lax07",
+            "creatorID": "LEI01",
+            "counterpartyID": "LEI02",
+            "statusDate": "2020-01-01T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "currency": "EUR",
+            "contractDealDate": "2020-01-01T00:00:00",
+            "initialExchangeDate": "2020-01-02T00:00:00",
+            "notionalPrincipal": "100",
+            "arrayCycleAnchorDateOfInterestPayment": "2021-01-01T00:00:00",
+            "arrayCycleOfInterestPayment": "P1YL1",
+            "nominalInterestRate": "0.10",
+            "dayCountConvention": "30E360",
+            "arrayCycleAnchorDateOfPrincipalRedemption": "2021-01-01T00:00:00",
+            "arrayCycleOfPrincipalRedemption": "P1YL1",
+            "arrayNextPrincipalRedemptionPayment": 20,
+            "arrayIncreaseDecrease": "DEC"
+        },
+        "to": "2025-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2020-01-02T00:00",
+                "eventType": "IED",
+                "payoff": "-100.0",
+                "currency": "EUR",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": 0.1,
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": 0.1,
+                "accruedInterest": "9.97222222222222"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "9.97222222222222",
+                "currency": "EUR",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": 0.1,
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": 0.1,
+                "accruedInterest": "8.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "8.0",
+                "currency": "EUR",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": 0.1,
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": 0.1,
+                "accruedInterest": "6.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "6.0",
+                "currency": "EUR",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": 0.1,
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": 0.1,
+                "accruedInterest": "4.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "4.0",
+                "currency": "EUR",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": 0.1,
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "2.0",
+                "currency": "EUR",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": 0.1,
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "MD",
+                "payoff": "20.0",
+                "currency": "EUR",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": 0.1,
+                "accruedInterest": "0.0"
+            }
+        ]
+    },
+    "lax08": {
+        "identifier": "lax08",
+        "terms": {
+            "contractType": "LAX",
+            "contractID": "lax08",
+            "creatorID": "LEI01",
+            "counterpartyID": "LEI02",
+            "statusDate": "2020-01-01T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "currency": "USD",
+            "contractDealDate": "2020-01-01T00:00:00",
+            "initialExchangeDate": "2020-01-02T00:00:00",
+            "notionalPrincipal": "100",
+            "arrayCycleAnchorDateOfInterestPayment": "2021-01-01T00:00:00",
+            "arrayCycleOfInterestPayment": "P1YL1",
+            "nominalInterestRate": "0.05",
+            "dayCountConvention": "30E360",
+            "arrayCycleAnchorDateOfPrincipalRedemption": "2021-01-01T00:00:00",
+            "arrayCycleOfPrincipalRedemption": "P1YL1",
+            "arrayNextPrincipalRedemptionPayment": 20,
+            "arrayIncreaseDecrease": "DEC"
+        },
+        "to": "2025-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2020-01-02T00:00",
+                "eventType": "IED",
+                "payoff": "-100.0",
+                "currency": "USD",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.98611111111111"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "4.98611111111111",
+                "currency": "USD",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "4.0",
+                "currency": "USD",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "3.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "3.0",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "2.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "2.0",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "1.0",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "MD",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            }
+        ]
+    },
+    "lax09": {
+        "identifier": "lax09",
+        "terms": {
+            "contractType": "LAX",
+            "contractID": "lax09",
+            "creatorID": "LEI01",
+            "counterpartyID": "LEI02",
+            "statusDate": "2020-01-01T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "currency": "USD",
+            "contractDealDate": "2020-01-01T00:00:00",
+            "initialExchangeDate": "2020-01-02T00:00:00",
+            "notionalPrincipal": "100",
+            "arrayCycleAnchorDateOfInterestPayment": "2021-01-01T00:00:00",
+            "arrayCycleOfInterestPayment": "P1YL1",
+            "nominalInterestRate": "0.05",
+            "dayCountConvention": "30E360",
+            "arrayCycleAnchorDateOfPrincipalRedemption": "2022-01-01T00:00:00",
+            "arrayCycleOfPrincipalRedemption": "P1YL1",
+            "arrayNextPrincipalRedemptionPayment": 20,
+            "arrayIncreaseDecrease": "DEC"
+        },
+        "to": "2026-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2020-01-02T00:00",
+                "eventType": "IED",
+                "payoff": "-100.0",
+                "currency": "USD",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "4.98611111111111",
+                "currency": "USD",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "5.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "5.0",
+                "currency": "USD",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "4.0",
+                "currency": "USD",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "3.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "3.0",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "2.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "2.0",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2026-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "1.0",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2026-01-01T00:00",
+                "eventType": "MD",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            }
+        ]
+    },
+    "lax10": {
+        "identifier": "lax10",
+        "terms": {
+            "contractType": "LAX",
+            "contractID": "lax10",
+            "creatorID": "LEI01",
+            "counterpartyID": "LEI02",
+            "statusDate": "2020-01-01T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "currency": "USD",
+            "contractDealDate": "2020-01-01T00:00:00",
+            "initialExchangeDate": "2020-01-02T00:00:00",
+            "notionalPrincipal": "100",
+            "arrayCycleAnchorDateOfInterestPayment": "2021-01-01T00:00:00",
+            "arrayCycleOfInterestPayment": "P6ML1",
+            "nominalInterestRate": "0.05",
+            "dayCountConvention": "30E360",
+            "arrayCycleAnchorDateOfPrincipalRedemption": "2022-01-01T00:00:00",
+            "arrayCycleOfPrincipalRedemption": "P6ML1",
+            "arrayNextPrincipalRedemptionPayment": 20,
+            "arrayIncreaseDecrease": "DEC"
+        },
+        "to": "2024-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2020-01-02T00:00",
+                "eventType": "IED",
+                "payoff": "-100.0",
+                "currency": "USD",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "4.98611111111111",
+                "currency": "USD",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-07-01T00:00",
+                "eventType": "IP",
+                "payoff": "2.5",
+                "currency": "USD",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "2.5"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "2.5",
+                "currency": "USD",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-07-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "2.0"
+            },
+            {
+                "eventDate": "2022-07-01T00:00",
+                "eventType": "IP",
+                "payoff": "2.0",
+                "currency": "USD",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "1.5"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "1.5",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2023-07-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "1.0"
+            },
+            {
+                "eventDate": "2023-07-01T00:00",
+                "eventType": "IP",
+                "payoff": "1.0",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.5",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "MD",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            }
+        ]
+    },
+    "lax11": {
+        "identifier": "lax11",
+        "terms": {
+            "contractType": "LAX",
+            "contractID": "lax11",
+            "creatorID": "LEI01",
+            "counterpartyID": "LEI02",
+            "statusDate": "2020-01-01T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "currency": "USD",
+            "contractDealDate": "2020-01-01T00:00:00",
+            "initialExchangeDate": "2020-01-02T00:00:00",
+            "notionalPrincipal": "120",
+            "arrayCycleAnchorDateOfInterestPayment": "2021-01-01T00:00:00",
+            "arrayCycleOfInterestPayment": "P1ML1",
+            "nominalInterestRate": "0.05",
+            "dayCountConvention": "30E360",
+            "arrayCycleAnchorDateOfPrincipalRedemption": "2022-01-01T00:00:00",
+            "arrayCycleOfPrincipalRedemption": "P1ML1",
+            "arrayNextPrincipalRedemptionPayment": 10,
+            "arrayIncreaseDecrease": "DEC"
+        },
+        "to": "2022-12-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2020-01-02T00:00",
+                "eventType": "IED",
+                "payoff": "-120.0",
+                "currency": "USD",
+                "notionalPrincipal": "120.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "5.98333333333333",
+                "currency": "USD",
+                "notionalPrincipal": "120.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-02-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.5",
+                "currency": "USD",
+                "notionalPrincipal": "120.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-03-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.5",
+                "currency": "USD",
+                "notionalPrincipal": "120.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-04-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.5",
+                "currency": "USD",
+                "notionalPrincipal": "120.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-05-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.5",
+                "currency": "USD",
+                "notionalPrincipal": "120.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-06-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.5",
+                "currency": "USD",
+                "notionalPrincipal": "120.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-07-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.5",
+                "currency": "USD",
+                "notionalPrincipal": "120.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-08-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.5",
+                "currency": "USD",
+                "notionalPrincipal": "120.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-09-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.5",
+                "currency": "USD",
+                "notionalPrincipal": "120.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-10-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.5",
+                "currency": "USD",
+                "notionalPrincipal": "120.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-11-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.5",
+                "currency": "USD",
+                "notionalPrincipal": "120.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-12-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.5",
+                "currency": "USD",
+                "notionalPrincipal": "120.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "10.0",
+                "currency": "USD",
+                "notionalPrincipal": "110.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.5"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.5",
+                "currency": "USD",
+                "notionalPrincipal": "110.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-02-01T00:00",
+                "eventType": "PR",
+                "payoff": "10.0",
+                "currency": "USD",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.458333333333333"
+            },
+            {
+                "eventDate": "2022-02-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.458333333333333",
+                "currency": "USD",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-03-01T00:00",
+                "eventType": "PR",
+                "payoff": "10.0",
+                "currency": "USD",
+                "notionalPrincipal": "90.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.416666666666666"
+            },
+            {
+                "eventDate": "2022-03-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.416666666666666",
+                "currency": "USD",
+                "notionalPrincipal": "90.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-04-01T00:00",
+                "eventType": "PR",
+                "payoff": "10.0",
+                "currency": "USD",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.375"
+            },
+            {
+                "eventDate": "2022-04-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.375",
+                "currency": "USD",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-05-01T00:00",
+                "eventType": "PR",
+                "payoff": "10.0",
+                "currency": "USD",
+                "notionalPrincipal": "70.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.333333333333333"
+            },
+            {
+                "eventDate": "2022-05-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.333333333333333",
+                "currency": "USD",
+                "notionalPrincipal": "70.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-06-01T00:00",
+                "eventType": "PR",
+                "payoff": "10.0",
+                "currency": "USD",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.291666666666666"
+            },
+            {
+                "eventDate": "2022-06-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.291666666666666",
+                "currency": "USD",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-07-01T00:00",
+                "eventType": "PR",
+                "payoff": "10.0",
+                "currency": "USD",
+                "notionalPrincipal": "50.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.25"
+            },
+            {
+                "eventDate": "2022-07-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.25",
+                "currency": "USD",
+                "notionalPrincipal": "50.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-08-01T00:00",
+                "eventType": "PR",
+                "payoff": "10.0",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.208333333333333"
+            },
+            {
+                "eventDate": "2022-08-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.208333333333333",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-09-01T00:00",
+                "eventType": "PR",
+                "payoff": "10.0",
+                "currency": "USD",
+                "notionalPrincipal": "30.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.166666666666666"
+            },
+            {
+                "eventDate": "2022-09-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.166666666666666",
+                "currency": "USD",
+                "notionalPrincipal": "30.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-10-01T00:00",
+                "eventType": "PR",
+                "payoff": "10.0",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.125"
+            },
+            {
+                "eventDate": "2022-10-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.125",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-11-01T00:00",
+                "eventType": "PR",
+                "payoff": "10.0",
+                "currency": "USD",
+                "notionalPrincipal": "10.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0833333333333333"
+            },
+            {
+                "eventDate": "2022-11-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.0833333333333333",
+                "currency": "USD",
+                "notionalPrincipal": "10.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-12-01T00:00",
+                "eventType": "IP",
+                "payoff": "0.0416666666666666",
+                "currency": "USD",
+                "notionalPrincipal": "10.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-12-01T00:00",
+                "eventType": "MD",
+                "payoff": "10.0",
+                "currency": "USD",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            }
+        ]
+    },
+    "lax12": {
+        "identifier": "lax12",
+        "terms": {
+            "contractType": "LAX",
+            "contractID": "lax12",
+            "creatorID": "LEI01",
+            "counterpartyID": "LEI02",
+            "statusDate": "2020-01-01T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "currency": "USD",
+            "contractDealDate": "2020-01-01T00:00:00",
+            "initialExchangeDate": "2020-01-02T00:00:00",
+            "notionalPrincipal": "100",
+            "arrayCycleAnchorDateOfInterestPayment": [
+                "2021-01-01T00:00:00",
+                "2022-01-01T00:00:00",
+                "2023-01-01T00:00:00",
+                "2024-01-01T00:00:00",
+                "2025-01-01T00:00:00"
+            ],
+            "nominalInterestRate": "0.05",
+            "dayCountConvention": "30E360",
+            "arrayCycleAnchorDateOfPrincipalRedemption": [
+                "2021-01-01T00:00:00",
+                "2022-01-01T00:00:00",
+                "2023-01-01T00:00:00",
+                "2024-01-01T00:00:00",
+                "2025-01-01T00:00:00"
+            ],
+            "arrayNextPrincipalRedemptionPayment": [
+                20,
+                20,
+                20,
+                20,
+                20
+            ],
+            "arrayIncreaseDecrease": [
+                "DEC",
+                "DEC",
+                "DEC",
+                "DEC",
+                "DEC"
+            ]
+        },
+        "to": "2025-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2020-01-02T00:00",
+                "eventType": "IED",
+                "payoff": "-100.0",
+                "currency": "USD",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.98611111111111"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "4.98611111111111",
+                "currency": "USD",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "4.0",
+                "currency": "USD",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "3.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "3.0",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "2.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "2.0",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "1.0",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "MD",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            }
+        ]
+    },
+    "lax13": {
+        "identifier": "lax13",
+        "terms": {
+            "contractType": "LAX",
+            "contractID": "lax13",
+            "creatorID": "LEI01",
+            "counterpartyID": "LEI02",
+            "statusDate": "2020-01-01T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "currency": "USD",
+            "contractDealDate": "2020-01-01T00:00:00",
+            "initialExchangeDate": "2020-01-02T00:00:00",
+            "notionalPrincipal": "100",
+            "arrayCycleAnchorDateOfInterestPayment": [
+                "2021-01-01T00:00:00",
+                "2022-01-01T00:00:00",
+                "2023-01-01T00:00:00",
+                "2024-01-01T00:00:00",
+                "2025-01-01T00:00:00"
+            ],
+            "arrayCycleOfInterestPayment": [
+                "P1YL1",
+                "P1YL1",
+                "P1YL1",
+                "P1YL1",
+                "P1YL1"
+            ],
+            "nominalInterestRate": "0.05",
+            "dayCountConvention": "30E360",
+            "arrayCycleAnchorDateOfPrincipalRedemption": [
+                "2021-01-01T00:00:00",
+                "2022-01-01T00:00:00",
+                "2023-01-01T00:00:00",
+                "2024-01-01T00:00:00",
+                "2025-01-01T00:00:00"
+            ],
+            "arrayCycleOfPrincipalRedemption": [
+                "P1YL1",
+                "P1YL1",
+                "P1YL1",
+                "P1YL1",
+                "P1YL1"
+            ],
+            "arrayNextPrincipalRedemptionPayment": [
+                20,
+                20,
+                20,
+                20,
+                20
+            ],
+            "arrayIncreaseDecrease": [
+                "DEC",
+                "DEC",
+                "DEC",
+                "DEC",
+                "DEC"
+            ]
+        },
+        "to": "2025-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2020-01-02T00:00",
+                "eventType": "IED",
+                "payoff": "-100.0",
+                "currency": "USD",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.98611111111111"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "4.98611111111111",
+                "currency": "USD",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "4.0",
+                "currency": "USD",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "3.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "3.0",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "2.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "2.0",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "1.0",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "MD",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            }
+        ]
+    },
+    "lax14": {
+        "identifier": "lax14",
+        "terms": {
+            "contractType": "LAX",
+            "contractID": "lax14",
+            "creatorID": "LEI01",
+            "counterpartyID": "LEI02",
+            "statusDate": "2020-01-01T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "currency": "USD",
+            "contractDealDate": "2020-01-01T00:00:00",
+            "initialExchangeDate": "2020-01-02T00:00:00",
+            "notionalPrincipal": "100",
+            "arrayCycleAnchorDateOfInterestPayment": [
+                "2021-01-01T00:00:00",
+                "2022-01-01T00:00:00",
+                "2023-01-01T00:00:00",
+                "2024-01-01T00:00:00"
+            ],
+            "nominalInterestRate": "0.05",
+            "dayCountConvention": "30E360",
+            "arrayCycleAnchorDateOfPrincipalRedemption": [
+                "2021-01-01T00:00:00",
+                "2022-01-01T00:00:00",
+                "2023-01-01T00:00:00",
+                "2024-01-01T00:00:00"
+            ],
+            "arrayNextPrincipalRedemptionPayment": [
+                10,
+                20,
+                30,
+                40
+            ],
+            "arrayIncreaseDecrease": [
+                "DEC",
+                "DEC",
+                "DEC",
+                "DEC"
+            ]
+        },
+        "to": "2024-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2020-01-02T00:00",
+                "eventType": "IED",
+                "payoff": "-100.0",
+                "currency": "USD",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "10.0",
+                "currency": "USD",
+                "notionalPrincipal": "90.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.98611111111111"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "4.98611111111111",
+                "currency": "USD",
+                "notionalPrincipal": "90.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "70.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.5"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "4.5",
+                "currency": "USD",
+                "notionalPrincipal": "70.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "30.0",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "3.5"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "3.5",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "2.0",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "MD",
+                "payoff": "40.0",
+                "currency": "USD",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            }
+        ]
+    },
+    "lax15": {
+        "identifier": "lax15",
+        "terms": {
+            "contractType": "LAX",
+            "contractID": "lax15",
+            "creatorID": "LEI01",
+            "counterpartyID": "LEI02",
+            "statusDate": "2020-01-01T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "currency": "USD",
+            "contractDealDate": "2020-01-01T00:00:00",
+            "initialExchangeDate": "2020-01-02T00:00:00",
+            "notionalPrincipal": "100",
+            "arrayCycleAnchorDateOfInterestPayment": [
+                "2021-01-01T00:00:00",
+                "2022-01-01T00:00:00",
+                "2023-01-01T00:00:00",
+                "2024-01-01T00:00:00"
+            ],
+            "arrayCycleOfInterestPayment": [
+                "P3ML1",
+                "P6ML1",
+                "P1YL1",
+                "P1YL1"
+            ],
+            "nominalInterestRate": "0.05",
+            "dayCountConvention": "30E360",
+            "arrayCycleAnchorDateOfPrincipalRedemption": [
+                "2021-01-01T00:00:00",
+                "2022-01-01T00:00:00",
+                "2023-01-01T00:00:00",
+                "2024-01-01T00:00:00"
+            ],
+            "arrayCycleOfPrincipalRedemption": [
+                "P3ML1",
+                "P6ML1",
+                "P1YL1",
+                "P1YL1"
+            ],
+            "arrayNextPrincipalRedemptionPayment": [
+                2.5,
+                10,
+                30,
+                40
+            ],
+            "arrayIncreaseDecrease": [
+                "DEC",
+                "DEC",
+                "DEC",
+                "DEC"
+            ]
+        },
+        "to": "2024-01-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2020-01-02T00:00",
+                "eventType": "IED",
+                "payoff": "-100.0",
+                "currency": "USD",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "2.5",
+                "currency": "USD",
+                "notionalPrincipal": "97.5",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.98611111111111"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "4.98611111111111",
+                "currency": "USD",
+                "notionalPrincipal": "97.5",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-04-01T00:00",
+                "eventType": "PR",
+                "payoff": "2.5",
+                "currency": "USD",
+                "notionalPrincipal": "95.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "1.21875"
+            },
+            {
+                "eventDate": "2021-04-01T00:00",
+                "eventType": "IP",
+                "payoff": "1.21875",
+                "currency": "USD",
+                "notionalPrincipal": "95.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-07-01T00:00",
+                "eventType": "PR",
+                "payoff": "2.5",
+                "currency": "USD",
+                "notionalPrincipal": "92.5",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "1.1875"
+            },
+            {
+                "eventDate": "2021-07-01T00:00",
+                "eventType": "IP",
+                "payoff": "1.1875",
+                "currency": "USD",
+                "notionalPrincipal": "92.5",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-10-01T00:00",
+                "eventType": "PR",
+                "payoff": "2.5",
+                "currency": "USD",
+                "notionalPrincipal": "90.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "1.15625"
+            },
+            {
+                "eventDate": "2021-10-01T00:00",
+                "eventType": "IP",
+                "payoff": "1.15625",
+                "currency": "USD",
+                "notionalPrincipal": "90.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "10.0",
+                "currency": "USD",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "1.125"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "1.125",
+                "currency": "USD",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-07-01T00:00",
+                "eventType": "PR",
+                "payoff": "10.0",
+                "currency": "USD",
+                "notionalPrincipal": "70.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "2.0"
+            },
+            {
+                "eventDate": "2022-07-01T00:00",
+                "eventType": "IP",
+                "payoff": "2.0",
+                "currency": "USD",
+                "notionalPrincipal": "70.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "30.0",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "1.75"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "1.75",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "2.0",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "MD",
+                "payoff": "40.0",
+                "currency": "USD",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            }
+        ]
+    },
+    "lax16": {
+        "identifier": "lax16",
+        "terms": {
+            "contractType": "LAX",
+            "contractID": "lax16",
+            "creatorID": "LEI01",
+            "counterpartyID": "LEI02",
+            "statusDate": "2020-01-01T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "currency": "USD",
+            "contractDealDate": "2020-01-01T00:00:00",
+            "initialExchangeDate": "2020-01-02T00:00:00",
+            "notionalPrincipal": "120",
+            "arrayCycleAnchorDateOfInterestPayment": "2021-01-01T00:00:00",
+            "arrayCycleOfInterestPayment": "P1YL1",
+            "nominalInterestRate": "0.05",
+            "dayCountConvention": "30E360",
+            "arrayCycleAnchorDateOfPrincipalRedemption": [
+                "2021-01-01T00:00:00",
+                "2027-01-01T00:00:00"
+            ],
+            "arrayCycleOfPrincipalRedemption": [
+                "P1YL1",
+                "P1ML1"
+            ],
+            "arrayNextPrincipalRedemptionPayment": [
+                20,
+                20
+            ],
+            "arrayIncreaseDecrease": [
+                "INC",
+                "DEC"
+            ]
+        },
+        "to": "2027-12-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2020-01-02T00:00",
+                "eventType": "IED",
+                "payoff": "-120.0",
+                "currency": "USD",
+                "notionalPrincipal": "120.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "PI",
+                "payoff": "-20.0",
+                "currency": "USD",
+                "notionalPrincipal": "140.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "5.98333333333333"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "5.98333333333333",
+                "currency": "USD",
+                "notionalPrincipal": "140.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "PI",
+                "payoff": "-20.0",
+                "currency": "USD",
+                "notionalPrincipal": "160.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "7.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "7.0",
+                "currency": "USD",
+                "notionalPrincipal": "160.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "PI",
+                "payoff": "-20.0",
+                "currency": "USD",
+                "notionalPrincipal": "180.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "8.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "8.0",
+                "currency": "USD",
+                "notionalPrincipal": "180.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "PI",
+                "payoff": "-20.0",
+                "currency": "USD",
+                "notionalPrincipal": "200.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "9.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "9.0",
+                "currency": "USD",
+                "notionalPrincipal": "200.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "PI",
+                "payoff": "-20.0",
+                "currency": "USD",
+                "notionalPrincipal": "220.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "10.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "10.0",
+                "currency": "USD",
+                "notionalPrincipal": "220.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2026-01-01T00:00",
+                "eventType": "PI",
+                "payoff": "-20.0",
+                "currency": "USD",
+                "notionalPrincipal": "240.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "11.0"
+            },
+            {
+                "eventDate": "2026-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "11.0",
+                "currency": "USD",
+                "notionalPrincipal": "240.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2027-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "220.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "12.0"
+            },
+            {
+                "eventDate": "2027-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "12.0",
+                "currency": "USD",
+                "notionalPrincipal": "220.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2027-02-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "200.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.916666666666666"
+            },
+            {
+                "eventDate": "2027-03-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "180.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "1.75"
+            },
+            {
+                "eventDate": "2027-04-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "160.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "2.5"
+            },
+            {
+                "eventDate": "2027-05-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "140.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "3.16666666666666"
+            },
+            {
+                "eventDate": "2027-06-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "120.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "3.75"
+            },
+            {
+                "eventDate": "2027-07-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "100.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.25"
+            },
+            {
+                "eventDate": "2027-08-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "80.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "4.66666666666666"
+            },
+            {
+                "eventDate": "2027-09-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "5.0"
+            },
+            {
+                "eventDate": "2027-10-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "40.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "5.25"
+            },
+            {
+                "eventDate": "2027-11-01T00:00",
+                "eventType": "PR",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "5.41666666666666"
+            },
+            {
+                "eventDate": "2027-12-01T00:00",
+                "eventType": "IP",
+                "payoff": "5.5",
+                "currency": "USD",
+                "notionalPrincipal": "20.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2027-12-01T00:00",
+                "eventType": "MD",
+                "payoff": "20.0",
+                "currency": "USD",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            }
+        ]
+    },
+    "lax17": {
+        "identifier": "lax17",
+        "terms": {
+            "contractType": "LAX",
+            "contractID": "lax17",
+            "creatorID": "LEI01",
+            "counterpartyID": "LEI02",
+            "statusDate": "2020-01-01T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "currency": "USD",
+            "contractDealDate": "2020-01-01T00:00:00",
+            "initialExchangeDate": "2020-01-02T00:00:00",
+            "notionalPrincipal": "120",
+            "arrayCycleAnchorDateOfInterestPayment": "2021-01-01T00:00:00",
+            "arrayCycleOfInterestPayment": "P1YL1",
+            "nominalInterestRate": "0.05",
+            "dayCountConvention": "30E360",
+            "arrayCycleAnchorDateOfPrincipalRedemption": [
+                "2021-01-01T00:00:00",
+                "2027-01-01T00:00:00"
+            ],
+            "arrayCycleOfPrincipalRedemption": [
+                "P1YL1",
+                "P3ML1"
+            ],
+            "arrayNextPrincipalRedemptionPayment": [
+                20,
+                60
+            ],
+            "arrayIncreaseDecrease": [
+                "INC",
+                "DEC"
+            ],
+            "arrayCycleAnchorDateOfRateReset": [
+                "2022-01-01T00:00:00",
+                "2023-01-01T00:00:00",
+                "2024-01-01T00:00:00"
+            ],
+            "arrayRate": [
+                0.06,
+                0.07,
+                0.08
+            ],
+            "arrayFixedVariable": [
+                "FIX",
+                "FIX",
+                "FIX"
+            ]
+        },
+        "to": "2027-10-01T00:00:00",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2020-01-02T00:00",
+                "eventType": "IED",
+                "payoff": "-120.0",
+                "currency": "USD",
+                "notionalPrincipal": "120.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "PI",
+                "payoff": "-20.0",
+                "currency": "USD",
+                "notionalPrincipal": "140.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "5.98333333333333"
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "5.98333333333333",
+                "currency": "USD",
+                "notionalPrincipal": "140.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "PI",
+                "payoff": "-20.0",
+                "currency": "USD",
+                "notionalPrincipal": "160.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "7.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "7.0",
+                "currency": "USD",
+                "notionalPrincipal": "160.0",
+                "nominalInterestRate": "0.05",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "RRF",
+                "payoff": "0.0",
+                "currency": "USD",
+                "notionalPrincipal": "160.0",
+                "nominalInterestRate": "0.06",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "PI",
+                "payoff": "-20.0",
+                "currency": "USD",
+                "notionalPrincipal": "180.0",
+                "nominalInterestRate": "0.06",
+                "accruedInterest": "9.6"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "9.6",
+                "currency": "USD",
+                "notionalPrincipal": "180.0",
+                "nominalInterestRate": "0.06",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "RRF",
+                "payoff": "0.0",
+                "currency": "USD",
+                "notionalPrincipal": "180.0",
+                "nominalInterestRate": "0.07",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "PI",
+                "payoff": "-20.0",
+                "currency": "USD",
+                "notionalPrincipal": "200.0",
+                "nominalInterestRate": "0.07",
+                "accruedInterest": "12.6"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "12.6",
+                "currency": "USD",
+                "notionalPrincipal": "200.0",
+                "nominalInterestRate": "0.07",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "RRF",
+                "payoff": "0.0",
+                "currency": "USD",
+                "notionalPrincipal": "200.0",
+                "nominalInterestRate": "0.08",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "PI",
+                "payoff": "-20.0",
+                "currency": "USD",
+                "notionalPrincipal": "220.0",
+                "nominalInterestRate": "0.08",
+                "accruedInterest": "16.0"
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "16.0",
+                "currency": "USD",
+                "notionalPrincipal": "220.0",
+                "nominalInterestRate": "0.08",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2026-01-01T00:00",
+                "eventType": "PI",
+                "payoff": "-20.0",
+                "currency": "USD",
+                "notionalPrincipal": "240.0",
+                "nominalInterestRate": "0.08",
+                "accruedInterest": "17.6"
+            },
+            {
+                "eventDate": "2026-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "17.6",
+                "currency": "USD",
+                "notionalPrincipal": "240.0",
+                "nominalInterestRate": "0.08",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2027-01-01T00:00",
+                "eventType": "PR",
+                "payoff": "60.0",
+                "currency": "USD",
+                "notionalPrincipal": "180.0",
+                "nominalInterestRate": "0.08",
+                "accruedInterest": "19.2"
+            },
+            {
+                "eventDate": "2027-01-01T00:00",
+                "eventType": "IP",
+                "payoff": "19.2",
+                "currency": "USD",
+                "notionalPrincipal": "180.0",
+                "nominalInterestRate": "0.08",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2027-04-01T00:00",
+                "eventType": "PR",
+                "payoff": "60.0",
+                "currency": "USD",
+                "notionalPrincipal": "120.0",
+                "nominalInterestRate": "0.08",
+                "accruedInterest": "3.6"
+            },
+            {
+                "eventDate": "2027-07-01T00:00",
+                "eventType": "PR",
+                "payoff": "60.0",
+                "currency": "USD",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.08",
+                "accruedInterest": "6.0"
+            },
+            {
+                "eventDate": "2027-10-01T00:00",
+                "eventType": "IP",
+                "payoff": "7.2",
+                "currency": "USD",
+                "notionalPrincipal": "60.0",
+                "nominalInterestRate": "0.08",
+                "accruedInterest": "0.0"
+            },
+            {
+                "eventDate": "2027-10-01T00:00",
+                "eventType": "MD",
+                "payoff": "60.0",
+                "currency": "USD",
+                "notionalPrincipal": "0.0",
+                "nominalInterestRate": "0.08",
+                "accruedInterest": "0.0"
+            }
+        ]
+    },
+    "lax18": {
+        "identifier": "lax18",
+        "terms": {
+            "contractType": "LAX",
+            "contractID": "lax18",
+            "creatorID": "LEI01",
+            "counterpartyID": "LEI02",
+            "statusDate": "2020-01-01T00:00:00",
+            "contractRole": "RPA",
+            "calendar": "NC",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "currency": "USD",
+            "contractDealDate": "2020-01-01T00:00:00",
+            "initialExchangeDate": "2020-01-02T00:00:00",
+            "notionalPrincipal": "120",
+            "arrayCycleAnchorDateOfInterestPayment": "2021-01-01T00:00:00",
+            "arrayCycleOfInterestPayment": "P1YL1",
+            "nominalInterestRate": "0.05",
+            "dayCountConvention": "30E360",
+            "arrayCycleAnchorDateOfPrincipalRedemption": [
+                "2021-01-01T00:00:00",
+                "2027-01-01T00:00:00"
+            ],
+            "arrayCycleOfPrincipalRedemption": [
+                "P1YL1",
+                "P3ML1"
+            ],
+            "arrayNextPrincipalRedemptionPayment": [
+                20,
+                60
+            ],
+            "arrayIncreaseDecrease": [
+                "INC",
+                "DEC"
+            ],
+            "arrayCycleAnchorDateOfRateReset": [
+                "2022-01-01T00:00:00",
+                "2023-01-01T00:00:00",
+                "2024-01-01T00:00:00"
+            ],
+            "arrayRate": [
+                0.06,
+                0.07,
+                0.08
+            ],
+            "arrayFixedVariable": [
+                "VAR",
+                "VAR",
+                "VAR"
+            ],
+            "marketObjectCodeOfRateReset": "LIBORUSD3M"
+        },
+        "to": "2027-10-01T00:00:00",
+        "dataObserved": {
+            "LIBORUSD3M": {
+                "identifier": "LIBORUSD3M",
+                "data": [
+                    {
+                        "timestamp": "2022-01-01T00:00:00",
+                        "value": "0.02"
+                    },
+                    {
+                        "timestamp": "2023-01-01T00:00:00",
+                        "value": "0.0"
+                    },
+                    {
+                        "timestamp": "2024-01-01T00:00:00",
+                        "value": "0.01"
+                    }
+                ]
+            }
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2020-01-02T00:00",
+                "eventType": "IED",
+                "payoff": -120,
+                "currency": "USD",
+                "notionalPrincipal": 120,
+                "nominalInterestRate": 0.05,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "PI",
+                "payoff": -20,
+                "currency": "USD",
+                "notionalPrincipal": 140,
+                "nominalInterestRate": 0.05,
+                "accruedInterest": 5.98333333333333
+            },
+            {
+                "eventDate": "2021-01-01T00:00",
+                "eventType": "IP",
+                "payoff": 5.98333333333333,
+                "currency": "USD",
+                "notionalPrincipal": 140,
+                "nominalInterestRate": 0.05,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "PI",
+                "payoff": -20,
+                "currency": "USD",
+                "notionalPrincipal": 160,
+                "nominalInterestRate": 0.05,
+                "accruedInterest": 7
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "IP",
+                "payoff": 7,
+                "currency": "USD",
+                "notionalPrincipal": 160,
+                "nominalInterestRate": 0.05,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2022-01-01T00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 160,
+                "nominalInterestRate": 0.08,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "PI",
+                "payoff": -20,
+                "currency": "USD",
+                "notionalPrincipal": 180,
+                "nominalInterestRate": 0.08,
+                "accruedInterest": 12.8
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "IP",
+                "payoff": 12.8,
+                "currency": "USD",
+                "notionalPrincipal": 180,
+                "nominalInterestRate": 0.08,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2023-01-01T00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 180,
+                "nominalInterestRate": 0.07,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "PI",
+                "payoff": -20,
+                "currency": "USD",
+                "notionalPrincipal": 200,
+                "nominalInterestRate": 0.07,
+                "accruedInterest": 12.6
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "IP",
+                "payoff": 12.6,
+                "currency": "USD",
+                "notionalPrincipal": 200,
+                "nominalInterestRate": 0.07,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2024-01-01T00:00",
+                "eventType": "RR",
+                "payoff": 0,
+                "currency": "USD",
+                "notionalPrincipal": 200,
+                "nominalInterestRate": 0.09,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "PI",
+                "payoff": -20,
+                "currency": "USD",
+                "notionalPrincipal": 220,
+                "nominalInterestRate": 0.09,
+                "accruedInterest": 18
+            },
+            {
+                "eventDate": "2025-01-01T00:00",
+                "eventType": "IP",
+                "payoff": 18,
+                "currency": "USD",
+                "notionalPrincipal": 220,
+                "nominalInterestRate": 0.09,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2026-01-01T00:00",
+                "eventType": "PI",
+                "payoff": -20,
+                "currency": "USD",
+                "notionalPrincipal": 240,
+                "nominalInterestRate": 0.09,
+                "accruedInterest": 19.8
+            },
+            {
+                "eventDate": "2026-01-01T00:00",
+                "eventType": "IP",
+                "payoff": 19.8,
+                "currency": "USD",
+                "notionalPrincipal": 240,
+                "nominalInterestRate": 0.09,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2027-01-01T00:00",
+                "eventType": "PR",
+                "payoff": 60,
+                "currency": "USD",
+                "notionalPrincipal": 180,
+                "nominalInterestRate": 0.09,
+                "accruedInterest": 21.5999999999999
+            },
+            {
+                "eventDate": "2027-01-01T00:00",
+                "eventType": "IP",
+                "payoff": 21.5999999999999,
+                "currency": "USD",
+                "notionalPrincipal": 180,
+                "nominalInterestRate": 0.09,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2027-04-01T00:00",
+                "eventType": "PR",
+                "payoff": 60,
+                "currency": "USD",
+                "notionalPrincipal": 120,
+                "nominalInterestRate": 0.09,
+                "accruedInterest": 4.05
+            },
+            {
+                "eventDate": "2027-07-01T00:00",
+                "eventType": "PR",
+                "payoff": 60,
+                "currency": "USD",
+                "notionalPrincipal": 60,
+                "nominalInterestRate": 0.09,
+                "accruedInterest": 6.75
+            },
+            {
+                "eventDate": "2027-10-01T00:00",
+                "eventType": "IP",
+                "payoff": 8.1,
+                "currency": "USD",
+                "notionalPrincipal": 60,
+                "nominalInterestRate": 0.09,
+                "accruedInterest": 0
+            },
+            {
+                "eventDate": "2027-10-01T00:00",
+                "eventType": "MD",
+                "payoff": 60,
+                "currency": "USD",
+                "notionalPrincipal": 0,
+                "nominalInterestRate": 0.09,
+                "accruedInterest": 0
+            }
+        ]
+    }
+}
+

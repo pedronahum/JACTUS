@@ -63,6 +63,7 @@ from jactus.core import (
 )
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.observers import ChildContractObserver, RiskFactorObserver
+from jactus.utilities import contract_role_sign
 
 
 class FuturePayoffFunction(BasePayoffFunction):
@@ -119,6 +120,8 @@ class FuturePayoffFunction(BasePayoffFunction):
             return self._pof_td(state, attributes, time, risk_factor_observer)
         if event_type == EventType.MD:
             return self._pof_md(state, attributes, time, risk_factor_observer)
+        if event_type == EventType.XD:
+            return self._pof_xd(state, attributes, time, risk_factor_observer)
         if event_type == EventType.STD:
             return self._pof_std(state, attributes, time, risk_factor_observer)
         if event_type == EventType.CE:
@@ -167,12 +170,16 @@ class FuturePayoffFunction(BasePayoffFunction):
     ) -> jnp.ndarray:
         """POF_PRD_FUTUR: Purchase Date payoff.
 
-        No premium for futures (zero cashflow).
+        Formula:
+            POF_PRD = R(CNTRL) × (-PPRD)
 
         Returns:
-            0.0
+            Premium payment (negative for buyer, positive for seller)
         """
-        return jnp.array(0.0, dtype=jnp.float32)
+        pprd = attributes.price_at_purchase_date or 0.0
+        role_sign = contract_role_sign(attributes.contract_role)
+
+        return jnp.array(role_sign * (-pprd), dtype=jnp.float32)
 
     def _pof_td(
         self,
@@ -212,6 +219,22 @@ class FuturePayoffFunction(BasePayoffFunction):
         """
         return jnp.array(0.0, dtype=jnp.float32)
 
+    def _pof_xd(
+        self,
+        state: ContractState,
+        attributes: ContractAttributes,
+        time: ActusDateTime,
+        risk_factor_observer: RiskFactorObserver,
+    ) -> jnp.ndarray:
+        """POF_XD_FUTUR: Exercise Date payoff.
+
+        Zero payoff at exercise (Xa calculated, payoff at STD).
+
+        Returns:
+            0.0
+        """
+        return jnp.array(0.0, dtype=jnp.float32)
+
     def _pof_std(
         self,
         state: ContractState,
@@ -224,7 +247,7 @@ class FuturePayoffFunction(BasePayoffFunction):
         Receive settlement amount (can be positive or negative).
 
         Formula:
-            POF_STD = Xa × NT
+            POF_STD = R(CNTRL) × Xa
 
         where Xa = S_t - PFUT (linear payoff, not max-based).
 
@@ -232,9 +255,9 @@ class FuturePayoffFunction(BasePayoffFunction):
             Settlement amount (positive or negative)
         """
         xa = float(state.xa) if hasattr(state, "xa") else 0.0
-        nt = attributes.notional_principal or 1.0
+        role_sign = contract_role_sign(attributes.contract_role)
 
-        return jnp.array(xa * nt, dtype=jnp.float32)
+        return jnp.array(role_sign * xa, dtype=jnp.float32)
 
     def _pof_ce(
         self,
@@ -292,6 +315,8 @@ class FutureStateTransitionFunction(BaseStateTransitionFunction):
 
         if event_type == EventType.MD:
             return self._stf_md(state_pre, event, attributes, risk_factor_observer)
+        if event_type == EventType.XD:
+            return self._stf_xd(state_pre, event, attributes, risk_factor_observer)
         if event_type == EventType.STD:
             return self._stf_std(state_pre, event, attributes)
         # No state change for other events
@@ -305,6 +330,33 @@ class FutureStateTransitionFunction(BaseStateTransitionFunction):
         risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
         """STF_MD_FUTUR: Maturity Date state transition.
+
+        Maturity just updates status date. Settlement calc is at XD.
+
+        Returns:
+            State with updated status date
+        """
+        return ContractState(
+            sd=event.event_time,
+            tmd=state.tmd,
+            nt=state.nt,
+            ipnr=state.ipnr,
+            ipac=state.ipac,
+            feac=state.feac,
+            nsc=state.nsc,
+            isc=state.isc,
+            prf=state.prf,
+            xa=state.xa if hasattr(state, "xa") else jnp.array(0.0, dtype=jnp.float32),
+        )
+
+    def _stf_xd(
+        self,
+        state: ContractState,
+        event: ContractEvent,
+        attributes: ContractAttributes,
+        risk_factor_observer: RiskFactorObserver,
+    ) -> ContractState:
+        """STF_XD_FUTUR: Exercise Date state transition.
 
         Calculate settlement amount based on spot price vs futures price.
 
@@ -437,6 +489,13 @@ class FutureContract(BaseContract):
 
         super().__init__(attributes, risk_factor_observer, child_contract_observer)
 
+    def _is_pre_exercised(self) -> bool:
+        """Check if contract was already exercised before simulation start."""
+        return (
+            self.attributes.exercise_date is not None
+            and self.attributes.exercise_amount is not None
+        )
+
     def generate_event_schedule(self) -> EventSchedule:
         """Generate event schedule for FUTUR contract.
 
@@ -445,12 +504,31 @@ class FutureContract(BaseContract):
         - PRD (optional): Purchase date (zero payment)
         - TD (optional): Termination date
         - MD: Maturity date (settlement amount calculated)
+        - XD: Exercise date at maturity
         - STD: Settlement date (receive settlement amount)
+        - Pre-exercised (exercise_date + exercise_amount set): STD only
 
         Returns:
             Event schedule with all contract events
         """
         events = []
+
+        # Pre-exercised: only generate STD at exercise_date + settlement period
+        if self._is_pre_exercised():
+            settlement_date = self._apply_settlement_period(self.attributes.exercise_date)
+            events.append(
+                ContractEvent(
+                    event_type=EventType.STD,
+                    event_time=settlement_date,
+                    payoff=0.0,
+                    currency=self.attributes.currency,
+                    sequence=0,
+                )
+            )
+            return EventSchedule(
+                contract_id=self.attributes.contract_id,
+                events=events,
+            )
 
         # Analysis dates (if specified)
         if self.attributes.analysis_dates:
@@ -500,15 +578,27 @@ class FutureContract(BaseContract):
             )
         )
 
-        # Settlement date (same as maturity for futures)
-        settlement_date = self.attributes.maturity_date
+        # Exercise date (XD) at maturity
+        events.append(
+            ContractEvent(
+                event_type=EventType.XD,
+                event_time=self.attributes.maturity_date,
+                payoff=0.0,
+                currency=self.attributes.currency,
+                sequence=4,
+            )
+        )
+
+        # Settlement date (maturity + settlement period, with BDC adjustment)
+        settlement_date = self._apply_settlement_period(self.attributes.maturity_date)
+        settlement_date = self._apply_bdc(settlement_date)
         events.append(
             ContractEvent(
                 event_type=EventType.STD,
                 event_time=settlement_date,
                 payoff=0.0,
                 currency=self.attributes.currency,
-                sequence=4,
+                sequence=5,
             )
         )
 
@@ -520,15 +610,62 @@ class FutureContract(BaseContract):
             events=events,
         )
 
+    def _apply_settlement_period(self, base_date: ActusDateTime) -> ActusDateTime:
+        """Apply settlement period offset to a date."""
+        sp = self.attributes.settlement_period
+        if not sp or sp == "P0D":
+            return base_date
+
+        from datetime import timedelta
+
+        from jactus.core.time import parse_cycle
+
+        # Strip ISO 8601 duration prefix (P3D → 3D)
+        sp_clean = sp.lstrip("P") if sp.startswith("P") else sp
+        mult, period, _ = parse_cycle(sp_clean)
+        if period == "D":
+            delta = timedelta(days=mult)
+        elif period == "W":
+            delta = timedelta(weeks=mult)
+        elif period == "M":
+            from dateutil.relativedelta import relativedelta
+
+            py_dt = base_date.to_datetime() + relativedelta(months=mult)
+            return ActusDateTime(py_dt.year, py_dt.month, py_dt.day, py_dt.hour, py_dt.minute, py_dt.second)
+        else:
+            delta = timedelta(days=mult)
+
+        py_dt = base_date.to_datetime() + delta
+        return ActusDateTime(py_dt.year, py_dt.month, py_dt.day, py_dt.hour, py_dt.minute, py_dt.second)
+
+    def _apply_bdc(self, date: ActusDateTime) -> ActusDateTime:
+        """Apply business day convention adjustment to a date."""
+        from jactus.utilities.calendars import MondayToFridayCalendar
+
+        bdc = self.attributes.business_day_convention
+        cal = self.attributes.calendar
+        if not bdc or bdc == "NULL" or not cal or cal in ("NO_CALENDAR", "NC"):
+            return date
+        calendar = MondayToFridayCalendar()
+        bdc_val = bdc.value if hasattr(bdc, "value") else str(bdc)
+        if bdc_val in ("CSF", "SCF", "CSMF", "SCMF"):
+            return calendar.next_business_day(date)
+        if bdc_val in ("CSP", "SCP", "CSMP", "SCMP"):
+            return calendar.previous_business_day(date)
+        return date
+
     def initialize_state(self) -> ContractState:
         """Initialize contract state at status date.
 
         Returns:
-            Initial contract state with xa=0
+            Initial contract state with xa set to exercise_amount if pre-exercised
         """
         prf = self.attributes.contract_performance
         if prf is None:
             prf = "PF"  # Default: performing
+
+        # Pre-exercised: xa is the known exercise amount
+        xa = self.attributes.exercise_amount if self._is_pre_exercised() else 0.0
 
         return ContractState(
             sd=self.attributes.status_date,
@@ -540,7 +677,7 @@ class FutureContract(BaseContract):
             nsc=jnp.array(1.0, dtype=jnp.float32),
             isc=jnp.array(1.0, dtype=jnp.float32),
             prf=prf,
-            xa=jnp.array(0.0, dtype=jnp.float32),  # Settlement amount
+            xa=jnp.array(xa, dtype=jnp.float32),  # Settlement amount
         )
 
     def get_payoff_function(self, event_type: Any) -> FuturePayoffFunction:

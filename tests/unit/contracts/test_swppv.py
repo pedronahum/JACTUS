@@ -134,8 +134,8 @@ class TestSWPPVInitialization:
         with pytest.raises(ValueError, match="interest_payment_cycle.*required"):
             PlainVanillaSwapContract(attrs, rf_obs)
 
-    def test_swppv_requires_rate_reset_cycle(self):
-        """Test that SWPPV requires rate_reset_cycle."""
+    def test_swppv_rate_reset_cycle_optional(self):
+        """Test that SWPPV does not require rate_reset_cycle (it is optional)."""
         attrs = ContractAttributes(
             contract_id="SWAP001",
             contract_type=ContractType.SWPPV,
@@ -147,15 +147,17 @@ class TestSWPPVInitialization:
             nominal_interest_rate=0.05,
             nominal_interest_rate_2=0.03,
             interest_payment_cycle="6M",
-            # Missing rate_reset_cycle
+            # No rate_reset_cycle — should still create successfully
             interest_calculation_base_anchor=ActusDateTime(2024, 1, 15, 0, 0, 0),
             rate_reset_anchor=ActusDateTime(2024, 1, 15, 0, 0, 0),
         )
 
         rf_obs = ConstantRiskFactorObserver(constant_value=0.04)
 
-        with pytest.raises(ValueError, match="rate_reset_cycle.*required"):
-            PlainVanillaSwapContract(attrs, rf_obs)
+        # Should create successfully without rate_reset_cycle
+        swap = PlainVanillaSwapContract(attrs, rf_obs)
+        assert swap is not None
+        assert swap.attributes.contract_type == ContractType.SWPPV
 
     def test_swppv_wrong_contract_type(self):
         """Test that wrong contract type raises error."""
@@ -212,7 +214,11 @@ class TestSWPPVEventSchedule:
         assert EventType.IED in event_types
 
     def test_swppv_generates_ip_events(self):
-        """Test that SWPPV generates IP events."""
+        """Test that SWPPV generates interest payment events.
+
+        With default delivery_settlement="D", SWPPV generates separate
+        IPFX (fixed leg) and IPFL (floating leg) events instead of IP events.
+        """
         attrs = ContractAttributes(
             contract_id="SWAP001",
             contract_type=ContractType.SWPPV,
@@ -234,10 +240,13 @@ class TestSWPPVEventSchedule:
         swap = PlainVanillaSwapContract(attrs, rf_obs)
 
         schedule = swap.generate_event_schedule()
-        ip_events = [e for e in schedule.events if e.event_type == EventType.IP]
+        ipfx_events = [e for e in schedule.events if e.event_type == EventType.IPFX]
+        ipfl_events = [e for e in schedule.events if e.event_type == EventType.IPFL]
 
-        # Should have 2 IP events for 1-year swap with semi-annual payments
-        assert len(ip_events) >= 2
+        # Default DS="D" generates IPFX/IPFL pairs, not IP events
+        # Should have 2 IPFX and 2 IPFL events for 1-year swap with semi-annual payments
+        assert len(ipfx_events) >= 2
+        assert len(ipfl_events) >= 2
 
     def test_swppv_generates_rr_events(self):
         """Test that SWPPV generates RR (Rate Reset) events."""
@@ -783,8 +792,8 @@ class TestSWPPVStateTransitions:
         assert float(state_post.ipac1) == pytest.approx(8333.33, abs=1.0)
         # Floating leg accrues: 60/360 * 0.03 * 1M = 5000.0
         assert float(state_post.ipac2) == pytest.approx(5000.0, abs=1.0)
-        # Net accrual = 8333.33 - 5000.0 = 3333.33
-        assert float(state_post.ipac) == pytest.approx(3333.33, abs=1.0)
+        # ipac = R(CNTRL) × ipac1 = 1 × 8333.33 = 8333.33 (signed fixed leg accrual)
+        assert float(state_post.ipac) == pytest.approx(8333.33, abs=1.0)
         # Notional unchanged
         assert float(state_post.nt) == pytest.approx(1000000.0)
 

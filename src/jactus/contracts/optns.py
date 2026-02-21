@@ -72,6 +72,7 @@ from jactus.core import (
 )
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.observers import ChildContractObserver, RiskFactorObserver
+from jactus.utilities import contract_role_sign
 
 
 class OptionPayoffFunction(BasePayoffFunction):
@@ -182,16 +183,15 @@ class OptionPayoffFunction(BasePayoffFunction):
         Pay option premium (negative cashflow for buyer).
 
         Formula:
-            POF_PRD = -PPRD × NT
+            POF_PRD = R(CNTRL) × (-PPRD)
 
         Returns:
-            Negative premium payment
+            Premium payment (negative for buyer, positive for seller)
         """
         pprd = attributes.price_at_purchase_date or 0.0
-        nt = attributes.notional_principal or 1.0
+        role_sign = contract_role_sign(attributes.contract_role)
 
-        # Buyer pays premium (negative cashflow)
-        return jnp.array(-pprd * nt, dtype=jnp.float32)
+        return jnp.array(role_sign * (-pprd), dtype=jnp.float32)
 
     def _pof_td(
         self,
@@ -202,18 +202,18 @@ class OptionPayoffFunction(BasePayoffFunction):
     ) -> jnp.ndarray:
         """POF_TD_OPTNS: Termination Date payoff.
 
-        Receive termination price (positive cashflow for seller).
+        Receive termination price.
 
         Formula:
-            POF_TD = PTD × NT
+            POF_TD = R(CNTRL) × PTD
 
         Returns:
-            Positive termination payment
+            Termination payment
         """
         ptd = attributes.price_at_termination_date or 0.0
-        nt = attributes.notional_principal or 1.0
+        role_sign = contract_role_sign(attributes.contract_role)
 
-        return jnp.array(ptd * nt, dtype=jnp.float32)
+        return jnp.array(role_sign * ptd, dtype=jnp.float32)
 
     def _pof_md(
         self,
@@ -259,7 +259,7 @@ class OptionPayoffFunction(BasePayoffFunction):
         Receive exercise amount if option was exercised.
 
         Formula:
-            POF_STD = Xa × NT
+            POF_STD = R(CNTRL) × Xa
 
         where Xa is the exercise amount calculated at XD.
 
@@ -267,9 +267,9 @@ class OptionPayoffFunction(BasePayoffFunction):
             Exercise amount (0 if not exercised)
         """
         xa = float(state.xa) if hasattr(state, "xa") else 0.0
-        nt = attributes.notional_principal or 1.0
+        role_sign = contract_role_sign(attributes.contract_role)
 
-        return jnp.array(xa * nt, dtype=jnp.float32)
+        return jnp.array(role_sign * xa, dtype=jnp.float32)
 
     def _pof_ce(
         self,
@@ -393,44 +393,23 @@ class OptionStateTransitionFunction(BaseStateTransitionFunction):
     ) -> ContractState:
         """STF_MD_OPTNS: Maturity Date state transition.
 
-        For European options, automatically exercise if in-the-money.
+        Maturity just updates status date. Exercise logic is handled at XD.
 
         Returns:
-            State with updated xa if auto-exercised
+            State with updated status date
         """
-        # European options auto-exercise at maturity if ITM
-        if attributes.option_exercise_type == "E":
-            # Calculate intrinsic value at maturity
-            underlier_ref = attributes.contract_structure
-            if underlier_ref is None:
-                raise ValueError("contract_structure (underlier) required for OPTNS")
-
-            spot_price = get_underlier_market_value(
-                underlier_ref, event.event_time, risk_factor_observer
-            )
-
-            intrinsic = calculate_intrinsic_value(
-                attributes.option_type,
-                float(spot_price),
-                attributes.option_strike_1,
-                attributes.option_strike_2,
-            )
-
-            # Update state with exercise amount
-            return ContractState(
-                sd=state.sd,
-                tmd=state.tmd,
-                nt=state.nt,
-                ipnr=state.ipnr,
-                ipac=state.ipac,
-                feac=state.feac,
-                nsc=state.nsc,
-                isc=state.isc,
-                prf=state.prf,
-                xa=jnp.array(float(intrinsic), dtype=jnp.float32),
-            )
-        # American/Bermudan options don't auto-exercise at maturity
-        return state
+        return ContractState(
+            sd=event.event_time,
+            tmd=state.tmd,
+            nt=state.nt,
+            ipnr=state.ipnr,
+            ipac=state.ipac,
+            feac=state.feac,
+            nsc=state.nsc,
+            isc=state.isc,
+            prf=state.prf,
+            xa=state.xa if hasattr(state, "xa") else jnp.array(0.0, dtype=jnp.float32),
+        )
 
     def _stf_std(
         self,
@@ -537,18 +516,43 @@ class OptionContract(BaseContract):
 
         super().__init__(attributes, risk_factor_observer, child_contract_observer)
 
+    def _is_pre_exercised(self) -> bool:
+        """Check if contract was already exercised before simulation start."""
+        return (
+            self.attributes.exercise_date is not None
+            and self.attributes.exercise_amount is not None
+        )
+
     def generate_event_schedule(self) -> EventSchedule:
         """Generate event schedule for OPTNS contract.
 
         Events depend on exercise type:
-        - European: AD (optional), PRD, MD, STD
+        - European: AD (optional), PRD, MD, XD, STD
         - American: AD (optional), PRD, XD (multiple), MD, STD
         - Bermudan: AD (optional), PRD, XD (specific dates), MD, STD
+        - Pre-exercised (exercise_date + exercise_amount set): STD only
 
         Returns:
             Event schedule with all contract events
         """
         events = []
+
+        # Pre-exercised: only generate STD at exercise_date + settlement period
+        if self._is_pre_exercised():
+            settlement_date = self._apply_settlement_period(self.attributes.exercise_date)
+            events.append(
+                ContractEvent(
+                    event_type=EventType.STD,
+                    event_time=settlement_date,
+                    payoff=0.0,
+                    currency=self.attributes.currency,
+                    sequence=0,
+                )
+            )
+            return EventSchedule(
+                contract_id=self.attributes.contract_id,
+                events=events,
+            )
 
         # Analysis dates (if specified)
         if self.attributes.analysis_dates:
@@ -588,7 +592,18 @@ class OptionContract(BaseContract):
             )
 
         # Exercise dates (XD) depend on exercise type
-        if self.attributes.option_exercise_type == "A":
+        if self.attributes.option_exercise_type == "E":
+            # European: single XD at maturity date (after MD)
+            events.append(
+                ContractEvent(
+                    event_type=EventType.XD,
+                    event_time=self.attributes.maturity_date,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
+                    currency=self.attributes.currency,
+                    sequence=4,
+                )
+            )
+        elif self.attributes.option_exercise_type == "A":
             # American: generate monthly XD events from purchase/status to maturity
             from jactus.utilities.schedules import generate_schedule
 
@@ -598,21 +613,18 @@ class OptionContract(BaseContract):
                 cycle="1M",
                 end=self.attributes.maturity_date,
             )
-            # Include all dates except the first (purchase) and last (maturity)
-            # since maturity has its own MD event that handles auto-exercise
-            for xd_time in xd_dates[1:-1]:
+            for xd_time in xd_dates[1:]:
                 events.append(
                     ContractEvent(
                         event_type=EventType.XD,
                         event_time=xd_time,
                         payoff=jnp.array(0.0, dtype=jnp.float32),
                         currency=self.attributes.currency,
-                        sequence=2,
+                        sequence=4,
                     )
                 )
         elif self.attributes.option_exercise_type == "B":
             # Bermudan: exercise on specific dates from exercise end date schedule
-            # Use option_exercise_end_date if provided as single exercise date
             if self.attributes.option_exercise_end_date:
                 events.append(
                     ContractEvent(
@@ -620,7 +632,7 @@ class OptionContract(BaseContract):
                         event_time=self.attributes.option_exercise_end_date,
                         payoff=jnp.array(0.0, dtype=jnp.float32),
                         currency=self.attributes.currency,
-                        sequence=2,
+                        sequence=4,
                     )
                 )
 
@@ -635,16 +647,16 @@ class OptionContract(BaseContract):
             )
         )
 
-        # Settlement date (after maturity)
-        # Default: settlement at maturity (can add settlement period if needed)
-        settlement_date = self.attributes.maturity_date
+        # Settlement date (after maturity + settlement period, with BDC adjustment)
+        settlement_date = self._apply_settlement_period(self.attributes.maturity_date)
+        settlement_date = self._apply_bdc(settlement_date)
         events.append(
             ContractEvent(
                 event_type=EventType.STD,
                 event_time=settlement_date,
                 payoff=0.0,
                 currency=self.attributes.currency,
-                sequence=4,
+                sequence=5,
             )
         )
 
@@ -656,15 +668,69 @@ class OptionContract(BaseContract):
             events=events,
         )
 
+    def _apply_settlement_period(self, base_date: ActusDateTime) -> ActusDateTime:
+        """Apply settlement period offset to a date.
+
+        Args:
+            base_date: The date to offset from (e.g., maturity/exercise date)
+
+        Returns:
+            Offset date (base_date + settlement_period)
+        """
+        sp = self.attributes.settlement_period
+        if not sp or sp == "P0D":
+            return base_date
+
+        from datetime import timedelta
+
+        from jactus.core.time import parse_cycle
+
+        # Strip ISO 8601 duration prefix (P3D → 3D)
+        sp_clean = sp.lstrip("P") if sp.startswith("P") else sp
+        mult, period, _ = parse_cycle(sp_clean)
+        if period == "D":
+            delta = timedelta(days=mult)
+        elif period == "W":
+            delta = timedelta(weeks=mult)
+        elif period == "M":
+            from dateutil.relativedelta import relativedelta
+
+            py_dt = base_date.to_datetime() + relativedelta(months=mult)
+            return ActusDateTime(py_dt.year, py_dt.month, py_dt.day, py_dt.hour, py_dt.minute, py_dt.second)
+        else:
+            delta = timedelta(days=mult)
+
+        py_dt = base_date.to_datetime() + delta
+        return ActusDateTime(py_dt.year, py_dt.month, py_dt.day, py_dt.hour, py_dt.minute, py_dt.second)
+
+    def _apply_bdc(self, date: ActusDateTime) -> ActusDateTime:
+        """Apply business day convention adjustment to a date."""
+        from jactus.utilities.calendars import MondayToFridayCalendar
+
+        bdc = self.attributes.business_day_convention
+        cal = self.attributes.calendar
+        if not bdc or bdc == "NULL" or not cal or cal in ("NO_CALENDAR", "NC"):
+            return date
+        calendar = MondayToFridayCalendar()
+        bdc_val = bdc.value if hasattr(bdc, "value") else str(bdc)
+        if bdc_val in ("CSF", "SCF", "CSMF", "SCMF"):
+            return calendar.next_business_day(date)
+        if bdc_val in ("CSP", "SCP", "CSMP", "SCMP"):
+            return calendar.previous_business_day(date)
+        return date
+
     def initialize_state(self) -> ContractState:
         """Initialize contract state at status date.
 
         Returns:
-            Initial contract state with xa=0
+            Initial contract state with xa set to exercise_amount if pre-exercised
         """
         prf = self.attributes.contract_performance
         if prf is None:
             prf = "PF"  # Default: performing
+
+        # Pre-exercised: xa is the known exercise amount
+        xa = self.attributes.exercise_amount if self._is_pre_exercised() else 0.0
 
         return ContractState(
             sd=self.attributes.status_date,
@@ -676,7 +742,7 @@ class OptionContract(BaseContract):
             nsc=jnp.array(1.0, dtype=jnp.float32),
             isc=jnp.array(1.0, dtype=jnp.float32),
             prf=prf,
-            xa=jnp.array(0.0, dtype=jnp.float32),  # Exercise amount
+            xa=jnp.array(xa, dtype=jnp.float32),  # Exercise amount
         )
 
     def get_payoff_function(self, event_type: Any) -> OptionPayoffFunction:

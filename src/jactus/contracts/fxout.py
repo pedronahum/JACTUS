@@ -46,6 +46,7 @@ Example:
     >>> result = contract.simulate()
 """
 
+from datetime import timedelta
 from typing import Any
 
 import jax.numpy as jnp
@@ -175,28 +176,13 @@ class FXOutrightPayoffFunction(BasePayoffFunction):
     ) -> jnp.ndarray:
         """POF_TD_FXOUT: Termination Date - receive termination price.
 
-        Formula:
-            POF_TD_FXOUT = X^CURS_CUR(t) × R(CNTRL) × PTD
-
-        Where:
-            PTD: Price at termination date
-            R(CNTRL): Role sign
-            X^CURS_CUR(t): FX rate (if needed)
+        For FXOUT, PTD is already directional (not role-sign adjusted).
 
         Returns:
-            Termination price (inflow for seller)
+            Termination price
         """
-        # Get termination price
         ptd = attributes.price_at_termination_date or 0.0
-
-        # Termination is positive cashflow
-        payoff = ptd
-
-        # Apply contract role sign
-        role_sign = 1.0 if attributes.contract_role.value == "RPA" else -1.0
-        payoff = role_sign * payoff
-
-        return jnp.array(payoff, dtype=jnp.float32)
+        return jnp.array(ptd, dtype=jnp.float32)
 
     def _pof_std(
         self,
@@ -560,40 +546,67 @@ class FXOutrightContract(BaseContract):
             child_contract_observer=child_contract_observer,
         )
 
+    def _apply_settlement_period(self, base_date: ActusDateTime) -> ActusDateTime:
+        """Apply settlement period offset to a date.
+
+        Handles P1DL0, P5DL0 format (strip P prefix and L0/L1 suffix).
+        """
+        sp = self.attributes.settlement_period
+        if not sp or sp == "P0D":
+            return base_date
+
+        # Strip P prefix and L suffix (e.g., P1DL0 → 1D, P5DL0 → 5D)
+        s = sp
+        if s.startswith("P"):
+            s = s[1:]
+        if "L" in s:
+            s = s[: s.index("L")]
+
+        # Parse number and period
+        from jactus.core.time import parse_cycle
+
+        mult, period, _ = parse_cycle(s)
+        if period == "D":
+            delta = timedelta(days=mult)
+        elif period == "W":
+            delta = timedelta(weeks=mult)
+        else:
+            delta = timedelta(days=mult)
+
+        py_dt = base_date.to_datetime() + delta
+        return ActusDateTime(
+            py_dt.year, py_dt.month, py_dt.day,
+            py_dt.hour, py_dt.minute, py_dt.second,
+        )
+
+    def _has_early_termination(self) -> bool:
+        """Check if contract is terminated before maturity."""
+        if not self.attributes.termination_date:
+            return False
+        md = self.attributes.maturity_date
+        if not md:
+            return False
+        return self.attributes.termination_date.to_iso() < md.to_iso()
+
+    def _has_settlement_period(self) -> bool:
+        """Check if a non-zero settlement period is defined."""
+        sp = self.attributes.settlement_period
+        return bool(sp) and sp != "P0D"
+
     def generate_event_schedule(self) -> EventSchedule:
         """Generate event schedule for FXOUT contract.
 
-        ACTUS Reference:
-            ACTUS v1.1 Section 7.11 - FXOUT Event Schedule
-
-        Events generated:
-            - AD: Analysis dates (if defined)
-            - PRD: Purchase date (if defined)
-            - TD: Termination date (if defined)
-            - STD: Settlement date (delivery mode)
-            - STD(1), STD(2): Settlement dates (dual mode)
-            - CE: Credit events (if defined)
+        Events depend on delivery/settlement mode and settlement period:
+        - DS='S' with settlement period → single STD at maturity + SP (net settlement)
+        - Otherwise → MD events at maturity (gross exchange, two currency legs)
+        - Early termination (TD < maturity) → suppress MD/STD events
 
         Returns:
             EventSchedule with contract events
         """
         events = []
-
-        # Determine settlement date
-        settlement_date = self.attributes.settlement_date or self.attributes.maturity_date
-
-        # AD: Analysis dates
-        if self.attributes.analysis_dates:
-            for ad_date in self.attributes.analysis_dates:
-                events.append(
-                    ContractEvent(
-                        event_type=EventType.AD,
-                        event_time=ad_date,
-                        payoff=jnp.array(0.0, dtype=jnp.float32),
-                        currency=self.attributes.currency or "XXX",
-                        sequence=len(events),
-                    )
-                )
+        maturity_date = self.attributes.settlement_date or self.attributes.maturity_date
+        early_term = self._has_early_termination()
 
         # PRD: Purchase date
         if self.attributes.purchase_date:
@@ -619,36 +632,36 @@ class FXOutrightContract(BaseContract):
                 )
             )
 
-        # STD: Settlement
-        if settlement_date:
-            if self.attributes.delivery_settlement == "D":
-                # Delivery mode: single net settlement
+        # Settlement/maturity events (suppressed if early termination)
+        if maturity_date and not early_term:
+            ds = self.attributes.delivery_settlement or "D"
+            if ds == "S" and self._has_settlement_period():
+                # Net cash settlement: single STD at maturity + settlement period
+                std_date = self._apply_settlement_period(maturity_date)
                 events.append(
                     ContractEvent(
                         event_type=EventType.STD,
-                        event_time=settlement_date,
+                        event_time=std_date,
                         payoff=jnp.array(0.0, dtype=jnp.float32),
                         currency=self.attributes.currency or "XXX",
                         sequence=len(events),
                     )
                 )
             else:
-                # Dual mode: two separate settlements
-                # STD(1): First currency
+                # Gross settlement: two MD events (one per currency leg)
                 events.append(
                     ContractEvent(
-                        event_type=EventType.STD,
-                        event_time=settlement_date,
+                        event_type=EventType.MD,
+                        event_time=maturity_date,
                         payoff=jnp.array(0.0, dtype=jnp.float32),
                         currency=self.attributes.currency or "XXX",
                         sequence=len(events),
                     )
                 )
-                # STD(2): Second currency
                 events.append(
                     ContractEvent(
-                        event_type=EventType.STD,
-                        event_time=settlement_date,
+                        event_type=EventType.MD,
+                        event_time=maturity_date,
                         payoff=jnp.array(0.0, dtype=jnp.float32),
                         currency=self.attributes.currency_2 or "YYY",
                         sequence=len(events),
@@ -725,3 +738,93 @@ class FXOutrightContract(BaseContract):
             FXOutrightStateTransitionFunction instance
         """
         return FXOutrightStateTransitionFunction()
+
+    def simulate(
+        self,
+        risk_factor_observer: RiskFactorObserver | None = None,
+        child_contract_observer: ChildContractObserver | None = None,
+    ):
+        """Simulate FXOUT contract with dual-currency MD and net STD handling.
+
+        Overrides base simulate() to compute:
+        - Per-leg payoffs for gross settlement (MD events)
+        - Net settlement payoff for cash settlement (STD events)
+        """
+        from jactus.contracts.base import SimulationHistory
+
+        risk_obs = risk_factor_observer or self.risk_factor_observer
+        state = self.initialize_state()
+        initial_state = state
+        events_with_states = []
+        schedule = self.get_events()
+
+        role_sign = self.attributes.contract_role.get_sign()
+        maturity_date = self.attributes.settlement_date or self.attributes.maturity_date
+
+        for event in schedule.events:
+            stf = self.get_state_transition_function(event.event_type)
+            calc_time = getattr(event, "calculation_time", None) or event.event_time
+
+            if event.event_type == EventType.MD:
+                # Dual-currency: determine payoff by which currency leg
+                if event.currency == self.attributes.currency:
+                    payoff = jnp.array(
+                        role_sign * (self.attributes.notional_principal or 0.0),
+                        dtype=jnp.float32,
+                    )
+                elif event.currency == (self.attributes.currency_2 or ""):
+                    payoff = jnp.array(
+                        -role_sign * (self.attributes.notional_principal_2 or 0.0),
+                        dtype=jnp.float32,
+                    )
+                else:
+                    payoff = jnp.array(0.0, dtype=jnp.float32)
+            elif event.event_type == EventType.STD:
+                # Net cash settlement: observe FX rate at maturity date
+                nt = self.attributes.notional_principal or 0.0
+                nt2 = self.attributes.notional_principal_2 or 0.0
+                cur = self.attributes.currency or "XXX"
+                cur2 = self.attributes.currency_2 or "YYY"
+                rate_id = f"{cur2}/{cur}"
+                # Observe at maturity date (not STD date)
+                obs_time = maturity_date or calc_time
+                fx_rate = float(risk_obs.observe_risk_factor(rate_id, obs_time))
+                net_payoff = nt - (fx_rate * nt2)
+                payoff = jnp.array(role_sign * net_payoff, dtype=jnp.float32)
+            else:
+                pof = self.get_payoff_function(event.event_type)
+                payoff = pof(
+                    event_type=event.event_type,
+                    state=state,
+                    attributes=self.attributes,
+                    time=calc_time,
+                    risk_factor_observer=risk_obs,
+                )
+
+            state_post = stf(
+                event_type=event.event_type,
+                state_pre=state,
+                attributes=self.attributes,
+                time=calc_time,
+                risk_factor_observer=risk_obs,
+            )
+
+            processed_event = ContractEvent(
+                event_type=event.event_type,
+                event_time=event.event_time,
+                payoff=payoff,
+                currency=event.currency or self.attributes.currency or "XXX",
+                state_pre=state,
+                state_post=state_post,
+                sequence=event.sequence,
+            )
+
+            events_with_states.append(processed_event)
+            state = state_post
+
+        return SimulationHistory(
+            events=events_with_states,
+            states=[e.state_post for e in events_with_states if e.state_post is not None],
+            initial_state=initial_state,
+            final_state=state,
+        )

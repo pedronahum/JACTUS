@@ -153,9 +153,14 @@ class CLMPayoffFunction(BasePayoffFunction):
     def _pof_ied(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
     ) -> jnp.ndarray:
-        """POF_IED: Initial Exchange - disburse principal."""
+        """POF_IED: Initial Exchange - disburse principal.
+
+        Formula: R(CNTRL) × (-1) × (NT + PDIED)
+        """
         role_sign = contract_role_sign(attrs.contract_role)
-        return role_sign * state.nsc * state.nt
+        nt = attrs.notional_principal or 0.0
+        pdied = attrs.premium_discount_at_ied or 0.0
+        return jnp.array(role_sign * (-1) * (nt + pdied), dtype=jnp.float32)
 
     def _pof_pr(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
@@ -173,14 +178,12 @@ class CLMPayoffFunction(BasePayoffFunction):
     def _pof_md(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
     ) -> jnp.ndarray:
-        """POF_MD: Maturity - return principal + accrued interest.
+        """POF_MD: Maturity - return principal.
 
-        CLM pays all accrued interest at maturity (not periodically).
+        Interest is paid separately by the IP event at maturity.
         """
         role_sign = contract_role_sign(attrs.contract_role)
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
-        accrued = yf * state.ipnr * state.nt
-        return role_sign * state.nsc * (state.nt + state.ipac + accrued)
+        return role_sign * state.nsc * state.nt
 
     def _pof_fp(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
@@ -534,25 +537,30 @@ class CallMoneyContract(BaseContract):
             )
         )
 
-        # IED: Initial Exchange Date
-        events.append(
-            ContractEvent(
-                event_type=EventType.IED,
-                event_time=ied,
-                payoff=jnp.array(0.0, dtype=jnp.float32),
-                currency=attributes.currency or "XXX",
+        # IED: Initial Exchange Date (skip when SD >= IED)
+        if attributes.status_date < ied:
+            events.append(
+                ContractEvent(
+                    event_type=EventType.IED,
+                    event_time=ied,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
+                    currency=attributes.currency or "XXX",
+                )
             )
-        )
 
-        # IPCI Schedule: Optional periodic capitalization
-        if attributes.interest_capitalization_end_date and attributes.interest_payment_cycle:
+        # IPCI Schedule: Periodic interest capitalization
+        # Generate IPCI events using interest_payment_cycle.
+        # If interest_capitalization_end_date is set, IPCI runs up to that date.
+        # Otherwise, all periodic dates before maturity become IPCI events.
+        if attributes.interest_payment_cycle and attributes.maturity_date:
+            ipci_end = attributes.interest_capitalization_end_date or attributes.maturity_date
             ipci_schedule = generate_schedule(
                 start=attributes.interest_payment_anchor or ied,
                 cycle=attributes.interest_payment_cycle,
-                end=attributes.interest_capitalization_end_date,
+                end=ipci_end,
             )
             for time in ipci_schedule:
-                if ied < time <= attributes.interest_capitalization_end_date:
+                if ied < time < attributes.maturity_date:
                     events.append(
                         ContractEvent(
                             event_type=EventType.IPCI,

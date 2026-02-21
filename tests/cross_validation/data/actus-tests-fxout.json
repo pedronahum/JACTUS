@@ -1,0 +1,574 @@
+{
+    "fxout01": {
+        "identifier": "fxout01",
+        "terms": {
+            "contractType": "FXOUT",
+            "contractID": "fxout01",
+            "contractRole": "RPA",
+            "currency": "USD",
+            "currency2": "EUR",
+            "maturityDate": "2014-12-31T23:59:59",
+            "notionalPrincipal": "2000",
+            "notionalPrincipal2": "1000",
+            "calendar": "NOCALENDAR",
+            "endOfMonthConvention": "SD",
+            "statusDate": "2013-12-30T00:00:00",
+            "contractDealDate": "2013-12-20T00:00:00"
+        },
+        "to": "2014-12-31T23:59:59",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2014-12-31T23:59:59",
+                "eventType": "MD",
+                "payoff": 2000,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": 0,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2014-12-31T23:59:59",
+                "eventType": "MD",
+                "payoff": -1000,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": 0,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            }
+        ]
+    },
+    "fxout02": {
+        "identifier": "fxout02",
+        "terms": {
+            "contractType": "FXOUT",
+            "contractID": "fxout02",
+            "contractRole": "RPL",
+            "currency": "USD",
+            "currency2": "EUR",
+            "maturityDate": "2014-12-31T23:59:59",
+            "notionalPrincipal": "2000",
+            "notionalPrincipal2": "1000",
+            "calendar": "NOCALENDAR",
+            "endOfMonthConvention": "SD",
+            "statusDate": "2013-12-30T00:00:00",
+            "contractDealDate": "2013-12-20T00:00:00"
+        },
+        "to": "2014-12-31T23:59:59",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2014-12-31T23:59:59",
+                "eventType": "MD",
+                "payoff": -2000,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": 0,
+                "accruedInterest": 0,
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2014-12-31T23:59:59",
+                "eventType": "MD",
+                "payoff": 1000,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": 0,
+                "accruedInterest": 0,
+                "currency": "EUR"
+            }
+        ]
+    },
+    "fxout03": {
+        "identifier": "fxout03",
+        "terms": {
+            "contractType": "FXOUT",
+            "contractID": "fxout03",
+            "contractRole": "RPA",
+            "currency": "USD",
+            "currency2": "EUR",
+            "maturityDate": "2014-10-30T00:00:00",
+            "notionalPrincipal": "2000",
+            "notionalPrincipal2": "1000",
+            "calendar": "NOCALENDAR",
+            "endOfMonthConvention": "SD",
+            "statusDate": "2013-12-30T00:00:00",
+            "contractDealDate": "2013-12-20T00:00:00",
+            "deliverySettlement": "S",
+            "settlementPeriod": "P1DL0"
+        },
+        "to": "2014-11-30T00:00:00",
+        "dataObserved": {
+            "EUR/USD": {
+                "identifier": "EUR/USD",
+                "data": [
+                    {
+                        "timestamp": "2014-10-30T00:00:00",
+                        "value": "1.2612"
+                    }
+                ]
+            }
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2014-10-31T00:00:00",
+                "eventType": "STD",
+                "payoff": 738.8,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": "0",
+                "accruedInterest": "0",
+                "currency": "USD"
+            }
+        ]
+    },
+    "fxout04": {
+        "identifier": "fxout04",
+        "terms": {
+            "contractType": "FXOUT",
+            "contractID": "fxout04",
+            "contractRole": "RPL",
+            "currency": "USD",
+            "currency2": "EUR",
+            "maturityDate": "2014-10-30T00:00:00",
+            "notionalPrincipal": "2000",
+            "notionalPrincipal2": "1000",
+            "calendar": "NOCALENDAR",
+            "endOfMonthConvention": "SD",
+            "statusDate": "2013-12-30T00:00:00",
+            "contractDealDate": "2013-12-20T00:00:00",
+            "deliverySettlement": "S",
+            "settlementPeriod": "P1DL0"
+        },
+        "to": "2014-11-30T00:00:00",
+        "dataObserved": {
+            "EUR/USD": {
+                "identifier": "EUR/USD",
+                "data": [
+                    {
+                        "timestamp": "2014-10-30T00:00:00",
+                        "value": "1.2612"
+                    }
+                ]
+            }
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2014-10-31T00:00:00",
+                "eventType": "STD",
+                "payoff": -738.8,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": "0",
+                "accruedInterest": "0",
+                "currency": "USD"
+            }
+        ]
+    },
+    "fxout05": {
+        "identifier": "fxout05",
+        "terms": {
+            "contractType": "FXOUT",
+            "contractID": "fxout05",
+            "contractRole": "RPL",
+            "currency": "USD",
+            "currency2": "EUR",
+            "maturityDate": "2015-01-01T00:00:00",
+            "notionalPrincipal": "2000",
+            "notionalPrincipal2": "1000",
+            "calendar": "NOCALENDAR",
+            "endOfMonthConvention": "SD",
+            "statusDate": "2013-12-30T00:00:00",
+            "contractDealDate": "2013-12-20T00:00:00",
+            "deliverySettlement": "S",
+            "settlementPeriod": "P1DL0"
+        },
+        "to": "2015-01-03T00:00:00",
+        "dataObserved": {
+            "EUR/USD": {
+                "identifier": "EUR/USD",
+                "data": [
+                    {
+                        "timestamp": "2015-01-01T00:00:00",
+                        "value": "1.20"
+                    }
+                ]
+            }
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2015-01-02T00:00:00",
+                "eventType": "STD",
+                "payoff": -800.0,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": "0",
+                "accruedInterest": "0",
+                "currency": "USD"
+            }
+        ]
+    },
+    "fxout06": {
+        "identifier": "fxout06",
+        "terms": {
+            "contractType": "FXOUT",
+            "contractID": "fxout06",
+            "contractRole": "RPA",
+            "currency": "USD",
+            "currency2": "EUR",
+            "maturityDate": "2014-12-31T23:59:59",
+            "notionalPrincipal": "2000",
+            "notionalPrincipal2": "1000",
+            "calendar": "NOCALENDAR",
+            "endOfMonthConvention": "SD",
+            "statusDate": "2013-12-30T00:00:00",
+            "contractDealDate": "2013-12-20T00:00:00",
+            "terminationDate": "2014-09-30T23:59:59",
+            "priceAtTerminationDate": "100"
+        },
+        "to": "2014-12-31T23:59:59",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2014-09-30T23:59:59",
+                "eventType": "TD",
+                "payoff": 100,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": "0",
+                "accruedInterest": "0",
+                "currency": "USD"
+            }
+        ]
+    },
+    "fxout07": {
+        "identifier": "fxout07",
+        "terms": {
+            "contractType": "FXOUT",
+            "contractID": "fxout07",
+            "contractRole": "RPA",
+            "currency": "USD",
+            "currency2": "EUR",
+            "maturityDate": "2014-12-31T23:59:59",
+            "notionalPrincipal": "2000",
+            "notionalPrincipal2": "1000",
+            "calendar": "NOCALENDAR",
+            "endOfMonthConvention": "SD",
+            "statusDate": "2013-12-30T00:00:00",
+            "contractDealDate": "2013-12-20T00:00:00",
+            "purchaseDate": "2014-04-01T00:00:00",
+            "priceAtPurchaseDate": "50"
+        },
+        "to": "2014-12-31T23:59:59",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2014-04-01T00:00:00",
+                "eventType": "PRD",
+                "payoff": -50,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": "0",
+                "accruedInterest": "0",
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2014-12-31T23:59:59",
+                "eventType": "MD",
+                "payoff": 2000,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": "0",
+                "accruedInterest": "0",
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2014-12-31T23:59:59",
+                "eventType": "MD",
+                "payoff": -1000,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": "0",
+                "accruedInterest": "0",
+                "currency": "EUR"
+            }
+        ]
+    },
+    "fxout08": {
+        "identifier": "fxout08",
+        "terms": {
+            "contractType": "FXOUT",
+            "contractID": "fxout08",
+            "contractRole": "RPA",
+            "currency": "USD",
+            "currency2": "EUR",
+            "maturityDate": "2014-12-31T23:59:59",
+            "notionalPrincipal": "2000",
+            "notionalPrincipal2": "1000",
+            "calendar": "NOCALENDAR",
+            "endOfMonthConvention": "SD",
+            "statusDate": "2013-12-30T00:00:00",
+            "contractDealDate": "2013-12-20T00:00:00",
+            "purchaseDate": "2014-04-01T00:00:00",
+            "priceAtPurchaseDate": "50",
+            "terminationDate": "2014-09-30T23:59:59",
+            "priceAtTerminationDate": "100"
+        },
+        "to": "2014-12-31T23:59:59",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2014-04-01T00:00:00",
+                "eventType": "PRD",
+                "payoff": -50,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": "0",
+                "accruedInterest": "0",
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2014-09-30T23:59:59",
+                "eventType": "TD",
+                "payoff": 100,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": "0",
+                "accruedInterest": "0",
+                "currency": "USD"
+            }
+        ]
+    },
+    "fxout09": {
+        "identifier": "fxout09",
+        "terms": {
+            "contractType": "FXOUT",
+            "contractID": "fxout09",
+            "contractRole": "RPA",
+            "currency": "USD",
+            "currency2": "EUR",
+            "maturityDate": "2014-12-31T23:59:59",
+            "notionalPrincipal": "2000",
+            "notionalPrincipal2": "1000",
+            "calendar": "NOCALENDAR",
+            "endOfMonthConvention": "SD",
+            "statusDate": "2013-12-30T00:00:00",
+            "contractDealDate": "2013-12-20T00:00:00",
+            "purchaseDate": "2014-04-01T00:00:00",
+            "priceAtPurchaseDate": "50",
+            "deliverySettlement": "S",
+            "settlementPeriod": "P1DL0"
+        },
+        "to": "2015-01-02T00:00:00",
+        "dataObserved": {
+            "EUR/USD": {
+                "identifier": "EUR/USD",
+                "data": [
+                    {
+                        "timestamp": "2014-12-31T23:59:59",
+                        "value": "1.2101"
+                    }
+                ]
+            }
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2014-04-01T00:00:00",
+                "eventType": "PRD",
+                "payoff": -50,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": "0",
+                "accruedInterest": "0",
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-01-01T23:59:59",
+                "eventType": "STD",
+                "payoff": 789.9,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": "0",
+                "accruedInterest": "0",
+                "currency": "USD"
+            }
+        ]
+    },
+    "fxout10": {
+        "identifier": "fxout10",
+        "terms": {
+            "contractType": "FXOUT",
+            "contractID": "fxout10",
+            "contractRole": "RPL",
+            "currency": "USD",
+            "currency2": "EUR",
+            "maturityDate": "2015-01-01T00:00:00",
+            "notionalPrincipal": "2000",
+            "notionalPrincipal2": "1000",
+            "calendar": "NOCALENDAR",
+            "endOfMonthConvention": "SD",
+            "statusDate": "2013-12-30T00:00:00",
+            "contractDealDate": "2013-12-20T00:00:00",
+            "purchaseDate": "2014-04-01T00:00:00",
+            "priceAtPurchaseDate": "-50",
+            "terminationDate": "2014-09-30T23:59:59",
+            "priceAtTerminationDate": "100"
+        },
+        "to": "2014-12-31T23:59:59",
+        "dataObserved": {
+
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2014-04-01T00:00:00",
+                "eventType": "PRD",
+                "payoff": -50,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": "0",
+                "accruedInterest": "0",
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2014-09-30T23:59:59",
+                "eventType": "TD",
+                "payoff": 100,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": "0",
+                "accruedInterest": "0",
+                "currency": "USD"
+            }
+        ]
+    },
+    "fxout11": {
+        "identifier": "fxout11",
+        "terms": {
+            "contractType": "FXOUT",
+            "contractID": "fxout11",
+            "contractRole": "RPL",
+            "currency": "USD",
+            "currency2": "EUR",
+            "maturityDate": "2015-01-10T00:00:00",
+            "notionalPrincipal": "2000",
+            "notionalPrincipal2": "1000",
+            "calendar": "NOCALENDAR",
+            "endOfMonthConvention": "SD",
+            "statusDate": "2013-12-30T00:00:00",
+            "contractDealDate": "2013-12-20T00:00:00",
+            "purchaseDate": "2014-04-01T00:00:00",
+            "priceAtPurchaseDate": "-50",
+            "deliverySettlement": "S",
+            "settlementPeriod": "P5DL0"
+        },
+        "to": "2015-01-16T00:00:00",
+        "dataObserved": {
+            "EUR/USD": {
+                "identifier": "EUR/USD",
+                "data": [
+                    {
+                        "timestamp": "2015-01-10T00:00:00",
+                        "value": "1.18"
+                    }
+                ]
+            }
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2014-04-01T00:00:00",
+                "eventType": "PRD",
+                "payoff": -50,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": "0",
+                "accruedInterest": "0",
+                "currency": "USD"
+            },
+            {
+                "eventDate": "2015-01-15T00:00:00",
+                "eventType": "STD",
+                "payoff": -820.0,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": "0",
+                "accruedInterest": "0",
+                "currency": "USD"
+            }
+        ]
+    },
+    "fxout12": {
+        "identifier": "fxout12",
+        "terms": {
+            "contractType": "FXOUT",
+            "contractID": "fxout12",
+            "contractRole": "RPA",
+            "currency": "USD",
+            "currency2": "EUR",
+            "maturityDate": "2014-12-31T23:59:59",
+            "notionalPrincipal": "2000",
+            "notionalPrincipal2": "1000",
+            "calendar": "MF",
+            "businessDayConvention": "SCF",
+            "endOfMonthConvention": "SD",
+            "statusDate": "2013-12-30T00:00:00",
+            "contractDealDate": "2013-12-20T00:00:00",
+            "priceAtPurchaseDate": "0",
+            "priceAtTerminationDate": "0",
+            "deliverySettlement": "S",
+            "settlementPeriod": "P1DL0"
+        },
+        "to": "2015-01-02T00:00:00",
+        "dataObserved": {
+            "EUR/USD": {
+                "identifier": "EUR/USD",
+                "data": [
+                    {
+                        "timestamp": "2014-12-31T23:59:59",
+                        "value": "1.2"
+                    }
+                ]
+            }
+        },
+        "eventsObserved": [
+
+        ],
+        "results": [
+            {
+                "eventDate": "2015-01-01T23:59:59",
+                "eventType": "STD",
+                "payoff": 800.0,
+                "notionalPrincipal": "0",
+                "nominalInterestRate": "0",
+                "accruedInterest": "0",
+                "currency": "USD"
+            }
+        ]
+    }
+}
+

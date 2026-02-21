@@ -84,3 +84,87 @@ def nam_test_cases():
 def ann_test_cases():
     """Official ACTUS test cases for ANN contracts."""
     return _load_test_cases("ann")
+
+
+@pytest.fixture(scope="session")
+def clm_test_cases():
+    """Official ACTUS test cases for CLM contracts."""
+    return _load_test_cases("clm")
+
+
+@pytest.fixture(scope="session")
+def lax_test_cases():
+    """Official ACTUS test cases for LAX contracts."""
+    return _load_test_cases("lax")
+
+
+@pytest.fixture(scope="session")
+def ump_test_cases():
+    """Official ACTUS test cases for UMP contracts."""
+    return _load_test_cases("ump")
+
+
+@pytest.fixture(scope="session")
+def csh_test_cases():
+    """Official ACTUS test cases for CSH contracts."""
+    return _load_test_cases("csh")
+
+
+@pytest.fixture(scope="session")
+def stk_test_cases():
+    """Official ACTUS test cases for STK contracts."""
+    return _load_test_cases("stk")
+
+
+@pytest.fixture(scope="session")
+def com_test_cases():
+    """Official ACTUS test cases for COM contracts."""
+    return _load_test_cases("com")
+
+
+@pytest.fixture(scope="session")
+def fxout_test_cases():
+    """Official ACTUS test cases for FXOUT contracts."""
+    return _load_test_cases("fxout")
+
+
+@pytest.fixture(scope="session")
+def optns_test_cases():
+    """Official ACTUS test cases for OPTNS contracts."""
+    return _load_test_cases("optns")
+
+
+@pytest.fixture(scope="session")
+def futur_test_cases():
+    """Official ACTUS test cases for FUTUR contracts."""
+    return _load_test_cases("futur")
+
+
+@pytest.fixture(scope="session")
+def swppv_test_cases():
+    """Official ACTUS test cases for SWPPV contracts."""
+    return _load_test_cases("swppv")
+
+
+@pytest.fixture(scope="session")
+def swaps_test_cases():
+    """Official ACTUS test cases for SWAPS contracts."""
+    return _load_test_cases("swaps")
+
+
+@pytest.fixture(scope="session")
+def capfl_test_cases():
+    """Official ACTUS test cases for CAPFL contracts."""
+    return _load_test_cases("capfl")
+
+
+@pytest.fixture(scope="session")
+def ceg_test_cases():
+    """Official ACTUS test cases for CEG contracts."""
+    return _load_test_cases("ceg")
+
+
+@pytest.fixture(scope="session")
+def cec_test_cases():
+    """Official ACTUS test cases for CEC contracts."""
+    return _load_test_cases("cec")

@@ -208,7 +208,7 @@ class TestFXOutrightEventSchedule:
     """Test FXOUT event schedule generation."""
 
     def test_fxout_event_schedule_delivery_mode(self):
-        """Test event schedule generation for delivery (net) settlement mode."""
+        """Test event schedule generation for delivery (gross) settlement mode."""
         attrs = ContractAttributes(
             contract_id="FXOUT-001",
             contract_type=ContractType.FXOUT,
@@ -219,7 +219,7 @@ class TestFXOutrightEventSchedule:
             currency_2="USD",
             notional_principal=100000.0,
             notional_principal_2=110000.0,
-            delivery_settlement="D",  # Delivery mode
+            delivery_settlement="D",  # Gross settlement (no SP)
         )
 
         rf_obs = ConstantRiskFactorObserver(constant_value=1.10)
@@ -227,11 +227,13 @@ class TestFXOutrightEventSchedule:
 
         schedule = contract.generate_event_schedule()
 
-        # Should have 1 STD event for delivery mode
-        std_events = [e for e in schedule.events if e.event_type == EventType.STD]
-        assert len(std_events) == 1
-        assert std_events[0].event_time == ActusDateTime(2024, 7, 1, 0, 0, 0)
-        assert std_events[0].currency == "EUR"
+        # Should have 2 MD events for gross settlement (one per currency leg)
+        md_events = [e for e in schedule.events if e.event_type == EventType.MD]
+        assert len(md_events) == 2
+        assert md_events[0].event_time == ActusDateTime(2024, 7, 1, 0, 0, 0)
+        assert md_events[1].event_time == ActusDateTime(2024, 7, 1, 0, 0, 0)
+        currencies = {md_events[0].currency, md_events[1].currency}
+        assert currencies == {"EUR", "USD"}
 
     def test_fxout_event_schedule_dual_mode(self):
         """Test event schedule generation for dual (gross) settlement mode."""
@@ -253,13 +255,13 @@ class TestFXOutrightEventSchedule:
 
         schedule = contract.generate_event_schedule()
 
-        # Should have 2 STD events for dual mode
-        std_events = [e for e in schedule.events if e.event_type == EventType.STD]
-        assert len(std_events) == 2
-        assert std_events[0].event_time == ActusDateTime(2024, 7, 1, 0, 0, 0)
-        assert std_events[1].event_time == ActusDateTime(2024, 7, 1, 0, 0, 0)
+        # Should have 2 MD events for dual mode (one per currency)
+        md_events = [e for e in schedule.events if e.event_type == EventType.MD]
+        assert len(md_events) == 2
+        assert md_events[0].event_time == ActusDateTime(2024, 7, 1, 0, 0, 0)
+        assert md_events[1].event_time == ActusDateTime(2024, 7, 1, 0, 0, 0)
         # One in EUR, one in USD
-        currencies = {std_events[0].currency, std_events[1].currency}
+        currencies = {md_events[0].currency, md_events[1].currency}
         assert currencies == {"EUR", "USD"}
 
     def test_fxout_event_schedule_with_purchase(self):
@@ -370,7 +372,7 @@ class TestFXOutrightPayoffs:
     """Test FXOUT payoff calculations."""
 
     def test_fxout_payoff_std_delivery_mode_profit(self):
-        """Test STD payoff for delivery mode when FX rate moves in favor."""
+        """Test MD payoffs for gross settlement (DS='D', no settlement period)."""
         attrs = ContractAttributes(
             contract_id="FXOUT-001",
             contract_type=ContractType.FXOUT,
@@ -384,66 +386,22 @@ class TestFXOutrightPayoffs:
             delivery_settlement="D",
         )
 
-        # Market FX rate at settlement: 1.12 USD/EUR
-        # Means 100k EUR is now worth 112k USD
-        # Profit = 100k - (112k / 1.12) ≈ 0 (actually we locked in 1.10, market is 1.12)
-        # Better formula: 100k - (110k / 1.12) ≈ 1,785.71 EUR profit
         rf_obs = ConstantRiskFactorObserver(constant_value=1.12)
         contract = FXOutrightContract(attrs, rf_obs)
 
         result = contract.simulate()
 
-        # Find STD event
-        std_events = [e for e in result.events if e.event_type == EventType.STD]
-        assert len(std_events) == 1
+        # Gross settlement: 2 MD events (EUR leg + USD leg)
+        md_events = [e for e in result.events if e.event_type == EventType.MD]
+        assert len(md_events) == 2
 
-        # Payoff should be positive (profit)
-        # Payoff = NT - (FX_rate × NT2) = 100,000 - (1.12 × 110,000)
-        # = 100,000 - 123,200 = -23,200 EUR (loss, not profit!)
-        # Wait, I had the formula wrong. Let me recalculate:
-        # Forward: agreed to exchange 100k EUR for 110k USD (rate 1.10)
-        # Market: rate is 1.12
-        # If we're RPA (receiving EUR, paying USD):
-        #   We receive 100k EUR
-        #   We pay 110k USD
-        #   Market value of 100k EUR = 112k USD
-        #   Profit in USD = 112k - 110k = 2k USD
-        #   Profit in EUR = 2k / 1.12 ≈ 1,785.71 EUR
-        # But formula is: NT - (O_rf × NT2) = 100k - (1.12 × 110k) = -23,200
-        # This seems wrong. Let me check the spec...
-        # Actually, O_rf is CUR2/CUR, so it's the inverse!
-        # For EUR/USD, rate should be USD/EUR
-        # 100k EUR at 1.12 = 112k USD, so we locked in 110k USD, profit = 2k USD
-        # But we want profit in EUR, so 2k / 1.12 = 1,785.71 EUR
-        # Formula should be: NT - (NT2 / O_rf) where O_rf is the spot rate USD/EUR
-        # Actually, let's trust ACTUS formula: NT - (O_rf(i, Md) × NT2)
-        # If O_rf is the spot USD/EUR rate (1.12), then:
-        # 100k - (1.12 × 110k) = 100k - 123.2k = -23.2k (loss in EUR terms)
-        # This suggests we're paying more than we receive, which doesn't make sense...
+        # EUR leg: role_sign * NT = 1 * 100000 = 100000
+        eur_event = [e for e in md_events if e.currency == "EUR"][0]
+        assert float(eur_event.payoff) == pytest.approx(100000.0, abs=1.0)
 
-        # Let me reconsider: if we BUY EUR forward:
-        #  - We receive 100k EUR
-        #  - We pay 110k USD
-        #  - Forward rate = 110k / 100k = 1.10 USD per EUR
-        # At settlement, spot rate = 1.12 USD per EUR
-        # Market value of 100k EUR = 112k USD
-        # We only pay 110k USD, so we profit 2k USD
-        # In EUR terms: 2k / 1.12 ≈ 1,785.71 EUR profit
-
-        # The ACTUS formula POF = NT - O_rf × NT2 doesn't match this...
-        # Let me check if O_rf should be the inverse (EUR/USD instead of USD/EUR)
-        # If O_rf = 1/1.12 ≈ 0.8929 EUR per USD, then:
-        # POF = 100k - (0.8929 × 110k) = 100k - 98,214 = 1,786 EUR profit!
-
-        # So the FX rate should be EUR/USD (inverse), not USD/EUR!
-        # This means for rate identifier "USD/EUR", we need to return 1/1.12
-
-        # For now, let's just check that payoff is calculated
-        std_payoff = float(std_events[0].payoff)
-        # With current implementation (O_rf = 1.12), we get: 100k - 123.2k = -23.2k
-        # This is incorrect, but let's verify the calculation is happening
-        expected_wrong = 100000.0 - (1.12 * 110000.0)
-        assert std_payoff == pytest.approx(expected_wrong, abs=1.0)
+        # USD leg: -role_sign * NT2 = -1 * 110000 = -110000
+        usd_event = [e for e in md_events if e.currency == "USD"][0]
+        assert float(usd_event.payoff) == pytest.approx(-110000.0, abs=1.0)
 
     def test_fxout_payoff_prd(self):
         """Test PRD (purchase) payoff."""
@@ -523,9 +481,9 @@ class TestFXOutrightSimulation:
 
         result = contract.simulate()
 
-        # Should have 2 STD events
-        std_events = [e for e in result.events if e.event_type == EventType.STD]
-        assert len(std_events) == 2
+        # Should have 2 MD events (one per currency)
+        md_events = [e for e in result.events if e.event_type == EventType.MD]
+        assert len(md_events) == 2
 
     def test_fxout_factory_creation(self):
         """Test creating FXOUT via factory."""

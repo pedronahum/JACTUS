@@ -120,6 +120,12 @@ class ContractAttributes(BaseModel):
     option_exercise_end_date: ActusDateTime | None = Field(
         None, description="Last date option can be exercised (OPXED)"
     )
+    exercise_date: ActusDateTime | None = Field(
+        None, description="Date of option/derivative exercise (XD)"
+    )
+    exercise_amount: float | None = Field(
+        None, description="Amount determined at exercise (XA)"
+    )
     settlement_period: str | None = Field(
         None, description="Period between exercise and settlement (STPD)"
     )
@@ -134,6 +140,30 @@ class ContractAttributes(BaseModel):
     future_price: float | None = Field(
         None,
         description="Agreed futures price (PFUT)",
+    )
+    settlement_currency: str | None = Field(
+        None,
+        description="Settlement currency for cross-currency contracts (CURS)",
+    )
+    fixing_period: str | None = Field(
+        None,
+        description="Period between rate observation and reset (RRFIX)",
+    )
+
+    # ========== COMMODITY AND EQUITY ==========
+    quantity: float | None = Field(None, description="Quantity of commodity/stock (QT)")
+    unit: str | None = Field(None, description="Unit of measurement (UNIT)")
+    market_object_code: str | None = Field(
+        None, description="Market object code for price observation (MOC)"
+    )
+    market_object_code_of_dividends: str | None = Field(
+        None, description="Market object code for dividend observation (DVMO)"
+    )
+    dividend_cycle: Cycle | None = Field(
+        None, description="Dividend payment cycle (DVCL)"
+    )
+    dividend_anchor: ActusDateTime | None = Field(
+        None, description="Dividend payment anchor date (DVANX)"
     )
 
     # ========== DAY COUNT AND BUSINESS DAY CONVENTIONS ==========

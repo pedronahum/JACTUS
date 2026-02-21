@@ -369,8 +369,8 @@ class TestCLMPayoffs:
             EventType.IED, state, attrs, ActusDateTime(2024, 1, 15, 0, 0, 0), rf_obs
         )
 
-        # Should disburse notional
-        assert float(payoff) == pytest.approx(50000.0, abs=1.0)
+        # IED formula: R(CNTRL) × (-1) × (NT + PDIED) = 1 × (-1) × 50000 = -50000
+        assert float(payoff) == pytest.approx(-50000.0, abs=1.0)
 
     def test_md_payoff_with_interest(self):
         """Test MD payoff (return principal + interest)."""
@@ -408,10 +408,9 @@ class TestCLMPayoffs:
             EventType.MD, state, attrs, ActusDateTime(2025, 1, 15, 0, 0, 0), rf_obs
         )
 
-        # Should return notional + accrued + new interest
-        # 50000 + 1000 (ipac) + ~4000 (1 year interest)
-        assert float(payoff) > 50000.0
-        assert float(payoff) < 56000.0  # Reasonable upper bound
+        # MD payoff returns principal only: R(CNTRL) × Nsc × Nt = 1 × 1 × 50000
+        # Interest is paid separately by the IP event at maturity
+        assert float(payoff) == pytest.approx(50000.0, abs=1.0)
 
     def test_ipci_has_no_payoff(self):
         """Test that IPCI event has no payoff."""

@@ -41,7 +41,7 @@ from typing import Any
 
 import jax.numpy as jnp
 
-from jactus.contracts.base import BaseContract
+from jactus.contracts.base import BaseContract, SimulationHistory
 from jactus.core import (
     ActusDateTime,
     ContractAttributes,
@@ -78,10 +78,18 @@ class PlainVanillaSwapPayoffFunction(BasePayoffFunction):
             return self._pof_ad(state, attributes, time, risk_factor_observer)
         if event_type == EventType.IED:
             return self._pof_ied(state, attributes, time, risk_factor_observer)
+        if event_type == EventType.PRD:
+            return self._pof_prd(state, attributes, time, risk_factor_observer)
         if event_type == EventType.PR:
             return self._pof_pr(state, attributes, time, risk_factor_observer)
         if event_type == EventType.IP:
             return self._pof_ip(state, attributes, time, risk_factor_observer)
+        if event_type == EventType.IPFX:
+            return self._pof_ipfx(state, attributes, time, risk_factor_observer)
+        if event_type == EventType.IPFL:
+            return self._pof_ipfl(state, attributes, time, risk_factor_observer)
+        if event_type == EventType.MD:
+            return self._pof_md(state, attributes, time, risk_factor_observer)
         if event_type == EventType.RR:
             return self._pof_rr(state, attributes, time, risk_factor_observer)
         if event_type == EventType.TD:
@@ -114,6 +122,36 @@ class PlainVanillaSwapPayoffFunction(BasePayoffFunction):
         """POF_IED_SWPPV: Initial Exchange Date payoff.
 
         No notional exchange for plain vanilla swaps.
+        """
+        return jnp.array(0.0, dtype=jnp.float32)
+
+    def _pof_prd(
+        self,
+        state: ContractState,
+        attributes: ContractAttributes,
+        time: ActusDateTime,
+        risk_factor_observer: RiskFactorObserver,
+    ) -> jnp.ndarray:
+        """POF_PRD_SWPPV: Purchase Date payoff.
+
+        Formula: POF_PRD = R(CNTRL) × (-PPRD)
+        """
+        from jactus.utilities import contract_role_sign
+
+        pprd = attributes.price_at_purchase_date or 0.0
+        role_sign = contract_role_sign(attributes.contract_role)
+        return jnp.array(role_sign * (-pprd), dtype=jnp.float32)
+
+    def _pof_md(
+        self,
+        state: ContractState,
+        attributes: ContractAttributes,
+        time: ActusDateTime,
+        risk_factor_observer: RiskFactorObserver,
+    ) -> jnp.ndarray:
+        """POF_MD_SWPPV: Maturity Date payoff.
+
+        No notional exchange at maturity for plain vanilla swaps.
         """
         return jnp.array(0.0, dtype=jnp.float32)
 
@@ -171,6 +209,68 @@ class PlainVanillaSwapPayoffFunction(BasePayoffFunction):
 
         return jnp.array(role_sign * net_accrual, dtype=jnp.float32)
 
+    def _pof_ipfx(
+        self,
+        state: ContractState,
+        attributes: ContractAttributes,
+        time: ActusDateTime,
+        risk_factor_observer: RiskFactorObserver,
+    ) -> jnp.ndarray:
+        """POF_IPFX_SWPPV: Fixed Leg Interest Payment.
+
+        Formula:
+            POF_IPFX = R(CNTRL) × (Ipac1 + Y(Sd, t) × IPNR × Nt)
+
+        Where:
+            Ipac1: Accumulated fixed leg accrual
+            IPNR: Fixed nominal interest rate
+            R(CNTRL): Role sign (PFL=-1 pays fixed, RFL=+1 receives fixed)
+        """
+        from jactus.utilities import contract_role_sign
+
+        dcc = attributes.day_count_convention or DayCountConvention.A360
+        yf = year_fraction(state.sd, time, dcc)
+        nt = float(state.nt)
+
+        fixed_rate = attributes.nominal_interest_rate or 0.0
+        ipac1 = float(state.ipac1) if state.ipac1 is not None else 0.0
+        total_fixed = ipac1 + yf * fixed_rate * nt
+
+        role_sign = contract_role_sign(attributes.contract_role)
+
+        return jnp.array(role_sign * total_fixed, dtype=jnp.float32)
+
+    def _pof_ipfl(
+        self,
+        state: ContractState,
+        attributes: ContractAttributes,
+        time: ActusDateTime,
+        risk_factor_observer: RiskFactorObserver,
+    ) -> jnp.ndarray:
+        """POF_IPFL_SWPPV: Floating Leg Interest Payment.
+
+        Formula:
+            POF_IPFL = -R(CNTRL) × (Ipac2 + Y(Sd, t) × Ipnr × Nt)
+
+        Where:
+            Ipac2: Accumulated floating leg accrual
+            Ipnr: Current floating rate (from state, updated by RR)
+            R(CNTRL): Role sign (PFL=-1, so -(-1) = +1 receives floating)
+        """
+        from jactus.utilities import contract_role_sign
+
+        dcc = attributes.day_count_convention or DayCountConvention.A360
+        yf = year_fraction(state.sd, time, dcc)
+        nt = float(state.nt)
+
+        floating_rate = float(state.ipnr)
+        ipac2 = float(state.ipac2) if state.ipac2 is not None else 0.0
+        total_floating = ipac2 + yf * floating_rate * nt
+
+        role_sign = contract_role_sign(attributes.contract_role)
+
+        return jnp.array(-role_sign * total_floating, dtype=jnp.float32)
+
     def _pof_rr(
         self,
         state: ContractState,
@@ -193,10 +293,11 @@ class PlainVanillaSwapPayoffFunction(BasePayoffFunction):
     ) -> jnp.ndarray:
         """POF_TD_SWPPV: Termination Date payoff.
 
-        Early termination may have a mark-to-market settlement.
-        For now, zero payoff (would need market value calculation).
+        For SWPPV, PTD is the mark-to-market settlement amount
+        (already directional).
         """
-        return jnp.array(0.0, dtype=jnp.float32)
+        ptd = attributes.price_at_termination_date or 0.0
+        return jnp.array(ptd, dtype=jnp.float32)
 
     def _pof_ce(
         self,
@@ -239,10 +340,18 @@ class PlainVanillaSwapStateTransitionFunction(BaseStateTransitionFunction):
             return self._stf_ad(state_pre, event, attributes, risk_factor_observer)
         if event_type == EventType.IED:
             return self._stf_ied(state_pre, event, attributes, risk_factor_observer)
+        if event_type == EventType.PRD:
+            return self._stf_prd(state_pre, event, attributes, risk_factor_observer)
         if event_type == EventType.PR:
             return self._stf_pr(state_pre, event, attributes, risk_factor_observer)
         if event_type == EventType.IP:
             return self._stf_ip(state_pre, event, attributes, risk_factor_observer)
+        if event_type == EventType.IPFX:
+            return self._stf_ipfx(state_pre, event, attributes, risk_factor_observer)
+        if event_type == EventType.IPFL:
+            return self._stf_ipfl(state_pre, event, attributes, risk_factor_observer)
+        if event_type == EventType.MD:
+            return self._stf_md(state_pre, event, attributes, risk_factor_observer)
         if event_type == EventType.RR:
             return self._stf_rr(state_pre, event, attributes, risk_factor_observer)
         if event_type == EventType.TD:
@@ -252,6 +361,16 @@ class PlainVanillaSwapStateTransitionFunction(BaseStateTransitionFunction):
 
         # Unknown event, return state unchanged
         return state_pre
+
+    @staticmethod
+    def _adjust_eod_time(time: ActusDateTime) -> ActusDateTime:
+        """Adjust end-of-day times (23:59:59) to next day midnight for accrual."""
+        if time.hour == 23 and time.minute == 59:
+            from datetime import timedelta
+
+            py_dt = time.to_datetime() + timedelta(seconds=1)
+            return ActusDateTime(py_dt.year, py_dt.month, py_dt.day, 0, 0, 0)
+        return time
 
     def _accrue_legs(
         self,
@@ -265,10 +384,14 @@ class PlainVanillaSwapStateTransitionFunction(BaseStateTransitionFunction):
             Tuple of (new_ipac1, new_ipac2, new_ipac) where:
                 ipac1 = fixed leg accrual
                 ipac2 = floating leg accrual
-                ipac = net accrual (ipac1 - ipac2)
+                ipac = R(CNTRL) × ipac1 (signed fixed leg accrual)
         """
+        from jactus.utilities import contract_role_sign
+
         dcc = attributes.day_count_convention or DayCountConvention.A360
-        yf = year_fraction(state.sd, time, dcc)
+        # Adjust end-of-day times for correct day count
+        adj_time = self._adjust_eod_time(time)
+        yf = year_fraction(state.sd, adj_time, dcc)
         nt = float(state.nt)
 
         # Fixed leg accrual: uses IPNR (nominal_interest_rate)
@@ -280,8 +403,9 @@ class PlainVanillaSwapStateTransitionFunction(BaseStateTransitionFunction):
         ipac2 = float(state.ipac2) if state.ipac2 is not None else 0.0
         new_ipac2 = ipac2 + yf * float(state.ipnr) * nt
 
-        # Net accrual (fixed - floating)
-        new_ipac = new_ipac1 - new_ipac2
+        # ipac = R(CNTRL) × ipac1 (signed fixed leg accrual for ACTUS state)
+        role_sign = contract_role_sign(attributes.contract_role)
+        new_ipac = role_sign * new_ipac1
 
         return new_ipac1, new_ipac2, new_ipac
 
@@ -341,6 +465,59 @@ class PlainVanillaSwapStateTransitionFunction(BaseStateTransitionFunction):
             prf=attributes.contract_performance or ContractPerformance.PF,
         )
 
+    def _stf_prd(
+        self,
+        state: ContractState,
+        event: ContractEvent,
+        attributes: ContractAttributes,
+        risk_factor_observer: RiskFactorObserver,
+    ) -> ContractState:
+        """STF_PRD_SWPPV: Purchase Date state transition.
+
+        Accrue interest from status date to purchase date.
+        """
+        new_ipac1, new_ipac2, new_ipac = self._accrue_legs(
+            state, event.event_time, attributes
+        )
+        return ContractState(
+            tmd=state.tmd,
+            sd=event.event_time,
+            nt=state.nt,
+            ipnr=state.ipnr,
+            ipac=jnp.array(new_ipac, dtype=jnp.float32),
+            feac=state.feac,
+            nsc=state.nsc,
+            isc=state.isc,
+            ipac1=jnp.array(new_ipac1, dtype=jnp.float32),
+            ipac2=jnp.array(new_ipac2, dtype=jnp.float32),
+            prf=state.prf if hasattr(state, "prf") else ContractPerformance.PF,
+        )
+
+    def _stf_md(
+        self,
+        state: ContractState,
+        event: ContractEvent,
+        attributes: ContractAttributes,
+        risk_factor_observer: RiskFactorObserver,
+    ) -> ContractState:
+        """STF_MD_SWPPV: Maturity Date state transition.
+
+        Reset notional to zero.
+        """
+        return ContractState(
+            tmd=event.event_time,
+            sd=event.event_time,
+            nt=jnp.array(0.0, dtype=jnp.float32),
+            ipnr=state.ipnr,
+            ipac=jnp.array(0.0, dtype=jnp.float32),
+            feac=state.feac,
+            nsc=state.nsc,
+            isc=state.isc,
+            ipac1=jnp.array(0.0, dtype=jnp.float32),
+            ipac2=jnp.array(0.0, dtype=jnp.float32),
+            prf=state.prf if hasattr(state, "prf") else ContractPerformance.PF,
+        )
+
     def _stf_pr(
         self,
         state: ContractState,
@@ -379,6 +556,66 @@ class PlainVanillaSwapStateTransitionFunction(BaseStateTransitionFunction):
             isc=state.isc,
             ipac1=jnp.array(0.0, dtype=jnp.float32),
             ipac2=jnp.array(0.0, dtype=jnp.float32),
+            prf=state.prf if hasattr(state, "prf") else ContractPerformance.PF,
+        )
+
+    def _stf_ipfx(
+        self,
+        state: ContractState,
+        event: ContractEvent,
+        attributes: ContractAttributes,
+        risk_factor_observer: RiskFactorObserver,
+    ) -> ContractState:
+        """STF_IPFX_SWPPV: Fixed Leg Interest Payment state transition.
+
+        Accrue fixed leg up to payment time, then reset fixed leg accrual.
+        """
+        dcc = attributes.day_count_convention or DayCountConvention.A360
+        yf = year_fraction(state.sd, event.event_time, dcc)
+        nt = float(state.nt)
+
+        # Accrue floating leg (don't reset it - IPFL handles that)
+        floating_rate = float(state.ipnr)
+        ipac2 = float(state.ipac2) if state.ipac2 is not None else 0.0
+        new_ipac2 = ipac2 + yf * floating_rate * nt
+
+        return ContractState(
+            tmd=state.tmd,
+            sd=event.event_time,
+            nt=state.nt,
+            ipnr=state.ipnr,
+            ipac=jnp.array(0.0, dtype=jnp.float32),
+            feac=state.feac,
+            nsc=state.nsc,
+            isc=state.isc,
+            ipac1=jnp.array(0.0, dtype=jnp.float32),  # Reset fixed accrual
+            ipac2=jnp.array(new_ipac2, dtype=jnp.float32),
+            prf=state.prf if hasattr(state, "prf") else ContractPerformance.PF,
+        )
+
+    def _stf_ipfl(
+        self,
+        state: ContractState,
+        event: ContractEvent,
+        attributes: ContractAttributes,
+        risk_factor_observer: RiskFactorObserver,
+    ) -> ContractState:
+        """STF_IPFL_SWPPV: Floating Leg Interest Payment state transition.
+
+        Reset floating leg accrual after payment.
+        Note: IPFL follows IPFX on the same date, so fixed accrual is already reset.
+        """
+        return ContractState(
+            tmd=state.tmd,
+            sd=event.event_time,
+            nt=state.nt,
+            ipnr=state.ipnr,
+            ipac=jnp.array(0.0, dtype=jnp.float32),
+            feac=state.feac,
+            nsc=state.nsc,
+            isc=state.isc,
+            ipac1=state.ipac1,
+            ipac2=jnp.array(0.0, dtype=jnp.float32),  # Reset floating accrual
             prf=state.prf if hasattr(state, "prf") else ContractPerformance.PF,
         )
 
@@ -443,23 +680,19 @@ class PlainVanillaSwapStateTransitionFunction(BaseStateTransitionFunction):
     ) -> ContractState:
         """STF_TD_SWPPV: Termination Date state transition.
 
-        Accrue up to termination, then zero out.
+        Zero notional and accruals, preserve rate.
         """
-        new_ipac1, new_ipac2, new_ipac = self._accrue_legs(
-            state, event.event_time, attributes
-        )
-
         return ContractState(
             tmd=event.event_time,
             sd=event.event_time,
             nt=jnp.array(0.0, dtype=jnp.float32),
-            ipnr=jnp.array(0.0, dtype=jnp.float32),
-            ipac=jnp.array(new_ipac, dtype=jnp.float32),
+            ipnr=state.ipnr,  # Preserve current floating rate
+            ipac=jnp.array(0.0, dtype=jnp.float32),
             feac=state.feac,
             nsc=state.nsc,
             isc=state.isc,
-            ipac1=jnp.array(new_ipac1, dtype=jnp.float32),
-            ipac2=jnp.array(new_ipac2, dtype=jnp.float32),
+            ipac1=jnp.array(0.0, dtype=jnp.float32),
+            ipac2=jnp.array(0.0, dtype=jnp.float32),
             prf=state.prf if hasattr(state, "prf") else ContractPerformance.PF,
         )
 
@@ -523,13 +756,23 @@ class PlainVanillaSwapContract(BaseContract):
         if attributes.interest_payment_cycle is None:
             raise ValueError("interest_payment_cycle (IPCL) is required")
 
-        if attributes.rate_reset_cycle is None:
-            raise ValueError("rate_reset_cycle (RRCL) is required for floating leg")
-
         if attributes.maturity_date is None:
             raise ValueError("maturity_date (MD) is required")
 
         super().__init__(attributes, risk_factor_observer, child_contract_observer)
+
+    # Event ordering for same-date events (lower = earlier)
+    _EVENT_ORDER = {
+        EventType.IED: 0,
+        EventType.PRD: 1,
+        EventType.IPFX: 2,
+        EventType.IPFL: 3,
+        EventType.IP: 4,
+        EventType.RR: 5,
+        EventType.MD: 10,
+        EventType.TD: 11,
+        EventType.AD: 12,
+    }
 
     def generate_event_schedule(self) -> EventSchedule:
         """Generate event schedule for SWPPV contract.
@@ -538,66 +781,122 @@ class PlainVanillaSwapContract(BaseContract):
             EventSchedule with all contract events
         """
         events = []
+        ccy = self.attributes.currency or "USD"
+        maturity = self.attributes.maturity_date
 
-        # IED: Initial Exchange Date (no notional exchange)
+        # Determine settlement mode: D = separate (IPFX/IPFL), S = net (IP)
+        ds = self.attributes.delivery_settlement or "D"
+        use_separate = ds == "D"
+
+        # IED: Initial Exchange Date
         if self.attributes.initial_exchange_date:
             events.append(
                 ContractEvent(
                     event_type=EventType.IED,
                     event_time=self.attributes.initial_exchange_date,
                     payoff=0.0,
-                    currency=self.attributes.currency or "USD",
+                    currency=ccy,
                 )
             )
 
-        # Generate Rate Reset schedule
+        # Generate Rate Reset schedule (exclude maturity date)
         if self.attributes.rate_reset_cycle and self.attributes.rate_reset_anchor:
             rr_times = generate_schedule(
                 start=self.attributes.rate_reset_anchor,
-                end=self.attributes.maturity_date,
+                end=maturity,
                 cycle=self.attributes.rate_reset_cycle,
             )
             for rr_time in rr_times:
+                # Exclude RR at maturity date
+                if maturity and rr_time.to_iso()[:10] == maturity.to_iso()[:10]:
+                    continue
                 events.append(
                     ContractEvent(
                         event_type=EventType.RR,
                         event_time=rr_time,
                         payoff=0.0,
-                        currency=self.attributes.currency or "USD",
+                        currency=ccy,
+                    )
+                )
+        elif self.attributes.rate_reset_anchor:
+            # Single RR at anchor date (no cycle)
+            rr_anchor = self.attributes.rate_reset_anchor
+            if not maturity or rr_anchor.to_iso()[:10] != maturity.to_iso()[:10]:
+                events.append(
+                    ContractEvent(
+                        event_type=EventType.RR,
+                        event_time=rr_anchor,
+                        payoff=0.0,
+                        currency=ccy,
                     )
                 )
 
-        # Generate Interest Payment schedule (net settlement only)
-        # Use IED as anchor if no specific anchor is set
+        # Generate Interest Payment schedule
         ip_anchor = (
-            self.attributes.interest_calculation_base_anchor
+            self.attributes.interest_payment_anchor
+            or self.attributes.interest_calculation_base_anchor
             or self.attributes.initial_exchange_date
         )
         if self.attributes.interest_payment_cycle and ip_anchor:
             ip_times = generate_schedule(
                 start=ip_anchor,
-                end=self.attributes.maturity_date,
+                end=maturity,
                 cycle=self.attributes.interest_payment_cycle,
             )
 
+            # Add maturity date as final payment if not already included
+            if maturity:
+                maturity_iso = maturity.to_iso()[:10]
+                if not any(t.to_iso()[:10] == maturity_iso for t in ip_times):
+                    ip_times.append(maturity)
+
             for ip_time in ip_times:
-                events.append(
-                    ContractEvent(
-                        event_type=EventType.IP,
-                        event_time=ip_time,
-                        payoff=0.0,
-                        currency=self.attributes.currency or "USD",
+                if use_separate:
+                    events.append(
+                        ContractEvent(
+                            event_type=EventType.IPFX,
+                            event_time=ip_time,
+                            payoff=0.0,
+                            currency=ccy,
+                        )
                     )
+                    events.append(
+                        ContractEvent(
+                            event_type=EventType.IPFL,
+                            event_time=ip_time,
+                            payoff=0.0,
+                            currency=ccy,
+                        )
+                    )
+                else:
+                    events.append(
+                        ContractEvent(
+                            event_type=EventType.IP,
+                            event_time=ip_time,
+                            payoff=0.0,
+                            currency=ccy,
+                        )
+                    )
+
+        # PRD: Purchase Date
+        if self.attributes.purchase_date:
+            events.append(
+                ContractEvent(
+                    event_type=EventType.PRD,
+                    event_time=self.attributes.purchase_date,
+                    payoff=0.0,
+                    currency=ccy,
                 )
+            )
 
         # MD: Maturity Date
-        if self.attributes.maturity_date:
+        if maturity:
             events.append(
                 ContractEvent(
                     event_type=EventType.MD,
-                    event_time=self.attributes.maturity_date,
+                    event_time=maturity,
                     payoff=0.0,
-                    currency=self.attributes.currency or "USD",
+                    currency=ccy,
                 )
             )
 
@@ -609,7 +908,7 @@ class PlainVanillaSwapContract(BaseContract):
                         event_type=EventType.AD,
                         event_time=ad_time,
                         payoff=0.0,
-                        currency=self.attributes.currency or "USD",
+                        currency=ccy,
                     )
                 )
 
@@ -620,12 +919,15 @@ class PlainVanillaSwapContract(BaseContract):
                     event_type=EventType.TD,
                     event_time=self.attributes.termination_date,
                     payoff=0.0,
-                    currency=self.attributes.currency or "USD",
+                    currency=ccy,
                 )
             )
 
-        # Sort events by time
-        events.sort(key=lambda e: (e.event_time.year, e.event_time.month, e.event_time.day))
+        # Sort by date, then by event type ordering (IP/IPFX/IPFL before RR)
+        events.sort(key=lambda e: (
+            e.event_time.to_iso()[:10],
+            self._EVENT_ORDER.get(e.event_type, 99),
+        ))
 
         return EventSchedule(
             contract_id=self.attributes.contract_id,
@@ -678,3 +980,46 @@ class PlainVanillaSwapContract(BaseContract):
             PlainVanillaSwapStateTransitionFunction instance
         """
         return PlainVanillaSwapStateTransitionFunction()
+
+    def simulate(
+        self,
+        risk_factor_observer: RiskFactorObserver | None = None,
+        child_contract_observer: Any = None,
+    ) -> SimulationHistory:
+        """Simulate SWPPV contract.
+
+        Overrides base to filter out events before purchaseDate and after
+        terminationDate. The full event schedule is processed for state
+        computation, but only visible events are returned.
+        """
+        result = super().simulate(risk_factor_observer, child_contract_observer)
+
+        # Filter events: keep only PRD onwards when purchaseDate is set
+        if self.attributes.purchase_date:
+            purchase_iso = self.attributes.purchase_date.to_iso()
+            filtered = [
+                e for e in result.events
+                if e.event_time.to_iso() >= purchase_iso
+            ]
+            result = SimulationHistory(
+                events=filtered,
+                states=result.states,
+                initial_state=result.initial_state,
+                final_state=result.final_state,
+            )
+
+        # Filter events: keep only up to and including TD when terminationDate is set
+        if self.attributes.termination_date:
+            td_iso = self.attributes.termination_date.to_iso()[:10]
+            filtered = [
+                e for e in result.events
+                if e.event_time.to_iso()[:10] <= td_iso
+            ]
+            result = SimulationHistory(
+                events=filtered,
+                states=result.states,
+                initial_state=result.initial_state,
+                final_state=result.final_state,
+            )
+
+        return result

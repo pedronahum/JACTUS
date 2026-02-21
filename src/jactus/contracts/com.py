@@ -52,6 +52,7 @@ from jactus.core import (
 )
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.observers import ChildContractObserver, RiskFactorObserver
+from jactus.utilities import contract_role_sign
 
 
 class CommodityPayoffFunction(BasePayoffFunction):
@@ -144,11 +145,11 @@ class CommodityPayoffFunction(BasePayoffFunction):
         Returns:
             Negative of purchase price (outflow for buyer)
         """
-        # Get purchase price (total amount)
         pprd = attributes.price_at_purchase_date or 0.0
+        quantity = attributes.quantity or 1.0
+        role_sign = contract_role_sign(attributes.contract_role)
 
-        # Purchase is negative cashflow (paying for commodity)
-        payoff = -pprd
+        payoff = role_sign * (-pprd) * quantity
 
         return jnp.array(payoff, dtype=jnp.float32)
 
@@ -177,11 +178,11 @@ class CommodityPayoffFunction(BasePayoffFunction):
         Returns:
             Termination price (inflow for seller)
         """
-        # Get termination price (total amount)
         ptd = attributes.price_at_termination_date or 0.0
+        quantity = attributes.quantity or 1.0
+        role_sign = contract_role_sign(attributes.contract_role)
 
-        # Termination is positive cashflow (receiving sale proceeds)
-        payoff = ptd
+        payoff = role_sign * ptd * quantity
 
         return jnp.array(payoff, dtype=jnp.float32)
 

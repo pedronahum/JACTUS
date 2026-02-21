@@ -52,6 +52,7 @@ from jactus.core import (
 )
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.observers import ChildContractObserver, RiskFactorObserver
+from jactus.utilities import contract_role_sign
 
 
 class StockPayoffFunction(BasePayoffFunction):
@@ -143,11 +144,10 @@ class StockPayoffFunction(BasePayoffFunction):
         Returns:
             Negative of purchase price (outflow for buyer)
         """
-        # Get purchase price (should be defined in attributes)
         pprd = attributes.price_at_purchase_date or 0.0
+        role_sign = contract_role_sign(attributes.contract_role)
 
-        # Purchase is negative cashflow (paying for stock)
-        payoff = -pprd
+        payoff = role_sign * (-pprd)
 
         return jnp.array(payoff, dtype=jnp.float32)
 
@@ -171,11 +171,10 @@ class StockPayoffFunction(BasePayoffFunction):
         Returns:
             Termination price (inflow for seller)
         """
-        # Get termination price from attributes
         ptd = attributes.price_at_termination_date or 0.0
+        role_sign = contract_role_sign(attributes.contract_role)
 
-        # Termination is positive cashflow (receiving sale proceeds)
-        payoff = ptd
+        payoff = role_sign * ptd
 
         return jnp.array(payoff, dtype=jnp.float32)
 
@@ -188,31 +187,23 @@ class StockPayoffFunction(BasePayoffFunction):
     ) -> jnp.ndarray:
         """POF_DV_STK: Dividend Payment.
 
-        There are two types of dividends:
-        1. Fixed dividend (DVNP defined): POF = DVNP
-        2. Market-observed dividend: POF = observed from risk factor
-
-        Formula (fixed):
-            POF_DV_fix_STK = X^CURS_CUR(t) × R(CNTRL) × DVNP
-
         Formula (observed):
-            POF_DV_STK = X^CURS_CUR(t) × R(CNTRL) × f(O_dv(CID, t))
+            POF_DV_STK = R(CNTRL) × O_dv(DVMO, t)
 
         Where:
-            DVNP: Notional principal of dividend (fixed amount)
             O_dv: Observed dividend amount from risk factor
             R(CNTRL): Role sign
-            X^CURS_CUR(t): FX rate
-
-        Returns:
-            Dividend amount (positive = inflow to holder)
         """
-        # STK dividends would typically be observed from risk factors
-        # For now, return 0.0 as dividends are not part of standard attributes
-        # Future enhancement: observe from risk_factor_observer
-        payoff = 0.0
+        role_sign = contract_role_sign(attributes.contract_role)
 
-        return jnp.array(payoff, dtype=jnp.float32)
+        # Observe dividend amount from risk factors
+        dvmo = attributes.market_object_code_of_dividends or ""
+        if dvmo:
+            dv_amount = float(risk_factor_observer.observe_risk_factor(dvmo, time))
+        else:
+            dv_amount = 0.0
+
+        return jnp.array(role_sign * dv_amount, dtype=jnp.float32)
 
     def _pof_ce(
         self,
@@ -341,6 +332,22 @@ class StockContract(BaseContract):
         # STK doesn't have strict requirements beyond contract_type
         # market_object_code is recommended for price observation but not required
 
+    def _apply_bdc(self, date: ActusDateTime) -> ActusDateTime:
+        """Apply business day convention adjustment to a date."""
+        from jactus.utilities.calendars import MondayToFridayCalendar
+
+        bdc = self.attributes.business_day_convention
+        cal = self.attributes.calendar
+        if not bdc or bdc == "NULL" or not cal or cal in ("NO_CALENDAR", "NC"):
+            return date
+        calendar = MondayToFridayCalendar()
+        bdc_val = bdc.value if hasattr(bdc, "value") else str(bdc)
+        if bdc_val in ("CSF", "SCF", "CSMF", "SCMF"):
+            return calendar.next_business_day(date)
+        if bdc_val in ("CSP", "SCP", "CSMP", "SCMP"):
+            return calendar.previous_business_day(date)
+        return date
+
     def generate_event_schedule(self) -> EventSchedule:
         """Generate STK event schedule.
 
@@ -372,9 +379,32 @@ class StockContract(BaseContract):
                 )
             )
 
-        # DV: Dividend events (optional - not in standard attributes)
-        # Future enhancement: add dividend schedule generation
-        # For now, STK contracts focus on purchase/termination only
+        # DV: Dividend events
+        if self.attributes.dividend_cycle:
+            from jactus.utilities.schedules import generate_schedule
+
+            dv_start = self.attributes.dividend_anchor or self.attributes.purchase_date or self.attributes.status_date
+            dv_end = self.attributes.termination_date or self.attributes.maturity_date
+            if dv_end:
+                dv_dates = generate_schedule(
+                    start=dv_start,
+                    cycle=self.attributes.dividend_cycle,
+                    end=dv_end,
+                )
+                for dv_time in dv_dates:
+                    if dv_time > self.attributes.status_date:
+                        dv_time = self._apply_bdc(dv_time)
+                        events.append(
+                            ContractEvent(
+                                event_type=EventType.DV,
+                                event_time=dv_time,
+                                payoff=jnp.array(0.0, dtype=jnp.float32),
+                                currency=self.attributes.currency or "XXX",
+                                state_pre=None,
+                                state_post=None,
+                                sequence=len(events),
+                            )
+                        )
 
         # TD: Termination Date (if defined)
         if self.attributes.termination_date:

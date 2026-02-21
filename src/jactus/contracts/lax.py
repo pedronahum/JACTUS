@@ -900,7 +900,7 @@ class ExoticLinearAmortizerContract(BaseContract):
         md = attributes.maturity_date
 
         if not ied or not md:
-            return EventSchedule(events=[])
+            return EventSchedule(events=[], contract_id=attributes.contract_id)
 
         # AD: Analysis Date
         events.append(

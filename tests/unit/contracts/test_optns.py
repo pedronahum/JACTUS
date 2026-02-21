@@ -327,8 +327,8 @@ class TestOptionPayoffs:
         # Find PRD event
         prd_event = next(e for e in result.events if e.event_type == EventType.PRD)
 
-        # Premium = -5 * 100 = -500 (negative for buyer)
-        assert prd_event.payoff == pytest.approx(-500.0, abs=0.01)
+        # Premium = R(CNTRL) × (-PPRD) = 1 × (-5) = -5 (per-unit, not multiplied by NT)
+        assert prd_event.payoff == pytest.approx(-5.0, abs=0.01)
 
     def test_optns_payoff_std_call_itm(self):
         """Test POF_STD for in-the-money call option."""
@@ -353,8 +353,8 @@ class TestOptionPayoffs:
         # Find STD event
         std_event = next(e for e in result.events if e.event_type == EventType.STD)
 
-        # Exercise amount: max(110 - 100, 0) * 100 = 1000
-        assert std_event.payoff == pytest.approx(1000.0, abs=0.01)
+        # Exercise amount: R(CNTRL) × Xa = 1 × max(110 - 100, 0) = 10 (per-unit)
+        assert std_event.payoff == pytest.approx(10.0, abs=0.01)
 
     def test_optns_payoff_std_put_itm(self):
         """Test POF_STD for in-the-money put option."""
@@ -379,8 +379,8 @@ class TestOptionPayoffs:
         # Find STD event
         std_event = next(e for e in result.events if e.event_type == EventType.STD)
 
-        # Exercise amount: max(100 - 90, 0) * 100 = 1000
-        assert std_event.payoff == pytest.approx(1000.0, abs=0.01)
+        # Exercise amount: R(CNTRL) × Xa = 1 × max(100 - 90, 0) = 10 (per-unit)
+        assert std_event.payoff == pytest.approx(10.0, abs=0.01)
 
     def test_optns_payoff_std_call_otm(self):
         """Test POF_STD for out-of-the-money call option (expires worthless)."""
@@ -413,7 +413,7 @@ class TestOptionStateTransitions:
     """Test OPTNS state transition functions."""
 
     def test_optns_stf_md_european_call_itm(self):
-        """Test STF_MD for European call ITM (automatic exercise)."""
+        """Test STF_XD for European call ITM (exercise at XD, not MD)."""
         attrs = ContractAttributes(
             contract_id="OPT-001",
             contract_type=ContractType.OPTNS,
@@ -432,13 +432,14 @@ class TestOptionStateTransitions:
 
         result = contract.simulate()
 
-        # After MD event, state should have xa=10 (intrinsic value per share)
-        md_state = next(
-            s for e, s in zip(result.events, result.states, strict=False) if e.event_type == EventType.MD
+        # After XD event, state should have xa=10 (intrinsic value per share)
+        # MD no longer calculates xa; XD does
+        xd_state = next(
+            s for e, s in zip(result.events, result.states, strict=False) if e.event_type == EventType.XD
         )
 
-        assert md_state.xa is not None
-        assert float(md_state.xa) == pytest.approx(10.0, abs=0.01)  # max(110 - 100, 0)
+        assert xd_state.xa is not None
+        assert float(xd_state.xa) == pytest.approx(10.0, abs=0.01)  # max(110 - 100, 0)
 
     def test_optns_stf_md_european_call_otm(self):
         """Test STF_MD for European call OTM (no exercise)."""
@@ -500,17 +501,17 @@ class TestOptionSimulation:
         assert EventType.MD in event_types
         assert EventType.STD in event_types
 
-        # PRD: Pay premium -$500
+        # PRD: Pay premium R(CNTRL) × (-PPRD) = 1 × (-5) = -5
         prd_payoff = next(e.payoff for e in result.events if e.event_type == EventType.PRD)
-        assert prd_payoff == pytest.approx(-500.0, abs=0.01)
+        assert prd_payoff == pytest.approx(-5.0, abs=0.01)
 
-        # STD: Receive exercise amount $1000
+        # STD: Receive exercise amount R(CNTRL) × Xa = 1 × 10 = 10
         std_payoff = next(e.payoff for e in result.events if e.event_type == EventType.STD)
-        assert std_payoff == pytest.approx(1000.0, abs=0.01)
+        assert std_payoff == pytest.approx(10.0, abs=0.01)
 
-        # Net profit: 1000 - 500 = 500
+        # Net profit: 10 - 5 = 5
         total_payoff = sum(e.payoff for e in result.events)
-        assert total_payoff == pytest.approx(500.0, abs=0.01)
+        assert total_payoff == pytest.approx(5.0, abs=0.01)
 
     def test_optns_simulation_european_put_itm(self):
         """Test complete simulation of European put option in-the-money."""
@@ -534,13 +535,13 @@ class TestOptionSimulation:
 
         result = contract.simulate()
 
-        # STD: Receive exercise amount $1000 (max(100-90,0) * 100)
+        # STD: Receive exercise amount R(CNTRL) × Xa = 1 × 10 = 10 (per-unit)
         std_payoff = next(e.payoff for e in result.events if e.event_type == EventType.STD)
-        assert std_payoff == pytest.approx(1000.0, abs=0.01)
+        assert std_payoff == pytest.approx(10.0, abs=0.01)
 
-        # Net profit: 1000 - 400 = 600
+        # Net profit: 10 - 4 = 6
         total_payoff = sum(e.payoff for e in result.events)
-        assert total_payoff == pytest.approx(600.0, abs=0.01)
+        assert total_payoff == pytest.approx(6.0, abs=0.01)
 
     def test_optns_simulation_european_call_otm(self):
         """Test complete simulation of European call option out-of-the-money (expires worthless)."""
@@ -568,9 +569,9 @@ class TestOptionSimulation:
         std_payoff = next(e.payoff for e in result.events if e.event_type == EventType.STD)
         assert std_payoff == pytest.approx(0.0, abs=0.01)
 
-        # Net loss: 0 - 500 = -500 (lose premium)
+        # Net loss: 0 - 5 = -5 (lose premium, per-unit)
         total_payoff = sum(e.payoff for e in result.events)
-        assert total_payoff == pytest.approx(-500.0, abs=0.01)
+        assert total_payoff == pytest.approx(-5.0, abs=0.01)
 
     def test_optns_factory_creation(self):
         """Test creating OPTNS via factory."""
