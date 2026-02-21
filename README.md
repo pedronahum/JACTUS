@@ -5,6 +5,10 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
+<p align="center">
+  <img src="docs/jactus-demo.gif" alt="JACTUS Demo" width="800">
+</p>
+
 ## Overview
 
 JACTUS is a Python library that implements the **ACTUS (Algorithmic Contract Types Unified Standards)** specification using JAX for high-performance, differentiable financial contract modeling.
