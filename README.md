@@ -6,7 +6,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
 <p align="center">
-  <img src="docs/jactus-demo.gif" alt="JACTUS Demo" width="800">
+  <img src="docs/jactus-demo.gif" alt="JACTUS Demo">
 </p>
 
 ## Overview

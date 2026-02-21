@@ -138,7 +138,7 @@ attrs = ContractAttributes(
     maturity_date=ActusDateTime(2025, 1, 15),
     notional_principal=100_000.0,
     nominal_interest_rate=0.05,  # 5% annual
-    cycle_of_interest_payment="6M",  # Semi-annual interest
+    interest_payment_cycle="6M",  # Semi-annual interest (IPCL)
     day_count_convention="30E360",
 )
 

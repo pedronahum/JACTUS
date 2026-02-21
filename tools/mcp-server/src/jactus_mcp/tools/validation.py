@@ -87,11 +87,11 @@ def validate_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
             "status_date",
             "initial_exchange_date",
             "maturity_date",
-            "cycle_anchor_date_of_interest_payment",
-            "cycle_anchor_date_of_principal_redemption",
+            "interest_payment_anchor",
+            "principal_redemption_anchor",
             "purchase_date",
             "termination_date",
-            "capitalization_end_date",
+            "interest_capitalization_end_date",
         ]
 
         for field in date_fields:

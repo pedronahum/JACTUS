@@ -256,12 +256,12 @@ def get_contract_schema(contract_type: str) -> dict[str, Any]:
     optional = {
         "contract_id": "str - Unique identifier",
         "currency": "str - ISO currency code (default: USD)",
-        "cycle_of_interest_payment": "str - Payment cycle (e.g., '6M', '1Y')",
+        "interest_payment_cycle": "str - Interest payment cycle, IPCL (e.g., '6M', '1Y')",
         "day_count_convention": "DayCountConvention enum",
         "business_day_convention": "BusinessDayConvention enum",
         "premium_discount_at_ied": "float",
-        "cycle_anchor_date_of_interest_payment": "ActusDateTime",
-        "cycle_anchor_date_of_principal_redemption": "ActusDateTime",
+        "interest_payment_anchor": "ActusDateTime - Interest payment anchor date (IPANX)",
+        "principal_redemption_anchor": "ActusDateTime - Principal redemption anchor date (PRANX)",
     }
 
     return {
