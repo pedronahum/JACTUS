@@ -55,7 +55,15 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
+        if: runner.os != 'Windows'
         run: pip install -e ".[all]"
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          pip install -e ".[dev]"
+          pip install pandas matplotlib seaborn
+        shell: bash
 
       - name: Run tests
         run: pytest tests/ --ignore=tests/performance -v -s --tb=short --color=yes
