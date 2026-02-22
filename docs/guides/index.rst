@@ -115,7 +115,7 @@ Principal at Maturity contracts are interest-only loans where principal is repai
         notional_principal=500_000.0,  # $500k loan
         nominal_interest_rate=0.06,  # 6% annual
         day_count_convention=DayCountConvention.A360,
-        cycle_of_interest_payment="1M",  # Monthly payments
+        interest_payment_cycle="1M",  # Monthly payments
         cycle_anchor_date_of_interest_payment=ActusDateTime(2024, 2, 1, 0, 0, 0),
         end_of_month_convention=EndOfMonthConvention.EOM,
         currency="USD",
@@ -138,7 +138,7 @@ Principal at Maturity contracts are interest-only loans where principal is repai
 
 * ``notional_principal``: Loan amount
 * ``nominal_interest_rate``: Annual interest rate
-* ``cycle_of_interest_payment``: Payment frequency (1M=monthly, 3M=quarterly, 1Y=annual)
+* ``interest_payment_cycle``: Payment frequency (1M=monthly, 3M=quarterly, 1Y=annual)
 * ``maturity_date``: When principal is repaid
 
 **See:** ``examples/pam_example.py`` for complete examples
@@ -166,7 +166,7 @@ Linear amortizer contracts have fixed principal payments plus decreasing interes
         maturity_date=ActusDateTime(2029, 1, 1, 0, 0, 0),  # 5 years
         notional_principal=30_000.0,  # $30k car loan
         nominal_interest_rate=0.048,  # 4.8% APR
-        cycle_of_interest_payment="1M",  # Monthly payments
+        interest_payment_cycle="1M",  # Monthly payments
         cycle_anchor_date_of_interest_payment=ActusDateTime(2024, 2, 1, 0, 0, 0),
         cycle_of_principal_redemption="1M",  # Monthly principal payments
         cycle_anchor_date_of_principal_redemption=ActusDateTime(2024, 2, 1, 0, 0, 0),

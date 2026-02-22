@@ -50,7 +50,7 @@ Complete Example
         notional_principal=100_000.0,  # $100,000 loan
         nominal_interest_rate=0.05,  # 5% annual interest
         day_count_convention=DayCountConvention.A360,  # Actual/360
-        cycle_of_interest_payment="3M",  # Quarterly payments
+        interest_payment_cycle="3M",  # Quarterly payments
         cycle_anchor_date_of_interest_payment=ActusDateTime(2024, 4, 1, 0, 0, 0),
         end_of_month_convention=EndOfMonthConvention.SD,  # Same day
         currency="USD",
@@ -125,7 +125,7 @@ The ``ContractAttributes`` class defines all contract parameters:
 * **contract_role**: Perspective (RPA = lender, RPL = borrower)
 * **notional_principal**: The loan amount ($100,000)
 * **nominal_interest_rate**: Annual interest rate (5% = 0.05)
-* **cycle_of_interest_payment**: Payment frequency ("3M" = quarterly)
+* **interest_payment_cycle**: Payment frequency ("3M" = quarterly)
 * **maturity_date**: When the principal is repaid
 
 Risk Factor Observer
@@ -285,7 +285,7 @@ Calculate monthly payments on a loan::
         contract_type=ContractType.PAM,
         notional_principal=300_000.0,  # $300k
         nominal_interest_rate=0.065,  # 6.5%
-        cycle_of_interest_payment="1M",  # Monthly
+        interest_payment_cycle="1M",  # Monthly
         maturity_date=ActusDateTime(2054, 1, 1, 0, 0, 0),  # 30 years
     )
 
@@ -358,11 +358,11 @@ Make sure all required attributes are provided::
 Use correct cycle notation::
 
     # Correct
-    cycle_of_interest_payment="3M"  # Quarterly
+    interest_payment_cycle="3M"  # Quarterly
 
     # Wrong
-    cycle_of_interest_payment="P3M"  # Don't use 'P' prefix
-    cycle_of_interest_payment="3m"  # Use uppercase 'M'
+    interest_payment_cycle="P3M"  # Don't use 'P' prefix
+    interest_payment_cycle="3m"  # Use uppercase 'M'
 
 **"AttributeError: module has no attribute"**
 

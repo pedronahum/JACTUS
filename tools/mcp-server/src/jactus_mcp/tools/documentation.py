@@ -181,7 +181,7 @@ from jactus.core import ContractAttributes, ContractType
 from jactus.observers import ConstantRiskFactorObserver
 
 attrs = ContractAttributes(contract_type=ContractType.PAM, ...)
-rf_obs = ConstantRiskFactorObserver()
+rf_obs = ConstantRiskFactorObserver(constant_value=0.0)
 contract = create_contract(attrs, rf_obs)
 result = contract.simulate()
 ```

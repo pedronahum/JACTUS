@@ -142,8 +142,8 @@ attrs = ContractAttributes(
     day_count_convention="30E360",
 )
 
-# Create risk factor observer (constant 5% rate)
-rf_observer = ConstantRiskFactorObserver()
+# Create risk factor observer
+rf_observer = ConstantRiskFactorObserver(constant_value=0.0)
 
 # Create and simulate the contract
 contract = create_contract(attrs, rf_observer)

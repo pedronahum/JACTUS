@@ -63,12 +63,12 @@ attrs = ContractAttributes(
     maturity_date=ActusDateTime(2025, 1, 15),
     notional_principal=100_000.0,
     nominal_interest_rate=0.05,  # 5% annual
-    cycle_of_interest_payment="6M",  # Semi-annual interest
+    interest_payment_cycle="6M",  # Semi-annual interest
     day_count_convention="30E360",
 )
 
-# Create risk factor observer (constant 5% rate)
-rf_observer = ConstantRiskFactorObserver()
+# Create risk factor observer
+rf_observer = ConstantRiskFactorObserver(constant_value=0.0)
 
 # Create and simulate the contract
 contract = create_contract(attrs, rf_observer)

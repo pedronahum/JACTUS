@@ -313,7 +313,7 @@ attrs = ContractAttributes(
     # Add required fields listed above
 )
 
-rf_observer = ConstantRiskFactorObserver()
+rf_observer = ConstantRiskFactorObserver(constant_value=0.0)
 contract = create_contract(attrs, rf_observer)
 result = contract.simulate()
 """,
