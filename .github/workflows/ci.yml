@@ -21,7 +21,7 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[all]"
 
       - name: Ruff lint
         run: ruff check src/ tests/
@@ -55,7 +55,7 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[all]"
 
       - name: Run tests
         run: pytest tests/ --ignore=tests/performance -v -s --tb=short --color=yes
@@ -74,7 +74,7 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[all]"
 
       - name: Run performance benchmarks
         run: pytest tests/performance/ -v -s --tb=long --color=yes
