@@ -120,15 +120,11 @@ class ContractAttributes(BaseModel):
     option_exercise_end_date: ActusDateTime | None = Field(
         None, description="Last date option can be exercised (OPXED)"
     )
-    x_day_notice: str | None = Field(
-        None, description="Notice period for call/put (XDN)"
-    )
+    x_day_notice: str | None = Field(None, description="Notice period for call/put (XDN)")
     exercise_date: ActusDateTime | None = Field(
         None, description="Date of option/derivative exercise (XD)"
     )
-    exercise_amount: float | None = Field(
-        None, description="Amount determined at exercise (XA)"
-    )
+    exercise_amount: float | None = Field(None, description="Amount determined at exercise (XA)")
     settlement_period: str | None = Field(
         None, description="Period between exercise and settlement (STPD)"
     )
@@ -162,9 +158,7 @@ class ContractAttributes(BaseModel):
     market_object_code_of_dividends: str | None = Field(
         None, description="Market object code for dividend observation (DVMO)"
     )
-    dividend_cycle: Cycle | None = Field(
-        None, description="Dividend payment cycle (DVCL)"
-    )
+    dividend_cycle: Cycle | None = Field(None, description="Dividend payment cycle (DVCL)")
     dividend_anchor: ActusDateTime | None = Field(
         None, description="Dividend payment anchor date (DVANX)"
     )

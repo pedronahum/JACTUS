@@ -9,10 +9,8 @@ This module tests all aspects of the UMP contract:
 """
 
 import pytest
-import jax.numpy as jnp
 
 from jactus.contracts import create_contract
-from jactus.contracts.ump import UndefinedMaturityProfileContract
 from jactus.core import (
     ActusDateTime,
     ContractAttributes,

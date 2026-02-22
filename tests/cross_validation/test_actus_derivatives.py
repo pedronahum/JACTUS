@@ -32,7 +32,7 @@ class TestFXOUTCrossValidation:
             else:
                 lines.append(f"  {test_id}: PASS")
 
-        print(f"\n" + "\n".join(lines))
+        print("\n" + "\n".join(lines))
 
 
 class TestOPTNSCrossValidation:
@@ -62,7 +62,7 @@ class TestOPTNSCrossValidation:
             else:
                 lines.append(f"  {test_id}: PASS")
 
-        print(f"\n" + "\n".join(lines))
+        print("\n" + "\n".join(lines))
 
 
 class TestFUTURCrossValidation:
@@ -92,4 +92,4 @@ class TestFUTURCrossValidation:
             else:
                 lines.append(f"  {test_id}: PASS")
 
-        print(f"\n" + "\n".join(lines))
+        print("\n" + "\n".join(lines))

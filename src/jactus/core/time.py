@@ -546,7 +546,9 @@ def adjust_to_business_day(
             py_dt = original_dt.to_datetime()
             while not is_business_day(dt, calendar):
                 py_dt = py_dt - timedelta(days=1)
-                dt = ActusDateTime(py_dt.year, py_dt.month, py_dt.day, dt.hour, dt.minute, dt.second)
+                dt = ActusDateTime(
+                    py_dt.year, py_dt.month, py_dt.day, dt.hour, dt.minute, dt.second
+                )
 
     elif "P" in convention.value:  # Preceding
         # Move backward to previous business day
@@ -560,6 +562,8 @@ def adjust_to_business_day(
             py_dt = original_dt.to_datetime()
             while not is_business_day(dt, calendar):
                 py_dt = py_dt + timedelta(days=1)
-                dt = ActusDateTime(py_dt.year, py_dt.month, py_dt.day, dt.hour, dt.minute, dt.second)
+                dt = ActusDateTime(
+                    py_dt.year, py_dt.month, py_dt.day, dt.hour, dt.minute, dt.second
+                )
 
     return dt

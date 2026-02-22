@@ -8,13 +8,10 @@ Tests complex validation scenarios across contract components:
 - Cross-module validation (attributes + schedules + calendars)
 """
 
-import pytest
-
 from jactus.core import ActusDateTime, ContractAttributes
 from jactus.core.types import (
     BusinessDayConvention,
     Calendar,
-    ContractPerformance,
     ContractRole,
     ContractType,
     DayCountConvention,
@@ -59,8 +56,9 @@ class TestPAMContractComplete:
 
         # Verify schedule is consistent with contract
         assert schedule[0] == attrs.interest_payment_anchor
-        assert schedule[-1] >= attrs.maturity_date or \
-               schedule[-2] == ActusDateTime(2029, 1, 15, 0, 0, 0)
+        assert schedule[-1] >= attrs.maturity_date or schedule[-2] == ActusDateTime(
+            2029, 1, 15, 0, 0, 0
+        )
         # Quarterly payments for 5 years = 20 payments
         assert len(schedule) >= 19
 

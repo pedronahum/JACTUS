@@ -383,7 +383,11 @@ class StockContract(BaseContract):
         if self.attributes.dividend_cycle:
             from jactus.utilities.schedules import generate_schedule
 
-            dv_start = self.attributes.dividend_anchor or self.attributes.purchase_date or self.attributes.status_date
+            dv_start = (
+                self.attributes.dividend_anchor
+                or self.attributes.purchase_date
+                or self.attributes.status_date
+            )
             dv_end = self.attributes.termination_date or self.attributes.maturity_date
             if dv_end:
                 dv_dates = generate_schedule(

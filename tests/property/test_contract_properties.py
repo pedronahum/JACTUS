@@ -5,7 +5,6 @@ for all contracts regardless of parameters.
 """
 
 import jax.numpy as jnp
-import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -37,13 +36,13 @@ class TestCashContractProperties:
             currency="USD",
             notional_principal=notional,
         )
-        
+
         rf_obs = ConstantRiskFactorObserver(constant_value=0.0)
         contract = create_contract(attrs, rf_obs)
-        
+
         # Initialize state
         state = contract.initialize_state()
-        
+
         # Notional absolute value should match
         assert abs(abs(float(state.nt)) - notional) < notional * 0.001
 
@@ -61,10 +60,10 @@ class TestCashContractProperties:
             currency="USD",
             notional_principal=notional,
         )
-        
+
         rf_obs = ConstantRiskFactorObserver(constant_value=0.0)
         contract = create_contract(attrs, rf_obs)
-        
+
         # Should never raise
         result = contract.simulate()
         assert result is not None
@@ -93,15 +92,15 @@ class TestPAMContractProperties:
             nominal_interest_rate=rate,
             day_count_convention=DayCountConvention.A360,
         )
-        
+
         rf_obs = ConstantRiskFactorObserver(constant_value=rate)
         contract = create_contract(attrs, rf_obs)
         result = contract.simulate()
-        
+
         # Find IED event
         ied_event = next((e for e in result.events if e.event_type.value == "IED"), None)
         assert ied_event is not None
-        
+
         # IED payoff should equal notional (negative for borrower)
         assert abs(float(ied_event.payoff) + notional) < notional * 0.001  # 0.1% tolerance
 
@@ -125,14 +124,14 @@ class TestPAMContractProperties:
             day_count_convention=DayCountConvention.A360,
             interest_payment_cycle="6M",  # Semi-annual
         )
-        
+
         rf_obs = ConstantRiskFactorObserver(constant_value=rate)
         contract = create_contract(attrs, rf_obs)
         result = contract.simulate()
-        
+
         # Count IP events
         ip_events = [e for e in result.events if e.event_type.value == "IP"]
-        
+
         # Should have at least one IP event
         assert len(ip_events) >= 1
 
@@ -154,15 +153,15 @@ class TestPAMContractProperties:
             nominal_interest_rate=0.05,
             day_count_convention=DayCountConvention.A360,
         )
-        
+
         rf_obs = ConstantRiskFactorObserver(constant_value=0.05)
         contract = create_contract(attrs, rf_obs)
         result = contract.simulate()
-        
+
         # Find MD event
         md_event = next((e for e in result.events if e.event_type.value == "MD"), None)
         assert md_event is not None
-        
+
         # MD payoff should be at least notional (positive for borrower paying back)
         assert float(md_event.payoff) >= notional * 0.99  # Allow small rounding
 
@@ -171,8 +170,12 @@ class TestStockContractProperties:
     """Property tests for STK contract."""
 
     @given(
-        purchase_price=st.floats(min_value=1.0, max_value=1000.0, allow_nan=False, allow_infinity=False),
-        sale_price=st.floats(min_value=1.0, max_value=1000.0, allow_nan=False, allow_infinity=False),
+        purchase_price=st.floats(
+            min_value=1.0, max_value=1000.0, allow_nan=False, allow_infinity=False
+        ),
+        sale_price=st.floats(
+            min_value=1.0, max_value=1000.0, allow_nan=False, allow_infinity=False
+        ),
     )
     @settings(max_examples=50, deadline=None)
     def test_stk_profit_loss_calculation(self, purchase_price, sale_price):
@@ -188,15 +191,15 @@ class TestStockContractProperties:
             price_at_purchase_date=purchase_price,
             price_at_termination_date=sale_price,
         )
-        
+
         rf_obs = ConstantRiskFactorObserver(constant_value=100.0)
         contract = create_contract(attrs, rf_obs)
         result = contract.simulate()
-        
+
         # Calculate net cashflow
         cashflows = result.get_cashflows()
         net_cashflow = sum(float(amt) for _, amt, _ in cashflows)
-        
+
         # Net should equal sale - purchase
         expected_profit = sale_price - purchase_price
         assert abs(net_cashflow - expected_profit) < 0.01
@@ -206,8 +209,12 @@ class TestCommodityContractProperties:
     """Property tests for COM contract."""
 
     @given(
-        purchase_price=st.floats(min_value=100.0, max_value=10000.0, allow_nan=False, allow_infinity=False),
-        sale_price=st.floats(min_value=100.0, max_value=10000.0, allow_nan=False, allow_infinity=False),
+        purchase_price=st.floats(
+            min_value=100.0, max_value=10000.0, allow_nan=False, allow_infinity=False
+        ),
+        sale_price=st.floats(
+            min_value=100.0, max_value=10000.0, allow_nan=False, allow_infinity=False
+        ),
     )
     @settings(max_examples=50, deadline=None)
     def test_com_profit_loss_calculation(self, purchase_price, sale_price):
@@ -223,15 +230,15 @@ class TestCommodityContractProperties:
             price_at_purchase_date=purchase_price,
             price_at_termination_date=sale_price,
         )
-        
+
         rf_obs = ConstantRiskFactorObserver(constant_value=5000.0)
         contract = create_contract(attrs, rf_obs)
         result = contract.simulate()
-        
+
         # Calculate net cashflow
         cashflows = result.get_cashflows()
         net_cashflow = sum(float(amt) for _, amt, _ in cashflows)
-        
+
         # Net should equal sale - purchase
         expected_profit = sale_price - purchase_price
         assert abs(net_cashflow - expected_profit) < 0.01
@@ -267,11 +274,11 @@ class TestGeneralContractProperties:
                 price_at_purchase_date=100.0,
                 price_at_termination_date=120.0,
             )
-        
+
         rf_obs = ConstantRiskFactorObserver(constant_value=0.05)
         contract = create_contract(attrs, rf_obs)
         result = contract.simulate()
-        
+
         # Check monotonic time
         for i in range(len(result.events) - 1):
             curr_time = result.events[i].event_time
@@ -305,11 +312,11 @@ class TestGeneralContractProperties:
                 price_at_purchase_date=100.0,
                 price_at_termination_date=120.0,
             )
-        
+
         rf_obs = ConstantRiskFactorObserver(constant_value=0.05)
         contract = create_contract(attrs, rf_obs)
         result = contract.simulate()
-        
+
         # All payoffs should be finite
         for event in result.events:
             payoff = float(event.payoff)
@@ -342,11 +349,11 @@ class TestGeneralContractProperties:
                 price_at_purchase_date=100.0,
                 price_at_termination_date=120.0,
             )
-        
+
         rf_obs = ConstantRiskFactorObserver(constant_value=0.05)
         contract = create_contract(attrs, rf_obs)
         result = contract.simulate()
-        
+
         # All events should have EUR currency
         for event in result.events:
             assert event.currency == "EUR"

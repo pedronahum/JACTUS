@@ -247,7 +247,7 @@ class TestEventSchedule:
             currency="USD",
         )
 
-        schedule = EventSchedule(tuple([event1]), "LOAN-001")
+        schedule = EventSchedule((event1,), "LOAN-001")
 
         event2 = ContractEvent(
             event_type=EventType.IP,

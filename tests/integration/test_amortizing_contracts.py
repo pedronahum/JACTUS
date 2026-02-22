@@ -12,7 +12,6 @@ Test Categories:
 """
 
 import pytest
-import jax.numpy as jnp
 
 from jactus.contracts import create_contract
 from jactus.core import (
@@ -168,7 +167,7 @@ class TestIPCBFeature:
             nominal_interest_rate=0.06,
             day_count_convention=DayCountConvention.A360,
             principal_redemption_cycle="3M",
-                next_principal_redemption_amount=8333.33,
+            next_principal_redemption_amount=8333.33,
             principal_redemption_anchor=ActusDateTime(2024, 4, 15, 0, 0, 0),
             interest_calculation_base="NT",
         )
@@ -194,7 +193,7 @@ class TestIPCBFeature:
             nominal_interest_rate=0.06,
             day_count_convention=DayCountConvention.A360,
             principal_redemption_cycle="3M",
-                next_principal_redemption_amount=8333.33,
+            next_principal_redemption_amount=8333.33,
             principal_redemption_anchor=ActusDateTime(2024, 4, 15, 0, 0, 0),
             interest_calculation_base="NTIED",
         )
@@ -377,12 +376,15 @@ class TestFactoryRegistration:
             (ContractType.LAM, {"principal_redemption_cycle": "1M"}),
             (ContractType.NAM, {"principal_redemption_cycle": "1M"}),
             (ContractType.ANN, {"principal_redemption_cycle": "1M"}),
-            (ContractType.LAX, {
-                "array_pr_anchor": [ActusDateTime(2024, 2, 15, 0, 0, 0)],
-                "array_pr_cycle": ["1M"],
-                "array_pr_next": [1000.0],
-                "array_increase_decrease": ["DEC"],
-            }),
+            (
+                ContractType.LAX,
+                {
+                    "array_pr_anchor": [ActusDateTime(2024, 2, 15, 0, 0, 0)],
+                    "array_pr_cycle": ["1M"],
+                    "array_pr_next": [1000.0],
+                    "array_increase_decrease": ["DEC"],
+                },
+            ),
             (ContractType.CLM, {}),
             (ContractType.UMP, {}),
         ]

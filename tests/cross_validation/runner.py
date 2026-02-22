@@ -61,7 +61,6 @@ def _build_child_observer(
 
     Returns None if no composite structure is found.
     """
-    import jax.numpy as jnp
 
     terms = test_case["terms"]
     ct = terms.get("contractType", "")
@@ -88,9 +87,11 @@ def _build_child_observer(
                 # Inherit contractRole from parent if child doesn't have one
                 if "contract_role" not in child_kwargs:
                     from jactus.core.types import ContractRole
+
                     if ct == "SWAPS" and ref_role in ("FIL", "SEL"):
                         # Use determine_leg_roles to get correct child roles
                         from jactus.contracts.swaps import determine_leg_roles
+
                         parent_role = ContractRole(parent_role_str)
                         first_role, second_role = determine_leg_roles(parent_role)
                         child_kwargs["contract_role"] = (
@@ -105,7 +106,9 @@ def _build_child_observer(
                 child_contract = create_contract(child_attrs, rf_observer)
                 child_result = child_contract.simulate()
                 observer.register_simulation(
-                    child_id, child_result.events, child_attrs,
+                    child_id,
+                    child_result.events,
+                    child_attrs,
                     initial_state=child_result.initial_state,
                 )
             except Exception:
@@ -142,6 +145,7 @@ def _register_cid_child(
     contract state from the parent's notionalPrincipal and eventsObserved.
     """
     import jax.numpy as jnp
+
     from jactus.core import ContractEvent
     from jactus.core.types import ContractPerformance
 
@@ -178,14 +182,16 @@ def _register_cid_child(
     )
 
     # Create a synthetic IED event at status_date
-    synthetic_events.append(ContractEvent(
-        event_type=EventType.IED,
-        event_time=sd,
-        payoff=jnp.array(0.0, dtype=jnp.float32),
-        currency="XXX",
-        state_pre=initial_state,
-        state_post=initial_state,
-    ))
+    synthetic_events.append(
+        ContractEvent(
+            event_type=EventType.IED,
+            event_time=sd,
+            payoff=jnp.array(0.0, dtype=jnp.float32),
+            currency="XXX",
+            state_pre=initial_state,
+            state_post=initial_state,
+        )
+    )
 
     # Process observed credit events
     for eo in events_observed:
@@ -199,7 +205,11 @@ def _register_cid_child(
         eo_type = eo.get("type", "")
         states_data = eo.get("states", {})
         perf_str = states_data.get("contractPerformance", "PF")
-        perf = ContractPerformance(perf_str) if perf_str in ("PF", "DL", "DQ", "DF") else ContractPerformance.PF
+        perf = (
+            ContractPerformance(perf_str)
+            if perf_str in ("PF", "DL", "DQ", "DF")
+            else ContractPerformance.PF
+        )
 
         # Build state at credit event time
         ce_state = ContractState(
@@ -215,14 +225,16 @@ def _register_cid_child(
         )
 
         evt_type = EVENT_TYPE_MAP.get(eo_type, EventType.CE)
-        synthetic_events.append(ContractEvent(
-            event_type=evt_type,
-            event_time=eo_time,
-            payoff=jnp.array(0.0, dtype=jnp.float32),
-            currency="XXX",
-            state_pre=initial_state,
-            state_post=ce_state,
-        ))
+        synthetic_events.append(
+            ContractEvent(
+                event_type=evt_type,
+                event_time=eo_time,
+                payoff=jnp.array(0.0, dtype=jnp.float32),
+                currency="XXX",
+                state_pre=initial_state,
+                state_post=ce_state,
+            )
+        )
 
     observer.register_simulation(child_id, synthetic_events)
 
@@ -237,6 +249,7 @@ def _inject_credit_events(
     by querying child state at the credit event time.
     """
     import jax.numpy as jnp
+
     from jactus.core import ContractEvent
     from jactus.core.types import ContractPerformance
 
@@ -270,11 +283,13 @@ def _inject_credit_events(
         # Compute accrued interest from child_state.sd to CE time
         # so the CE state has correct ipac (not reset to 0 after last IP)
         from jactus.utilities.conventions import year_fraction
+
         child_attrs = observer._attributes.get(contract_id)
         if child_attrs and child_attrs.day_count_convention:
             dcc = child_attrs.day_count_convention
         else:
             from jactus.core.types import DayCountConvention
+
             dcc = DayCountConvention.A365
         yf = year_fraction(child_state.sd, eo_time, dcc)
         ipac_at_ce = float(child_state.ipac) + yf * float(child_state.ipnr) * float(child_state.nt)
@@ -306,9 +321,16 @@ def _inject_credit_events(
         observer._events.setdefault(contract_id, []).append(ce_event)
         observer._histories.setdefault(contract_id, []).append((eo_time, ce_state))
         # Re-sort history by time
-        observer._histories[contract_id].sort(key=lambda x: (
-            x[0].year, x[0].month, x[0].day, x[0].hour, x[0].minute, x[0].second,
-        ))
+        observer._histories[contract_id].sort(
+            key=lambda x: (
+                x[0].year,
+                x[0].month,
+                x[0].day,
+                x[0].hour,
+                x[0].minute,
+                x[0].second,
+            )
+        )
 
 
 def _values_close(a: float, b: float) -> bool:
@@ -354,8 +376,10 @@ def run_single_test(test_id: str, test_case: dict[str, Any]) -> list[str]:
             if ip_cycle and ip_cycle.endswith("-"):
                 # Short stub: subtract one cycle period from 'to'
                 from jactus.core.time import parse_cycle
+
                 mult, period, _ = parse_cycle(ip_cycle)
                 from dateutil.relativedelta import relativedelta
+
                 period_map = {
                     "D": relativedelta(days=mult),
                     "W": relativedelta(weeks=mult),
@@ -366,8 +390,12 @@ def run_single_test(test_id: str, test_case: dict[str, Any]) -> list[str]:
                 }
                 py_dt = to_dt.to_datetime() - period_map[period]
                 kwargs["maturity_date"] = ActusDateTime(
-                    py_dt.year, py_dt.month, py_dt.day,
-                    py_dt.hour, py_dt.minute, py_dt.second,
+                    py_dt.year,
+                    py_dt.month,
+                    py_dt.day,
+                    py_dt.hour,
+                    py_dt.minute,
+                    py_dt.second,
                 )
             else:
                 kwargs["maturity_date"] = to_dt
@@ -393,14 +421,17 @@ def run_single_test(test_id: str, test_case: dict[str, Any]) -> list[str]:
                     clm_xd_date = ActusDateTime.from_iso(xd_str)
                     # Compute STD date = XD + xDayNotice
                     xdn = terms.get("xDayNotice", "P0D")
-                    from jactus.core.time import parse_cycle
                     from dateutil.relativedelta import relativedelta
+
+                    from jactus.core.time import parse_cycle
+
                     xdn_str = xdn[1:] if xdn.startswith("P") else xdn
                     # Remove any L-suffix
                     if "L" in xdn_str:
-                        xdn_str = xdn_str[:xdn_str.index("L")]
+                        xdn_str = xdn_str[: xdn_str.index("L")]
                     # Parse: "31D", "1M", "0D", "3W", "9M"
                     import re
+
                     m = re.match(r"(\d+)([DWMY])", xdn_str)
                     if m:
                         n, unit = int(m.group(1)), m.group(2)
@@ -413,8 +444,12 @@ def run_single_test(test_id: str, test_case: dict[str, Any]) -> list[str]:
                         }
                         std_py = xd_py + delta_map.get(unit, relativedelta())
                         clm_std_date = ActusDateTime(
-                            std_py.year, std_py.month, std_py.day,
-                            std_py.hour, std_py.minute, std_py.second,
+                            std_py.year,
+                            std_py.month,
+                            std_py.day,
+                            std_py.hour,
+                            std_py.minute,
+                            std_py.second,
                         )
                     else:
                         clm_std_date = clm_xd_date
@@ -489,8 +524,10 @@ def run_single_test(test_id: str, test_case: dict[str, Any]) -> list[str]:
     # For CLM with observed XD: inject XD event, move IP+MD to STD date, rename MD→STD
     if clm_xd_date is not None:
         import jax.numpy as jnp
-        from jactus.core import ContractEvent, ContractState
+
+        from jactus.core import ContractEvent
         from jactus.utilities import year_fraction
+
         std_date = clm_std_date or clm_xd_date
         new_actual = []
 
@@ -594,7 +631,7 @@ def run_single_test(test_id: str, test_case: dict[str, Any]) -> list[str]:
                 key=lambda e: (float(e.get("payoff", 0)), float(e.get("notionalPrincipal", 0))),
             )
 
-        for i, (actual, expected) in enumerate(zip(actual_list, expected_list)):
+        for i, (actual, expected) in enumerate(zip(actual_list, expected_list, strict=False)):
             suffix = f" [{i}]" if len(actual_list) > 1 else ""
 
             # Payoff

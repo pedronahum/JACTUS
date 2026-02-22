@@ -6,8 +6,6 @@ and validates JACTUS simulation results against the expected outputs.
 
 from __future__ import annotations
 
-import pytest
-
 from .runner import run_single_test
 
 
@@ -38,7 +36,7 @@ class TestLAMCrossValidation:
             else:
                 lines.append(f"  {test_id}: PASS")
 
-        print(f"\n" + "\n".join(lines))
+        print("\n" + "\n".join(lines))
 
 
 class TestNAMCrossValidation:
@@ -68,7 +66,7 @@ class TestNAMCrossValidation:
             else:
                 lines.append(f"  {test_id}: PASS")
 
-        print(f"\n" + "\n".join(lines))
+        print("\n" + "\n".join(lines))
 
 
 class TestANNCrossValidation:
@@ -98,4 +96,4 @@ class TestANNCrossValidation:
             else:
                 lines.append(f"  {test_id}: PASS")
 
-        print(f"\n" + "\n".join(lines))
+        print("\n" + "\n".join(lines))

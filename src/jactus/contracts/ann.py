@@ -65,14 +65,18 @@ from jactus.core import (
     ActusDateTime,
     ContractAttributes,
     ContractEvent,
-    ContractRole,
     ContractState,
     ContractType,
     DayCountConvention,
     EventSchedule,
     EventType,
 )
-from jactus.core.types import BusinessDayConvention, Calendar, EndOfMonthConvention, EVENT_SCHEDULE_PRIORITY
+from jactus.core.types import (
+    EVENT_SCHEDULE_PRIORITY,
+    BusinessDayConvention,
+    Calendar,
+    EndOfMonthConvention,
+)
 from jactus.functions import BaseStateTransitionFunction
 from jactus.observers import RiskFactorObserver
 from jactus.utilities import (
@@ -130,7 +134,7 @@ class ANNStateTransitionFunction(BaseStateTransitionFunction):
         ACTUS v1.1 Section 7.5 - ANN State Transition Functions
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize ANN state transition function."""
         super().__init__()
         # Delegate to NAM for most state transitions
@@ -176,7 +180,8 @@ class ANNStateTransitionFunction(BaseStateTransitionFunction):
         """
         handler = self._build_dispatch_table().get(event_type)
         if handler is not None:
-            return handler(state, attributes, time, risk_factor_observer)
+            result: ContractState = handler(state, attributes, time, risk_factor_observer)
+            return result
         return state
 
     def _stf_rr(
@@ -272,6 +277,8 @@ class ANNStateTransitionFunction(BaseStateTransitionFunction):
             return state
 
         pr_anchor = attrs.principal_redemption_anchor or attrs.initial_exchange_date
+        if pr_anchor is None:
+            return state
         pr_cycle = attrs.principal_redemption_cycle
         # Use amortization_date for annuity calculation horizon when available
         md = attrs.amortization_date or attrs.maturity_date
@@ -316,9 +323,7 @@ class ANNStateTransitionFunction(BaseStateTransitionFunction):
             )
 
             role_sign = contract_role_sign(attrs.contract_role)
-            state = state.replace(
-                prnxt=jnp.array(role_sign * new_prnxt, dtype=jnp.float32)
-            )
+            state = state.replace(prnxt=jnp.array(role_sign * new_prnxt, dtype=jnp.float32))
 
         return state
 
@@ -368,13 +373,17 @@ class AnnuityContract(BaseContract):
 
         # Handle amortization_date: when maturity_date is absent, use amortization_date
         if not attributes.maturity_date and attributes.amortization_date:
-            attributes = attributes.model_copy(update={"maturity_date": attributes.amortization_date})
+            attributes = attributes.model_copy(
+                update={"maturity_date": attributes.amortization_date}
+            )
 
         # Derive maturity_date if not provided but PRNXT is given
         if not attributes.maturity_date and attributes.next_principal_redemption_amount:
             attributes = self._derive_maturity_date(attributes)
         elif not attributes.maturity_date:
-            raise ValueError("maturity_date (or amortizationDate or nextPrincipalRedemptionPayment) required for ANN")
+            raise ValueError(
+                "maturity_date (or amortizationDate or nextPrincipalRedemptionPayment) required for ANN"
+            )
 
         # ANN can auto-calculate Prnxt if not provided
         # (will be calculated in initialize_state)
@@ -410,8 +419,12 @@ class AnnuityContract(BaseContract):
         cal = attrs.calendar or Calendar.NO_CALENDAR
         far_future = ied.add_period("600M", EndOfMonthConvention.SD)
         pr_dates = generate_schedule(
-            start=pr_anchor, cycle=pr_cycle, end=far_future,
-            end_of_month_convention=eomc, business_day_convention=bdc, calendar=cal,
+            start=pr_anchor,
+            cycle=pr_cycle,
+            end=far_future,
+            end_of_month_convention=eomc,
+            business_day_convention=bdc,
+            calendar=cal,
         )
 
         # Simulate amortization
@@ -456,20 +469,28 @@ class AnnuityContract(BaseContract):
         eomc = attrs.end_of_month_convention
         cal = attrs.calendar
 
-        def _sched(anchor, cycle, end):
+        def _sched(
+            anchor: ActusDateTime, cycle: str, end: ActusDateTime | None
+        ) -> list[ActusDateTime]:
             return generate_schedule(
-                start=anchor, cycle=cycle, end=end,
+                start=anchor,
+                cycle=cycle,
+                end=end,
                 end_of_month_convention=eomc or EndOfMonthConvention.SD,
                 business_day_convention=bdc or BusinessDayConvention.NULL,
                 calendar=cal or Calendar.NO_CALENDAR,
             )
 
-        def _add(etype, time):
-            events.append(ContractEvent(
-                event_type=etype, event_time=time,
-                payoff=jnp.array(0.0, dtype=jnp.float32),
-                currency=currency, sequence=0,
-            ))
+        def _add(etype: EventType, time: ActusDateTime) -> None:
+            events.append(
+                ContractEvent(
+                    event_type=etype,
+                    event_time=time,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
+                    currency=currency,
+                    sequence=0,
+                )
+            )
 
         # IED: only if IED >= SD
         if ied >= sd:
@@ -543,9 +564,7 @@ class AnnuityContract(BaseContract):
             # Initial PRF: one day before first PR date (only if PRANX > IED)
             if pr_anchor > ied:
                 py_dt = pr_anchor.to_datetime() - timedelta(days=1)
-                prf_initial = ActusDateTime(
-                    py_dt.year, py_dt.month, py_dt.day, 0, 0, 0
-                )
+                prf_initial = ActusDateTime(py_dt.year, py_dt.month, py_dt.day, 0, 0, 0)
                 _add(EventType.PRF, prf_initial)
 
             # PRF at each RR date (to recalculate after rate change)
@@ -590,12 +609,15 @@ class AnnuityContract(BaseContract):
         if attrs.purchase_date:
             prd_time = attrs.purchase_date
             events = [
-                e for e in events
+                e
+                for e in events
                 if e.event_type == EventType.PRD
                 or (e.event_type != EventType.IED and e.event_time > prd_time)
             ]
 
-        events.sort(key=lambda e: (e.event_time.to_iso(), EVENT_SCHEDULE_PRIORITY.get(e.event_type, 99)))
+        events.sort(
+            key=lambda e: (e.event_time.to_iso(), EVENT_SCHEDULE_PRIORITY.get(e.event_type, 99))
+        )
 
         # If TD exists, remove all events after TD
         if attrs.termination_date:
@@ -614,25 +636,28 @@ class AnnuityContract(BaseContract):
 
         return EventSchedule(events=tuple(events), contract_id=attrs.contract_id)
 
-    def _pre_simulate_to_prd(
-        self, attrs: ContractAttributes, prnxt: jnp.ndarray
-    ) -> ContractState:
+    def _pre_simulate_to_prd(self, attrs: ContractAttributes, prnxt: jnp.ndarray) -> ContractState:
         """Pre-simulate events from IED to PRD to get correct initial state."""
         ied = attrs.initial_exchange_date
         prd = attrs.purchase_date
         sd = attrs.status_date
         md = attrs.maturity_date
-        assert ied is not None and prd is not None
+        assert ied is not None
+        assert prd is not None
 
         bdc = attrs.business_day_convention
         eomc = attrs.end_of_month_convention
         cal = attrs.calendar
 
-        def _sched(anchor, cycle, end):
+        def _sched(
+            anchor: ActusDateTime | None, cycle: str | None, end: ActusDateTime | None
+        ) -> list[ActusDateTime]:
             if anchor is None or cycle is None or end is None:
                 return []
             return generate_schedule(
-                start=anchor, cycle=cycle, end=end,
+                start=anchor,
+                cycle=cycle,
+                end=end,
                 end_of_month_convention=eomc or EndOfMonthConvention.SD,
                 business_day_convention=bdc or BusinessDayConvention.NULL,
                 calendar=cal or Calendar.NO_CALENDAR,
@@ -684,7 +709,8 @@ class AnnuityContract(BaseContract):
         pre_events.sort(key=lambda e: (e[0].to_iso(), EVENT_SCHEDULE_PRIORITY.get(e[1], 99)))
 
         state = ContractState(
-            sd=ied, tmd=md,
+            sd=ied,
+            tmd=md or attrs.status_date,
             nt=jnp.array(0.0, dtype=jnp.float32),
             ipnr=jnp.array(0.0, dtype=jnp.float32),
             ipac=jnp.array(0.0, dtype=jnp.float32),
@@ -698,8 +724,11 @@ class AnnuityContract(BaseContract):
         stf = self.get_state_transition_function(None)
         for time, etype in pre_events:
             state = stf.transition_state(
-                event_type=etype, state=state, attributes=attrs,
-                time=time, risk_factor_observer=self.risk_factor_observer,
+                event_type=etype,
+                state=state,
+                attributes=attrs,
+                time=time,
+                risk_factor_observer=self.risk_factor_observer,
             )
 
         if ied < sd and sd < prd:
@@ -729,18 +758,16 @@ class AnnuityContract(BaseContract):
             prnxt = role_sign * attrs.next_principal_redemption_amount
         else:
             # Calculate using annuity formula with PRANX- as start
-            if (
-                attrs.principal_redemption_cycle
-                and attrs.maturity_date
-                and ied
-            ):
+            if attrs.principal_redemption_cycle and attrs.maturity_date and ied:
                 pr_anchor = attrs.principal_redemption_anchor or ied
                 pr_cycle = attrs.principal_redemption_cycle
                 # Use amortization_date for annuity calculation horizon when provided
                 annuity_end = attrs.amortization_date or attrs.maturity_date
 
                 pr_schedule = generate_schedule(
-                    start=pr_anchor, cycle=pr_cycle, end=annuity_end,
+                    start=pr_anchor,
+                    cycle=pr_cycle,
+                    end=annuity_end,
                 )
                 pr_schedule = [d for d in pr_schedule if d <= annuity_end]
 
@@ -762,11 +789,10 @@ class AnnuityContract(BaseContract):
                     prnxt_amount = calculate_actus_annuity(
                         start=annuity_start,
                         pr_schedule=pr_schedule,
-                        notional=attrs.notional_principal,
+                        notional=attrs.notional_principal or 0.0,
                         accrued_interest=0.0,
                         rate=attrs.nominal_interest_rate or 0.0,
-                        day_count_convention=attrs.day_count_convention
-                        or DayCountConvention.A360,
+                        day_count_convention=attrs.day_count_convention or DayCountConvention.A360,
                     )
                     prnxt = role_sign * prnxt_amount
                 else:
@@ -798,7 +824,7 @@ class AnnuityContract(BaseContract):
             ipcb_val = abs(nt)
             return ContractState(
                 sd=init_sd,
-                tmd=attrs.maturity_date,
+                tmd=attrs.maturity_date or attrs.status_date,
                 nt=jnp.array(nt, dtype=jnp.float32),
                 ipnr=jnp.array(ipnr, dtype=jnp.float32),
                 ipac=jnp.array(ipac, dtype=jnp.float32),
@@ -811,7 +837,7 @@ class AnnuityContract(BaseContract):
 
         return ContractState(
             sd=sd,
-            tmd=attrs.maturity_date,
+            tmd=attrs.maturity_date or attrs.status_date,
             nt=jnp.array(0.0, dtype=jnp.float32),  # Set at IED
             ipnr=jnp.array(0.0, dtype=jnp.float32),  # Set at IED
             ipac=jnp.array(0.0, dtype=jnp.float32),

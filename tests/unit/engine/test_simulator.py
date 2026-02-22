@@ -126,7 +126,7 @@ class MockContract(BaseContract):
         """Generate simple monthly event schedule."""
         events = []
         for i in range(self.num_events):
-            event_time = self.attributes.status_date.add_period(f"{i+1}M")
+            event_time = self.attributes.status_date.add_period(f"{i + 1}M")
             event = ContractEvent(
                 event_type=EventType.IP,
                 event_time=event_time,

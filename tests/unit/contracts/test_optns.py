@@ -435,7 +435,9 @@ class TestOptionStateTransitions:
         # After XD event, state should have xa=10 (intrinsic value per share)
         # MD no longer calculates xa; XD does
         xd_state = next(
-            s for e, s in zip(result.events, result.states, strict=False) if e.event_type == EventType.XD
+            s
+            for e, s in zip(result.events, result.states, strict=False)
+            if e.event_type == EventType.XD
         )
 
         assert xd_state.xa is not None
@@ -463,7 +465,9 @@ class TestOptionStateTransitions:
 
         # After MD event, state should have xa=0 (no intrinsic value)
         md_state = next(
-            s for e, s in zip(result.events, result.states, strict=False) if e.event_type == EventType.MD
+            s
+            for e, s in zip(result.events, result.states, strict=False)
+            if e.event_type == EventType.MD
         )
 
         assert md_state.xa is not None

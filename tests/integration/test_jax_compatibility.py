@@ -7,7 +7,6 @@ so we test JAX compatibility at the state/payoff level.
 
 import jax
 import jax.numpy as jnp
-import pytest
 
 from jactus.contracts import create_contract
 from jactus.core import (
@@ -33,12 +32,12 @@ class TestJAXArrayHandling:
             currency="USD",
             notional_principal=100000.0,
         )
-        
+
         risk_factors = jnp.array([0.0])
         rf_obs = JaxRiskFactorObserver(risk_factors)
         contract = create_contract(attrs, rf_obs)
         state = contract.initialize_state()
-        
+
         # State fields should be JAX arrays
         assert isinstance(state.nt, jnp.ndarray)
         assert isinstance(state.ipnr, jnp.ndarray)
@@ -59,12 +58,12 @@ class TestJAXArrayHandling:
             nominal_interest_rate=0.05,
             day_count_convention=DayCountConvention.A360,
         )
-        
+
         risk_factors = jnp.array([0.05])
         rf_obs = JaxRiskFactorObserver(risk_factors)
         contract = create_contract(attrs, rf_obs)
         result = contract.simulate()
-        
+
         # All payoffs should be JAX arrays
         for event in result.events:
             assert isinstance(event.payoff, jnp.ndarray)
@@ -83,12 +82,12 @@ class TestJAXArrayHandling:
             price_at_purchase_date=150.0,
             price_at_termination_date=175.0,
         )
-        
+
         risk_factors = jnp.array([160.0])
         rf_obs = JaxRiskFactorObserver(risk_factors)
         contract = create_contract(attrs, rf_obs)
         result = contract.simulate()
-        
+
         assert len(result.events) == 2
         assert all(isinstance(e.payoff, jnp.ndarray) for e in result.events)
 
@@ -106,16 +105,16 @@ class TestJITCompatibleOperations:
             currency="USD",
             notional_principal=100000.0,
         )
-        
+
         risk_factors = jnp.array([0.0])
         rf_obs = JaxRiskFactorObserver(risk_factors)
         contract = create_contract(attrs, rf_obs)
-        
+
         # JIT compile initialization
         @jax.jit
         def init_state_jit():
             return contract.initialize_state()
-        
+
         state = init_state_jit()
         assert state is not None
         assert jnp.isfinite(state.nt)
@@ -130,20 +129,20 @@ class TestJITCompatibleOperations:
             currency="USD",
             notional_principal=100000.0,
         )
-        
+
         risk_factors = jnp.array([0.0])
         rf_obs = JaxRiskFactorObserver(risk_factors)
         contract = create_contract(attrs, rf_obs)
-        
+
         @jax.jit
         def get_notional():
             state = contract.initialize_state()
             return state.nt
-        
+
         # Multiple calls should give same result
         result1 = get_notional()
         result2 = get_notional()
-        
+
         assert jnp.array_equal(result1, result2)
 
 
@@ -230,12 +229,12 @@ class TestJAXCompatibleCalculations:
             day_count_convention=DayCountConvention.A360,
             interest_payment_cycle="6M",
         )
-        
+
         risk_factors = jnp.array([0.05])
         rf_obs = JaxRiskFactorObserver(risk_factors)
         contract = create_contract(attrs, rf_obs)
         result = contract.simulate()
-        
+
         # All calculations should produce finite JAX arrays
         for event in result.events:
             assert isinstance(event.payoff, jnp.ndarray)
@@ -256,12 +255,12 @@ class TestJAXCompatibleCalculations:
             price_at_purchase_date=7500.0,
             price_at_termination_date=8200.0,
         )
-        
+
         risk_factors = jnp.array([80.0])
         rf_obs = JaxRiskFactorObserver(risk_factors)
         contract = create_contract(attrs, rf_obs)
         result = contract.simulate()
-        
+
         # All states should use JAX arrays
         for event in result.events:
             if event.state_pre:
@@ -277,10 +276,11 @@ class TestJAXPerformance:
 
     def test_jit_compilation_works(self):
         """Test basic JIT compilation functionality."""
+
         @jax.jit
         def simple_calc(x):
             return x * 2.0 + 1.0
-        
+
         result = simple_calc(jnp.array(5.0))
         assert float(result) == 11.0
 
@@ -290,7 +290,7 @@ class TestJAXPerformance:
         obs1 = JaxRiskFactorObserver(jnp.array([0.03]))
         obs2 = JaxRiskFactorObserver(jnp.array([0.05]))
         obs3 = JaxRiskFactorObserver(jnp.array([0.07]))
-        
+
         attrs_template = ContractAttributes(
             contract_id="CSH-MULTI",
             contract_type=ContractType.CSH,
@@ -299,14 +299,14 @@ class TestJAXPerformance:
             currency="USD",
             notional_principal=100000.0,
         )
-        
+
         c1 = create_contract(attrs_template, obs1)
         c2 = create_contract(attrs_template, obs2)
         c3 = create_contract(attrs_template, obs3)
-        
+
         s1 = c1.initialize_state()
         s2 = c2.initialize_state()
         s3 = c3.initialize_state()
-        
+
         # All should be valid JAX arrays
         assert all(jnp.isfinite(s.nt) for s in [s1, s2, s3])

@@ -544,9 +544,7 @@ class SimulatedChildContractObserver(BaseChildContractObserver):
             else:
                 break
         if best_state is None:
-            raise KeyError(
-                f"No state found for '{identifier}' at or before {time.to_iso()}"
-            )
+            raise KeyError(f"No state found for '{identifier}' at or before {time.to_iso()}")
         return best_state
 
     def _get_attribute(
@@ -560,7 +558,5 @@ class SimulatedChildContractObserver(BaseChildContractObserver):
         attrs = self._attributes[identifier]
         value = getattr(attrs, attribute_name, None)
         if value is None:
-            raise AttributeError(
-                f"Attribute '{attribute_name}' not found in '{identifier}'"
-            )
+            raise AttributeError(f"Attribute '{attribute_name}' not found in '{identifier}'")
         return jnp.array(float(value), dtype=jnp.float32)

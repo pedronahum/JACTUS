@@ -7,8 +7,8 @@ handle errors properly, and integrate correctly with the factory system.
 import pytest
 
 from jactus.contracts import create_contract, get_available_contract_types
-from jactus.core import ContractAttributes, ContractRole, ContractType, ActusDateTime
-from jactus.observers import ConstantRiskFactorObserver, MockChildContractObserver
+from jactus.core import ActusDateTime, ContractAttributes, ContractRole, ContractType
+from jactus.observers import ConstantRiskFactorObserver
 
 
 # Test fixtures
@@ -288,7 +288,7 @@ class TestDerivativeErrorHandling:
 
     def test_invalid_contract_type_raises_error(self, status_date, maturity_date, rf_observer):
         """Test that invalid contract type raises error."""
-        attrs = ContractAttributes(
+        _attrs = ContractAttributes(
             contract_id="INVALID-001",
             contract_type=ContractType.FXOUT,  # Will be overridden
             contract_role=ContractRole.RPA,

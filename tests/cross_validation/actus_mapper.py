@@ -14,7 +14,7 @@ from typing import Any
 
 import jax.numpy as jnp
 
-from jactus.core import ActusDateTime, ContractAttributes, ContractRole, ContractType
+from jactus.core import ActusDateTime, ContractRole, ContractType
 from jactus.core.types import Calendar, DayCountConvention, EndOfMonthConvention
 from jactus.observers.risk_factor import BaseRiskFactorObserver
 
@@ -199,6 +199,7 @@ CALENDAR_MAP: dict[str, Calendar] = {
     "UK-SETTLEMENT": Calendar.UK_SETTLEMENT,
 }
 
+
 # Cycle format mapping: ACTUS JSON uses ISO 8601 duration-like format (P1ML0)
 # while JACTUS uses shorthand (1M). The trailing L0/L1 indicates stub handling.
 def _parse_cycle(cycle_str: str) -> str:
@@ -218,7 +219,7 @@ def _parse_cycle(cycle_str: str) -> str:
     # Extract stub indicator
     stub = ""
     if "L" in s:
-        stub_part = s[s.index("L"):]
+        stub_part = s[s.index("L") :]
         s = s[: s.index("L")]
         if stub_part == "L0":
             stub = "+"  # Long stub
@@ -290,10 +291,12 @@ def _parse_contract_structure(value: Any) -> str:
     if "FIL" in refs_by_role and "SEL" in refs_by_role:
         fil_obj = refs_by_role["FIL"].get("object", {})
         sel_obj = refs_by_role["SEL"].get("object", {})
-        return json.dumps({
-            "FirstLeg": _get_child_id(fil_obj),
-            "SecondLeg": _get_child_id(sel_obj),
-        })
+        return json.dumps(
+            {
+                "FirstLeg": _get_child_id(fil_obj),
+                "SecondLeg": _get_child_id(sel_obj),
+            }
+        )
 
     # CEC/CEG with COVI (covering) + one or more COVE (covered) — use IDs
     covi_refs = [r for r in value if r.get("referenceRole") == "COVI"]

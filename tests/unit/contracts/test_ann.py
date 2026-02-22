@@ -353,17 +353,18 @@ class TestAnnuityContract:
 
         # Get initial state to find the payment amount
         initial_state = contract.initialize_state()
-        payment_amount = abs(float(initial_state.prnxt))
+        _payment_amount = abs(float(initial_state.prnxt))
 
         # For each PR event, total payment should equal payment_amount
         # Total payment = PR payoff + interest accrued
         # Skip PR at IED (payoff=0, no interest accrued yet)
         pr_events = [
-            e for e in result.events
+            e
+            for e in result.events
             if e.event_type == EventType.PR and e.event_time != attrs.initial_exchange_date
         ]
 
-        for i, pr_event in enumerate(pr_events[:10]):  # Check first 10 payments
+        for _i, pr_event in enumerate(pr_events[:10]):  # Check first 10 payments
             if pr_event.state_pre:
                 principal_paid = abs(float(pr_event.payoff))
                 assert principal_paid > 0

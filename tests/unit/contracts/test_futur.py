@@ -527,7 +527,9 @@ class TestFutureEdgeCases:
         stf_md = contract.get_state_transition_function(EventType.MD)
         state_md = stf_md.transition_state(EventType.MD, state, attrs, attrs.maturity_date, rf_obs)
         stf_xd = contract.get_state_transition_function(EventType.XD)
-        state_xd = stf_xd.transition_state(EventType.XD, state_md, attrs, attrs.maturity_date, rf_obs)
+        state_xd = stf_xd.transition_state(
+            EventType.XD, state_md, attrs, attrs.maturity_date, rf_obs
+        )
 
         # Settlement should be 300 - 100 = 200
         assert float(state_xd.xa) == pytest.approx(200.0, abs=0.01)
@@ -902,7 +904,7 @@ class TestFutureAnalysisDates:
         contract = FutureContract(attrs, rf_obs)
 
         schedule = contract.generate_event_schedule()
-        event_types = [event.event_type for event in schedule.events]
+        _event_types = [event.event_type for event in schedule.events]
 
         # Should have AD events
         ad_events = [e for e in schedule.events if e.event_type == EventType.AD]

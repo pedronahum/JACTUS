@@ -125,13 +125,20 @@ select = [
     "ARG", # flake8-unused-arguments
 ]
 ignore = [
-    "E501",  # line too long (handled by black)
-    "N818",  # exception naming (ActusException is intentional)
+    "E501",   # line too long (handled by black)
+    "N818",   # exception naming (ActusException is intentional)
+    "ARG001", # unused function arguments needed for consistent API signatures
+    "ARG002", # unused method arguments are necessary for unified structural protocols
+    "ARG005", # unused lambda arguments in vectorization maps
+    "RET504", # unnecessary assignment before return — improves readability in contracts
+    "SIM102", # nested ifs are clearer for multi-condition ACTUS business logic
+    "SIM108", # ternary operators harm readability for complex state assignments
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Allow unused imports in __init__.py
-"tests/**/*.py" = ["ARG", "PT011"]  # Allow unused arguments in tests
+"tests/**/*.py" = ["ARG", "PT011", "PT012", "PT015", "PT017", "PT018", "B011", "DTZ001"]
+"src/jactus/core/time.py" = ["DTZ001"]  # ActusDateTime deliberately uses naive datetimes (ACTUS spec)
 
 [tool.ruff.lint.isort]
 known-first-party = ["jactus"]
@@ -156,6 +163,8 @@ module = [
     "jax.*",
     "flax.*",
     "numpy.*",
+    "dateutil.*",
+    "pandas.*",
 ]
 ignore_missing_imports = true
 

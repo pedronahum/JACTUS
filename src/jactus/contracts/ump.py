@@ -46,14 +46,14 @@ import jax.numpy as jnp
 
 from jactus.contracts.base import BaseContract
 from jactus.core.states import ContractState
-from jactus.core.types import ContractType, EventType
+from jactus.core.types import ContractRole, ContractType, DayCountConvention, EventType
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.utilities import contract_role_sign, generate_schedule, year_fraction
 
 if TYPE_CHECKING:
     from jactus.core.attributes import ContractAttributes
-    from jactus.core.datetime import ActusDateTime
     from jactus.core.events import ContractEvent, EventSchedule
+    from jactus.core.time import ActusDateTime
     from jactus.observers.risk_factor import RiskFactorObserver
 
 
@@ -71,7 +71,9 @@ class UMPPayoffFunction(BasePayoffFunction):
     All principal repayment amounts come from observed events.
     """
 
-    def __init__(self, contract_role, currency, settlement_currency=None):
+    def __init__(
+        self, contract_role: ContractRole, currency: str, settlement_currency: str | None = None
+    ) -> None:
         super().__init__(
             contract_role=contract_role,
             currency=currency,
@@ -100,24 +102,23 @@ class UMPPayoffFunction(BasePayoffFunction):
         """
         if event_type == EventType.AD:
             return self._pof_ad(state, attributes, time)
-        elif event_type == EventType.IED:
+        if event_type == EventType.IED:
             return self._pof_ied(state, attributes, time)
-        elif event_type == EventType.PR:
+        if event_type == EventType.PR:
             return self._pof_pr(state, attributes, time)
-        elif event_type == EventType.MD:
+        if event_type == EventType.MD:
             return self._pof_md(state, attributes, time)
-        elif event_type == EventType.FP:
+        if event_type == EventType.FP:
             return self._pof_fp(state, attributes, time)
-        elif event_type == EventType.TD:
+        if event_type == EventType.TD:
             return self._pof_td(state, attributes, time)
-        elif event_type == EventType.IPCI:
+        if event_type == EventType.IPCI:
             return self._pof_ipci(state, attributes, time)
-        elif event_type == EventType.RR:
+        if event_type == EventType.RR:
             return self._pof_rr(state, attributes, time)
-        elif event_type == EventType.RRF:
+        if event_type == EventType.RRF:
             return self._pof_rrf(state, attributes, time)
-        else:
-            return jnp.array(0.0, dtype=jnp.float32)
+        return jnp.array(0.0, dtype=jnp.float32)
 
     def _pof_ad(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
@@ -133,7 +134,11 @@ class UMPPayoffFunction(BasePayoffFunction):
         Formula: R(CNTRL) × (-1) × Nsc × NT
         """
         role_sign = contract_role_sign(attrs.contract_role)
-        return jnp.array(role_sign * (-1.0), dtype=jnp.float32) * state.nsc * attrs.notional_principal
+        return (
+            jnp.array(role_sign * (-1.0), dtype=jnp.float32)
+            * state.nsc
+            * (attrs.notional_principal or 0.0)
+        )
 
     def _pof_pr(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
@@ -152,7 +157,7 @@ class UMPPayoffFunction(BasePayoffFunction):
 
         No R(CNTRL) — all signed state variables.
         """
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
         accrued = yf * state.ipnr * state.nt
         return state.nsc * (state.nt + state.ipac + accrued)
 
@@ -164,7 +169,7 @@ class UMPPayoffFunction(BasePayoffFunction):
         Formula: Nsc × (PTD + IPAC + Y × Nrt × NT)
         """
         ptd = attrs.price_at_termination_date or 0.0
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
         accrued = yf * state.ipnr * state.nt
         return state.nsc * jnp.array(ptd + float(state.ipac) + float(accrued), dtype=jnp.float32)
 
@@ -176,13 +181,12 @@ class UMPPayoffFunction(BasePayoffFunction):
         No R(CNTRL) — Feac is a signed state variable.
         """
         role_sign = contract_role_sign(attrs.contract_role)
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
 
         if attrs.fee_rate and attrs.fee_basis:
             accrued_fees = yf * attrs.fee_rate * abs(state.nt)
             return state.nsc * (state.feac + accrued_fees)
-        else:
-            return role_sign * state.nsc * state.feac
+        return role_sign * state.nsc * state.feac
 
     def _pof_ipci(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
@@ -238,26 +242,25 @@ class UMPStateTransitionFunction(BaseStateTransitionFunction):
         """
         if event_type == EventType.AD:
             return self._stf_ad(state, attributes, time, risk_factor_observer)
-        elif event_type == EventType.IED:
+        if event_type == EventType.IED:
             return self._stf_ied(state, attributes, time, risk_factor_observer)
-        elif event_type == EventType.PR:
+        if event_type == EventType.PR:
             return self._stf_pr(state, attributes, time, risk_factor_observer)
-        elif event_type == EventType.MD:
+        if event_type == EventType.MD:
             return self._stf_md(state, attributes, time, risk_factor_observer)
-        elif event_type == EventType.FP:
+        if event_type == EventType.FP:
             return self._stf_fp(state, attributes, time, risk_factor_observer)
-        elif event_type == EventType.IPCI:
+        if event_type == EventType.IPCI:
             return self._stf_ipci(state, attributes, time, risk_factor_observer)
-        elif event_type == EventType.TD:
+        if event_type == EventType.TD:
             return self._stf_td(state, attributes, time, risk_factor_observer)
-        elif event_type == EventType.RR:
+        if event_type == EventType.RR:
             return self._stf_rr(state, attributes, time, risk_factor_observer)
-        elif event_type == EventType.RRF:
+        if event_type == EventType.RRF:
             return self._stf_rrf(state, attributes, time, risk_factor_observer)
-        elif event_type == EventType.CE:
+        if event_type == EventType.CE:
             return self._stf_ce(state, attributes, time, risk_factor_observer)
-        else:
-            return state
+        return state
 
     def _stf_ad(
         self,
@@ -302,7 +305,7 @@ class UMPStateTransitionFunction(BaseStateTransitionFunction):
         For UMP, all principal repayments come from observed events.
         The amount is obtained from the observer.
         """
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
 
         # Accrue interest
         new_ipac = state.ipac + yf * state.ipnr * state.nt
@@ -352,7 +355,7 @@ class UMPStateTransitionFunction(BaseStateTransitionFunction):
         risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
         """STF_IPCI: Interest Capitalization - add accrued interest to notional."""
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
         accrued = yf * state.ipnr * state.nt
 
         # Add accrued interest to notional (no role_sign - nt is already signed)
@@ -507,7 +510,7 @@ class UndefinedMaturityProfileContract(BaseContract):
         """
         return ContractState(
             sd=self.attributes.status_date,
-            tmd=self.attributes.maturity_date,  # May be None - determined from observer
+            tmd=self.attributes.maturity_date,  # type: ignore[arg-type]  # UMP has no maturity by design
             nt=jnp.array(0.0, dtype=jnp.float32),  # Set at IED
             ipnr=jnp.array(0.0, dtype=jnp.float32),  # Set at IED
             ipac=jnp.array(0.0, dtype=jnp.float32),

@@ -54,8 +54,10 @@ from jactus.core import (
     EventSchedule,
     EventType,
 )
+from jactus.core.types import DayCountConvention
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.observers import ChildContractObserver, RiskFactorObserver
+from jactus.observers.child_contract import SimulatedChildContractObserver
 
 
 class CECPayoffFunction(BasePayoffFunction):
@@ -203,7 +205,7 @@ class CreditEnhancementCollateralContract(BaseContract):
 
         # Default credit event type to "DF" if not specified
         if attributes.credit_event_type is None:
-            attributes.credit_event_type = "DF"
+            attributes.credit_event_type = ContractPerformance("DF")
 
         # Default guarantee extent to "NO" (notional only) if not specified
         if attributes.credit_enhancement_guarantee_extent is None:
@@ -223,7 +225,7 @@ class CreditEnhancementCollateralContract(BaseContract):
         Returns:
             Dictionary with CoveredContract and CoveringContract keys
         """
-        return json.loads(self.attributes.contract_structure)
+        return dict(json.loads(self.attributes.contract_structure or "{}"))
 
     def _get_covered_contract_ids(self) -> list[str]:
         """Get list of covered contract IDs.
@@ -276,6 +278,7 @@ class CreditEnhancementCollateralContract(BaseContract):
         Returns:
             Total collateral value
         """
+        assert self.child_contract_observer is not None
         covering_ids = self._get_covering_contract_ids()
         total_value = 0.0
 
@@ -304,6 +307,7 @@ class CreditEnhancementCollateralContract(BaseContract):
         Returns:
             Total exposure amount
         """
+        assert self.child_contract_observer is not None
         covered_ids = self._get_covered_contract_ids()
         cege = self.attributes.credit_enhancement_guarantee_extent
         total_exposure = 0.0
@@ -349,7 +353,7 @@ class CreditEnhancementCollateralContract(BaseContract):
         """
         collateral_value = self._calculate_collateral_value(time)
         exposure = self._calculate_exposure(time)
-        coverage_ratio = float(self.attributes.coverage)
+        coverage_ratio = float(self.attributes.coverage or 0.0)
 
         required_collateral = coverage_ratio * exposure
         difference = collateral_value - required_collateral
@@ -377,7 +381,7 @@ class CreditEnhancementCollateralContract(BaseContract):
                     ContractEvent(
                         event_type=EventType.AD,
                         event_time=ad_time,
-                        payoff=0.0,
+                        payoff=jnp.array(0.0, dtype=jnp.float32),
                         currency=self.attributes.currency or "USD",
                     )
                 )
@@ -392,7 +396,7 @@ class CreditEnhancementCollateralContract(BaseContract):
                 ContractEvent(
                     event_type=EventType.TD,
                     event_time=self.attributes.termination_date,
-                    payoff=0.0,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
                     currency=self.attributes.currency or "USD",
                 )
             )
@@ -409,14 +413,15 @@ class CreditEnhancementCollateralContract(BaseContract):
             # Negative payoff = seize shortfall
             settlement_amount = min(
                 self._calculate_collateral_value(self.attributes.maturity_date),
-                self.attributes.coverage * self._calculate_exposure(self.attributes.maturity_date),
+                (self.attributes.coverage or 0.0)
+                * self._calculate_exposure(self.attributes.maturity_date),
             )
 
             events.append(
                 ContractEvent(
                     event_type=EventType.STD,
                     event_time=self.attributes.maturity_date,
-                    payoff=settlement_amount,
+                    payoff=jnp.array(settlement_amount, dtype=jnp.float32),
                     currency=self.attributes.currency or "USD",
                 )
             )
@@ -425,7 +430,7 @@ class CreditEnhancementCollateralContract(BaseContract):
                 ContractEvent(
                     event_type=EventType.MD,
                     event_time=self.attributes.maturity_date,
-                    payoff=0.0,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
                     currency=self.attributes.currency or "USD",
                 )
             )
@@ -451,7 +456,7 @@ class CreditEnhancementCollateralContract(BaseContract):
         # Calculate initial collateral value and exposure
         collateral_value = self._calculate_collateral_value(self.attributes.status_date)
         exposure = self._calculate_exposure(self.attributes.status_date)
-        coverage_ratio = float(self.attributes.coverage)
+        coverage_ratio = float(self.attributes.coverage or 0.0)
 
         # Nt = min(collateral_value, CECV × exposure)
         required_collateral = coverage_ratio * exposure
@@ -494,24 +499,25 @@ class CreditEnhancementCollateralContract(BaseContract):
         """
         return CECStateTransitionFunction()
 
-    def _get_child_dcc(self, child_id: str):
+    def _get_child_dcc(self, child_id: str) -> DayCountConvention:
         """Get day count convention for a child contract."""
-        try:
-            child_attrs = self.child_contract_observer._attributes.get(child_id)
-            if child_attrs and child_attrs.day_count_convention:
-                return child_attrs.day_count_convention
-        except (AttributeError, KeyError):
-            pass
-        from jactus.core.types import DayCountConvention
+        if isinstance(self.child_contract_observer, SimulatedChildContractObserver):
+            try:
+                child_attrs = self.child_contract_observer._attributes.get(child_id)
+                if child_attrs and child_attrs.day_count_convention:
+                    return child_attrs.day_count_convention
+            except (AttributeError, KeyError):
+                pass
         return DayCountConvention.A365
 
     def _calculate_coverage_with_accrual(self, time: ActusDateTime) -> float:
         """Calculate coverage amount with proper accrued interest for NI mode."""
         from jactus.utilities.conventions import year_fraction
 
+        assert self.child_contract_observer is not None
         covered_ids = self._get_covered_contract_ids()
         cege = self.attributes.credit_enhancement_guarantee_extent
-        coverage_ratio = float(self.attributes.coverage)
+        coverage_ratio = float(self.attributes.coverage or 0.0)
         total = 0.0
 
         for cid in covered_ids:
@@ -539,25 +545,36 @@ class CreditEnhancementCollateralContract(BaseContract):
         For COM-backed collateral, queries market price * quantity.
         For other types, uses the child's notional.
         """
+        assert self.child_contract_observer is not None
         covering_ids = self._get_covering_contract_ids()
         total = 0.0
 
         for cid in covering_ids:
-            try:
-                child_attrs = self.child_contract_observer._attributes.get(cid)
-            except (AttributeError, KeyError):
-                child_attrs = None
+            child_attrs: ContractAttributes | None = None
+            if isinstance(self.child_contract_observer, SimulatedChildContractObserver):
+                try:
+                    child_attrs = self.child_contract_observer._attributes.get(cid)
+                except (AttributeError, KeyError):
+                    child_attrs = None
 
             # For COM contracts, get market value = quantity * market_price
-            ct_val = getattr(getattr(child_attrs, "contract_type", None), "value", str(getattr(child_attrs, "contract_type", ""))) if child_attrs else ""
+            ct_val = (
+                getattr(
+                    getattr(child_attrs, "contract_type", None),
+                    "value",
+                    str(getattr(child_attrs, "contract_type", "")),
+                )
+                if child_attrs
+                else ""
+            )
             if child_attrs and ct_val == "COM":
                 moc = getattr(child_attrs, "market_object_code", None)
                 qty = float(getattr(child_attrs, "quantity", 1) or 1)
                 if moc:
                     try:
-                        price = float(self.risk_factor_observer.observe_risk_factor(
-                            moc, time, None, None
-                        ))
+                        price = float(
+                            self.risk_factor_observer.observe_risk_factor(moc, time, None, None)
+                        )
                         total += abs(qty * price)
                         continue
                     except Exception:
@@ -575,24 +592,27 @@ class CreditEnhancementCollateralContract(BaseContract):
     def _adjust_business_day(self, time: ActusDateTime) -> ActusDateTime:
         """Adjust date to next business day if on weekend."""
         from jactus.core.types import Calendar
+
         calendar = self.attributes.calendar
         if calendar in (Calendar.NO_CALENDAR, None):
             return time
         dt = time.to_datetime()
         while dt.weekday() >= 5:
             from datetime import timedelta
+
             dt += timedelta(days=1)
         return ActusDateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
 
     def _compute_settlement_time(self, xd_time: ActusDateTime) -> ActusDateTime:
         """Compute settlement time from exercise time + settlement period."""
         import re
+
         sp = self.attributes.settlement_period
         if not sp:
             return self._adjust_business_day(xd_time)
         sp_str = sp[1:] if sp.startswith("P") else sp
         if "L" in sp_str:
-            sp_str = sp_str[:sp_str.index("L")]
+            sp_str = sp_str[: sp_str.index("L")]
         m = re.match(r"(\d+)([DWMY])", sp_str)
         if not m:
             return self._adjust_business_day(xd_time)
@@ -600,6 +620,7 @@ class CreditEnhancementCollateralContract(BaseContract):
         if n == 0:
             return self._adjust_business_day(xd_time)
         from dateutil.relativedelta import relativedelta
+
         xd_py = xd_time.to_datetime()
         delta_map = {
             "D": relativedelta(days=n),
@@ -608,7 +629,9 @@ class CreditEnhancementCollateralContract(BaseContract):
             "Y": relativedelta(years=n),
         }
         std_py = xd_py + delta_map.get(unit, relativedelta())
-        result = ActusDateTime(std_py.year, std_py.month, std_py.day, std_py.hour, std_py.minute, std_py.second)
+        result = ActusDateTime(
+            std_py.year, std_py.month, std_py.day, std_py.hour, std_py.minute, std_py.second
+        )
         return self._adjust_business_day(result)
 
     def simulate(
@@ -621,6 +644,7 @@ class CreditEnhancementCollateralContract(BaseContract):
         Generates XD, STD, and MD events based on covered/covering contract
         states and credit events observed through the child observer.
         """
+        assert self.child_contract_observer is not None
         role_sign = self.attributes.contract_role.get_sign()
         currency = self.attributes.currency or "USD"
         events: list[ContractEvent] = []
@@ -628,7 +652,9 @@ class CreditEnhancementCollateralContract(BaseContract):
 
         # Determine effective maturity from covered children
         effective_maturity = self.attributes.maturity_date
-        if effective_maturity is None:
+        if effective_maturity is None and isinstance(
+            self.child_contract_observer, SimulatedChildContractObserver
+        ):
             for cid in covered_ids:
                 try:
                     child_attrs = self.child_contract_observer._attributes.get(cid)
@@ -642,16 +668,17 @@ class CreditEnhancementCollateralContract(BaseContract):
         # Calculate coverage at a time when children are funded
         coverage_time = self.attributes.purchase_date or self.attributes.status_date
         # For CNT children whose IED > status_date, try using IED
-        for cid in covered_ids:
-            try:
-                child_attrs = self.child_contract_observer._attributes.get(cid)
-                if child_attrs and child_attrs.initial_exchange_date:
-                    ied = child_attrs.initial_exchange_date
-                    if ied > coverage_time:
-                        coverage_time = ied
-                    break
-            except (AttributeError, KeyError):
-                pass
+        if isinstance(self.child_contract_observer, SimulatedChildContractObserver):
+            for cid in covered_ids:
+                try:
+                    child_attrs = self.child_contract_observer._attributes.get(cid)
+                    if child_attrs and child_attrs.initial_exchange_date:
+                        ied = child_attrs.initial_exchange_date
+                        if ied > coverage_time:
+                            coverage_time = ied
+                        break
+                except (AttributeError, KeyError):
+                    pass
 
         coverage_amount = self._calculate_coverage_with_accrual(coverage_time)
         current_nt = role_sign * coverage_amount
@@ -688,9 +715,9 @@ class CreditEnhancementCollateralContract(BaseContract):
                 continue
             for ce in child_events:
                 if ce.event_type == EventType.CE and ce.state_post is not None:
-                    prf_match = (
-                        str(ce.state_post.prf) == target_perf
-                        or (hasattr(ce.state_post.prf, "value") and ce.state_post.prf.value == target_perf)
+                    prf_match = str(ce.state_post.prf) == target_perf or (
+                        hasattr(ce.state_post.prf, "value")
+                        and ce.state_post.prf.value == target_perf
                     )
                     if not prf_match:
                         continue
@@ -710,42 +737,48 @@ class CreditEnhancementCollateralContract(BaseContract):
 
             xd_nt = role_sign * ce_coverage
             xd_state = _make_state(ce_time, xd_nt)
-            events.append(ContractEvent(
-                event_type=EventType.XD,
-                event_time=ce_time,
-                payoff=jnp.array(0.0, dtype=jnp.float32),
-                currency=currency,
-                state_pre=xd_state,
-                state_post=xd_state,
-            ))
+            events.append(
+                ContractEvent(
+                    event_type=EventType.XD,
+                    event_time=ce_time,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
+                    currency=currency,
+                    state_pre=xd_state,
+                    state_post=xd_state,
+                )
+            )
 
             std_time = self._compute_settlement_time(ce_time)
             std_payoff = role_sign * exercise_amount
             std_state = _make_state(std_time, 0.0)
-            events.append(ContractEvent(
-                event_type=EventType.STD,
-                event_time=std_time,
-                payoff=jnp.array(std_payoff, dtype=jnp.float32),
-                currency=currency,
-                state_pre=xd_state,
-                state_post=std_state,
-            ))
+            events.append(
+                ContractEvent(
+                    event_type=EventType.STD,
+                    event_time=std_time,
+                    payoff=jnp.array(std_payoff, dtype=jnp.float32),
+                    currency=currency,
+                    state_pre=xd_state,
+                    state_post=std_state,
+                )
+            )
 
         # MD event at effective maturity (if not exercised)
         if effective_maturity and not exercised:
             md_state = _make_state(effective_maturity, 0.0)
-            events.append(ContractEvent(
-                event_type=EventType.MD,
-                event_time=effective_maturity,
-                payoff=jnp.array(0.0, dtype=jnp.float32),
-                currency=currency,
-                state_pre=_make_state(effective_maturity, current_nt),
-                state_post=md_state,
-            ))
+            events.append(
+                ContractEvent(
+                    event_type=EventType.MD,
+                    event_time=effective_maturity,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
+                    currency=currency,
+                    state_pre=_make_state(effective_maturity, current_nt),
+                    state_post=md_state,
+                )
+            )
 
-        events.sort(key=lambda e: (
-            e.event_time.year, e.event_time.month, e.event_time.day, e.sequence
-        ))
+        events.sort(
+            key=lambda e: (e.event_time.year, e.event_time.month, e.event_time.day, e.sequence)
+        )
 
         initial_state = _make_state(self.attributes.status_date, current_nt)
         states = [e.state_post for e in events if e.state_post is not None]

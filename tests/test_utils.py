@@ -84,8 +84,7 @@ def assert_cashflows_valid(cashflows: dict[str, Any], msg: str | None = None) ->
     # Check shapes match
     if len(times) != len(amounts):
         error_msg = msg or (
-            f"Length mismatch: times has {len(times)} elements, "
-            f"amounts has {len(amounts)} elements"
+            f"Length mismatch: times has {len(times)} elements, amounts has {len(amounts)} elements"
         )
         raise AssertionError(error_msg)
 

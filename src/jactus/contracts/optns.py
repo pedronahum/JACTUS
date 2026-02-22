@@ -266,7 +266,7 @@ class OptionPayoffFunction(BasePayoffFunction):
         Returns:
             Exercise amount (0 if not exercised)
         """
-        xa = float(state.xa) if hasattr(state, "xa") else 0.0
+        xa = float(state.xa) if state.xa is not None else 0.0
         role_sign = contract_role_sign(attributes.contract_role)
 
         return jnp.array(role_sign * xa, dtype=jnp.float32)
@@ -321,7 +321,7 @@ class OptionStateTransitionFunction(BaseStateTransitionFunction):
         event = ContractEvent(
             event_type=event_type,
             event_time=time,
-            payoff=0.0,
+            payoff=jnp.array(0.0, dtype=jnp.float32),
             currency=attributes.currency,
             sequence=0,
         )
@@ -368,6 +368,8 @@ class OptionStateTransitionFunction(BaseStateTransitionFunction):
         strike_1 = attributes.option_strike_1
         strike_2 = attributes.option_strike_2
 
+        assert option_type is not None
+        assert strike_1 is not None
         intrinsic = calculate_intrinsic_value(option_type, float(spot_price), strike_1, strike_2)
 
         # Update state with exercise amount
@@ -539,19 +541,20 @@ class OptionContract(BaseContract):
 
         # Pre-exercised: only generate STD at exercise_date + settlement period
         if self._is_pre_exercised():
+            assert self.attributes.exercise_date is not None
             settlement_date = self._apply_settlement_period(self.attributes.exercise_date)
             events.append(
                 ContractEvent(
                     event_type=EventType.STD,
                     event_time=settlement_date,
-                    payoff=0.0,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
                     currency=self.attributes.currency,
                     sequence=0,
                 )
             )
             return EventSchedule(
                 contract_id=self.attributes.contract_id,
-                events=events,
+                events=tuple(events),
             )
 
         # Analysis dates (if specified)
@@ -561,7 +564,7 @@ class OptionContract(BaseContract):
                     ContractEvent(
                         event_type=EventType.AD,
                         event_time=ad_time,
-                        payoff=0.0,
+                        payoff=jnp.array(0.0, dtype=jnp.float32),
                         currency=self.attributes.currency,
                         sequence=0,
                     )
@@ -573,7 +576,7 @@ class OptionContract(BaseContract):
                 ContractEvent(
                     event_type=EventType.PRD,
                     event_time=self.attributes.purchase_date,
-                    payoff=0.0,  # Calculated by payoff function
+                    payoff=jnp.array(0.0, dtype=jnp.float32),  # Calculated by payoff function
                     currency=self.attributes.currency,
                     sequence=1,
                 )
@@ -585,13 +588,14 @@ class OptionContract(BaseContract):
                 ContractEvent(
                     event_type=EventType.TD,
                     event_time=self.attributes.termination_date,
-                    payoff=0.0,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
                     currency=self.attributes.currency,
                     sequence=2,
                 )
             )
 
         # Exercise dates (XD) depend on exercise type
+        assert self.attributes.maturity_date is not None
         if self.attributes.option_exercise_type == "E":
             # European: single XD at maturity date (after MD)
             events.append(
@@ -641,7 +645,7 @@ class OptionContract(BaseContract):
             ContractEvent(
                 event_type=EventType.MD,
                 event_time=self.attributes.maturity_date,
-                payoff=0.0,
+                payoff=jnp.array(0.0, dtype=jnp.float32),
                 currency=self.attributes.currency,
                 sequence=3,
             )
@@ -654,7 +658,7 @@ class OptionContract(BaseContract):
             ContractEvent(
                 event_type=EventType.STD,
                 event_time=settlement_date,
-                payoff=0.0,
+                payoff=jnp.array(0.0, dtype=jnp.float32),
                 currency=self.attributes.currency,
                 sequence=5,
             )
@@ -665,7 +669,7 @@ class OptionContract(BaseContract):
 
         return EventSchedule(
             contract_id=self.attributes.contract_id,
-            events=events,
+            events=tuple(events),
         )
 
     def _apply_settlement_period(self, base_date: ActusDateTime) -> ActusDateTime:
@@ -696,12 +700,16 @@ class OptionContract(BaseContract):
             from dateutil.relativedelta import relativedelta
 
             py_dt = base_date.to_datetime() + relativedelta(months=mult)
-            return ActusDateTime(py_dt.year, py_dt.month, py_dt.day, py_dt.hour, py_dt.minute, py_dt.second)
+            return ActusDateTime(
+                py_dt.year, py_dt.month, py_dt.day, py_dt.hour, py_dt.minute, py_dt.second
+            )
         else:
             delta = timedelta(days=mult)
 
         py_dt = base_date.to_datetime() + delta
-        return ActusDateTime(py_dt.year, py_dt.month, py_dt.day, py_dt.hour, py_dt.minute, py_dt.second)
+        return ActusDateTime(
+            py_dt.year, py_dt.month, py_dt.day, py_dt.hour, py_dt.minute, py_dt.second
+        )
 
     def _apply_bdc(self, date: ActusDateTime) -> ActusDateTime:
         """Apply business day convention adjustment to a date."""
@@ -732,6 +740,7 @@ class OptionContract(BaseContract):
         # Pre-exercised: xa is the known exercise amount
         xa = self.attributes.exercise_amount if self._is_pre_exercised() else 0.0
 
+        assert self.attributes.maturity_date is not None
         return ContractState(
             sd=self.attributes.status_date,
             tmd=self.attributes.maturity_date,

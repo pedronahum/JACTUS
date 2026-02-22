@@ -156,10 +156,12 @@ class ContractState:
             >>> data = {'tmd': '2029-01-15T00:00:00', 'nt': 100000.0, ...}
             >>> state = ContractState.from_dict(data)
         """
+        tmd = ActusDateTime.from_iso(data["tmd"]) if data.get("tmd") else ActusDateTime(1970, 1, 1)
+        sd = ActusDateTime.from_iso(data["sd"]) if data.get("sd") else ActusDateTime(1970, 1, 1)
         return cls(
             # Dates
-            tmd=ActusDateTime.from_iso(data["tmd"]) if data.get("tmd") else None,
-            sd=ActusDateTime.from_iso(data["sd"]) if data.get("sd") else None,
+            tmd=tmd,
+            sd=sd,
             xd=ActusDateTime.from_iso(data["xd"]) if data.get("xd") else None,
             # Numerical values (convert to JAX arrays)
             nt=jnp.array(data["nt"]) if data.get("nt") is not None else jnp.array(0.0),
@@ -265,7 +267,7 @@ def initialize_state(
 
 
 # Register ContractState as a JAX pytree
-def _state_flatten(state: ContractState) -> tuple[tuple, dict]:
+def _state_flatten(state: ContractState) -> tuple[tuple[Any, ...], dict[str, Any]]:
     """Flatten ContractState for JAX pytree registration.
 
     Separates JAX arrays (children) from non-array data (auxiliary).
@@ -296,7 +298,7 @@ def _state_flatten(state: ContractState) -> tuple[tuple, dict]:
     return (tuple(arrays), aux)
 
 
-def _state_unflatten(aux: dict, arrays: tuple) -> ContractState:
+def _state_unflatten(aux: dict[str, Any], arrays: tuple[Any, ...]) -> ContractState:
     """Unflatten ContractState for JAX pytree registration."""
     return ContractState(
         tmd=aux["tmd"],
@@ -318,7 +320,7 @@ def _state_unflatten(aux: dict, arrays: tuple) -> ContractState:
 
 
 # Register with JAX
-jax.tree_util.register_pytree_node(
+jax.tree_util.register_pytree_node(  # type: ignore[type-var]
     ContractState,
     _state_flatten,
     _state_unflatten,

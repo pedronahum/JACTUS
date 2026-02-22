@@ -6,8 +6,6 @@ and validates JACTUS simulation results against the expected outputs.
 
 from __future__ import annotations
 
-import pytest
-
 from .runner import run_single_test
 
 

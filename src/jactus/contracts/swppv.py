@@ -53,9 +53,10 @@ from jactus.core import (
     EventSchedule,
     EventType,
 )
+from jactus.core.types import DayCountConvention
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.observers import RiskFactorObserver
-from jactus.utilities.conventions import DayCountConvention, year_fraction
+from jactus.utilities import year_fraction
 from jactus.utilities.schedules import generate_schedule
 
 
@@ -205,7 +206,9 @@ class PlainVanillaSwapPayoffFunction(BasePayoffFunction):
         net_accrual = total_ipac1 - total_ipac2
 
         # Contract role sign: RPA receives fixed leg, RPL pays it
-        role_sign = 1.0 if attributes.contract_role in (ContractRole.RPA, ContractRole.RFL) else -1.0
+        role_sign = (
+            1.0 if attributes.contract_role in (ContractRole.RPA, ContractRole.RFL) else -1.0
+        )
 
         return jnp.array(role_sign * net_accrual, dtype=jnp.float32)
 
@@ -332,7 +335,7 @@ class PlainVanillaSwapStateTransitionFunction(BaseStateTransitionFunction):
         event = ContractEvent(
             event_type=event_type,
             event_time=time,
-            payoff=0.0,
+            payoff=jnp.array(0.0, dtype=jnp.float32),
             currency=attributes.currency or "USD",
         )
 
@@ -420,9 +423,7 @@ class PlainVanillaSwapStateTransitionFunction(BaseStateTransitionFunction):
 
         Accrue interest for both fixed and floating legs.
         """
-        new_ipac1, new_ipac2, new_ipac = self._accrue_legs(
-            state, event.event_time, attributes
-        )
+        new_ipac1, new_ipac2, new_ipac = self._accrue_legs(state, event.event_time, attributes)
 
         return ContractState(
             tmd=state.tmd,
@@ -476,9 +477,7 @@ class PlainVanillaSwapStateTransitionFunction(BaseStateTransitionFunction):
 
         Accrue interest from status date to purchase date.
         """
-        new_ipac1, new_ipac2, new_ipac = self._accrue_legs(
-            state, event.event_time, attributes
-        )
+        new_ipac1, new_ipac2, new_ipac = self._accrue_legs(state, event.event_time, attributes)
         return ContractState(
             tmd=state.tmd,
             sd=event.event_time,
@@ -636,12 +635,14 @@ class PlainVanillaSwapStateTransitionFunction(BaseStateTransitionFunction):
             Ipnr_t = min(max(RRMLT * O_rf(RRMO, t) + RRSP, RRLF), RRLC)
         """
         # First accrue both legs up to reset time using old rates
-        new_ipac1, new_ipac2, new_ipac = self._accrue_legs(
-            state, event.event_time, attributes
-        )
+        new_ipac1, new_ipac2, new_ipac = self._accrue_legs(state, event.event_time, attributes)
 
         # Get rate reset parameters
-        rrmlt = attributes.rate_reset_multiplier if attributes.rate_reset_multiplier is not None else 1.0
+        rrmlt = (
+            attributes.rate_reset_multiplier
+            if attributes.rate_reset_multiplier is not None
+            else 1.0
+        )
         rrsp = attributes.rate_reset_spread if attributes.rate_reset_spread is not None else 0.0
         rrmo = attributes.rate_reset_market_object or ""
 
@@ -794,7 +795,7 @@ class PlainVanillaSwapContract(BaseContract):
                 ContractEvent(
                     event_type=EventType.IED,
                     event_time=self.attributes.initial_exchange_date,
-                    payoff=0.0,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
                     currency=ccy,
                 )
             )
@@ -814,7 +815,7 @@ class PlainVanillaSwapContract(BaseContract):
                     ContractEvent(
                         event_type=EventType.RR,
                         event_time=rr_time,
-                        payoff=0.0,
+                        payoff=jnp.array(0.0, dtype=jnp.float32),
                         currency=ccy,
                     )
                 )
@@ -826,7 +827,7 @@ class PlainVanillaSwapContract(BaseContract):
                     ContractEvent(
                         event_type=EventType.RR,
                         event_time=rr_anchor,
-                        payoff=0.0,
+                        payoff=jnp.array(0.0, dtype=jnp.float32),
                         currency=ccy,
                     )
                 )
@@ -856,7 +857,7 @@ class PlainVanillaSwapContract(BaseContract):
                         ContractEvent(
                             event_type=EventType.IPFX,
                             event_time=ip_time,
-                            payoff=0.0,
+                            payoff=jnp.array(0.0, dtype=jnp.float32),
                             currency=ccy,
                         )
                     )
@@ -864,7 +865,7 @@ class PlainVanillaSwapContract(BaseContract):
                         ContractEvent(
                             event_type=EventType.IPFL,
                             event_time=ip_time,
-                            payoff=0.0,
+                            payoff=jnp.array(0.0, dtype=jnp.float32),
                             currency=ccy,
                         )
                     )
@@ -873,7 +874,7 @@ class PlainVanillaSwapContract(BaseContract):
                         ContractEvent(
                             event_type=EventType.IP,
                             event_time=ip_time,
-                            payoff=0.0,
+                            payoff=jnp.array(0.0, dtype=jnp.float32),
                             currency=ccy,
                         )
                     )
@@ -884,7 +885,7 @@ class PlainVanillaSwapContract(BaseContract):
                 ContractEvent(
                     event_type=EventType.PRD,
                     event_time=self.attributes.purchase_date,
-                    payoff=0.0,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
                     currency=ccy,
                 )
             )
@@ -895,7 +896,7 @@ class PlainVanillaSwapContract(BaseContract):
                 ContractEvent(
                     event_type=EventType.MD,
                     event_time=maturity,
-                    payoff=0.0,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
                     currency=ccy,
                 )
             )
@@ -907,7 +908,7 @@ class PlainVanillaSwapContract(BaseContract):
                     ContractEvent(
                         event_type=EventType.AD,
                         event_time=ad_time,
-                        payoff=0.0,
+                        payoff=jnp.array(0.0, dtype=jnp.float32),
                         currency=ccy,
                     )
                 )
@@ -918,16 +919,18 @@ class PlainVanillaSwapContract(BaseContract):
                 ContractEvent(
                     event_type=EventType.TD,
                     event_time=self.attributes.termination_date,
-                    payoff=0.0,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
                     currency=ccy,
                 )
             )
 
         # Sort by date, then by event type ordering (IP/IPFX/IPFL before RR)
-        events.sort(key=lambda e: (
-            e.event_time.to_iso()[:10],
-            self._EVENT_ORDER.get(e.event_type, 99),
-        ))
+        events.sort(
+            key=lambda e: (
+                e.event_time.to_iso()[:10],
+                self._EVENT_ORDER.get(e.event_type, 99),
+            )
+        )
 
         return EventSchedule(
             contract_id=self.attributes.contract_id,
@@ -997,10 +1000,7 @@ class PlainVanillaSwapContract(BaseContract):
         # Filter events: keep only PRD onwards when purchaseDate is set
         if self.attributes.purchase_date:
             purchase_iso = self.attributes.purchase_date.to_iso()
-            filtered = [
-                e for e in result.events
-                if e.event_time.to_iso() >= purchase_iso
-            ]
+            filtered = [e for e in result.events if e.event_time.to_iso() >= purchase_iso]
             result = SimulationHistory(
                 events=filtered,
                 states=result.states,
@@ -1011,10 +1011,7 @@ class PlainVanillaSwapContract(BaseContract):
         # Filter events: keep only up to and including TD when terminationDate is set
         if self.attributes.termination_date:
             td_iso = self.attributes.termination_date.to_iso()[:10]
-            filtered = [
-                e for e in result.events
-                if e.event_time.to_iso()[:10] <= td_iso
-            ]
+            filtered = [e for e in result.events if e.event_time.to_iso()[:10] <= td_iso]
             result = SimulationHistory(
                 events=filtered,
                 states=result.states,

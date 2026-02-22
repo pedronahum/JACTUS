@@ -804,7 +804,8 @@ class TestLinearAmortizerContract:
 
         # Check that interest payments exist and decrease (NTIED tracks NT per ACTUS spec)
         ip_events = [
-            e for e in result.events
+            e
+            for e in result.events
             if e.event_type == EventType.IP and e.event_time != attrs.initial_exchange_date
         ]
         assert len(ip_events) >= 3

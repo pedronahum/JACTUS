@@ -114,11 +114,13 @@ class ContractReference:
             >>> ref = ContractReference.from_dict(data)
         """
         # Try to convert to enums, fall back to strings
+        contract_type: ContractType | str
         try:
             contract_type = ContractType(data["type"])
         except (KeyError, ValueError):
             contract_type = data.get("type", "")
 
+        contract_role: ContractRole | str
         try:
             contract_role = ContractRole(data["role"])
         except (KeyError, ValueError):
@@ -171,11 +173,13 @@ def parse_ctst(ctst: str | None) -> list[ContractReference]:
         object_id, type_str, role_str = parts
 
         # Try to convert to enums
+        contract_type: ContractType | str
         try:
             contract_type = ContractType(type_str.strip())
         except ValueError:
             contract_type = type_str.strip()
 
+        contract_role: ContractRole | str
         try:
             contract_role = ContractRole(role_str.strip())
         except ValueError:

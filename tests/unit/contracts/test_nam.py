@@ -422,10 +422,7 @@ class TestNegativeAmortizerContract:
         assert len(pr_events) == 5
         # IP events include IED (payoff=0) and all cycle dates up to MD
         # Filter out IP at IED for count check
-        ip_after_ied = [
-            e for e in ip_events
-            if e.event_time != attrs.initial_exchange_date
-        ]
+        ip_after_ied = [e for e in ip_events if e.event_time != attrs.initial_exchange_date]
         assert len(ip_after_ied) >= 4  # At least one IP per year
 
     def test_simulate_with_negative_amortization(self):

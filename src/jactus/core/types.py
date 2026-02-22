@@ -54,16 +54,14 @@ class EventType(str, Enum):
     IPFL = "IPFL"  # Interest Payment Floating Leg (swaps)
 
     @property
-    def index(self) -> int:
+    def index(self) -> int:  # type: ignore[override]
         """Integer index for this event type (for dispatch tables and future jax.lax.switch)."""
         return _EVENT_TYPE_INDEX[self]
 
 
 # Stable integer mapping for EventType → int (used by dispatch tables).
 # Order matches the enum definition. Adding new event types must append to the end.
-_EVENT_TYPE_INDEX: dict["EventType", int] = {
-    member: i for i, member in enumerate(EventType)
-}
+_EVENT_TYPE_INDEX: dict["EventType", int] = {member: i for i, member in enumerate(EventType)}
 
 # Total number of event types (used to size dispatch tables)
 NUM_EVENT_TYPES: int = len(_EVENT_TYPE_INDEX)

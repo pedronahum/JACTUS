@@ -17,7 +17,6 @@ from jactus.core import (
     ActusDateTime,
     ContractAttributes,
     ContractRole,
-    ContractState,
     ContractType,
     DayCountConvention,
 )
@@ -43,7 +42,6 @@ class TestSchedulePerformance:
 
     def test_100_monthly_schedules_parallel(self):
         """Generate 100 schedules in under 150ms total."""
-        start = ActusDateTime(2024, 1, 1, 0, 0, 0)
         end = ActusDateTime(2029, 1, 1, 0, 0, 0)
 
         start_time = time.perf_counter()
@@ -283,7 +281,7 @@ class TestContractSimulationPerformance:
         results = [c.simulate() for c in contracts]
         elapsed = (time.perf_counter() - start_time) * 1000
 
-        print(f"\n100 CSH contracts simulated in {elapsed:.2f}ms ({elapsed/100:.2f}ms avg)")
+        print(f"\n100 CSH contracts simulated in {elapsed:.2f}ms ({elapsed / 100:.2f}ms avg)")
         assert len(results) == 100
         assert all(r is not None for r in results)
         assert elapsed < 500, f"Too slow: {elapsed:.2f}ms > 500ms"
@@ -303,11 +301,11 @@ class TestContractSimulationPerformance:
             )
 
             rf_obs = ConstantRiskFactorObserver(constant_value=0.0)
-            contract = create_contract(attrs, rf_obs)
+            _contract = create_contract(attrs, rf_obs)
 
         elapsed = (time.perf_counter() - start_time) * 1000
 
-        print(f"\n100 contract creations in {elapsed:.2f}ms ({elapsed/100:.2f}ms avg)")
+        print(f"\n100 contract creations in {elapsed:.2f}ms ({elapsed / 100:.2f}ms avg)")
         assert elapsed < 100, f"Too slow: {elapsed:.2f}ms > 100ms"
 
 
@@ -324,7 +322,7 @@ class TestJAXContractPerformance:
             _ = observer.get(0) + observer.get(1) + observer.get(2)
         elapsed = (time.perf_counter() - start_time) * 1000
 
-        print(f"\n1000 JAX observer accesses in {elapsed:.2f}ms ({elapsed/1000:.3f}ms avg)")
+        print(f"\n1000 JAX observer accesses in {elapsed:.2f}ms ({elapsed / 1000:.3f}ms avg)")
         # Allow 500ms for 1000 accesses (0.5ms per access)
         assert elapsed < 500, f"Too slow: {elapsed:.2f}ms > 500ms"
 

@@ -62,10 +62,15 @@ from jactus.core import (
     EventType,
     FeeBasis,
 )
-from jactus.core.types import BusinessDayConvention, Calendar, EndOfMonthConvention, EVENT_SCHEDULE_PRIORITY
+from jactus.core.time import adjust_to_business_day
+from jactus.core.types import (
+    EVENT_SCHEDULE_PRIORITY,
+    BusinessDayConvention,
+    Calendar,
+    EndOfMonthConvention,
+)
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.observers import ChildContractObserver, RiskFactorObserver
-from jactus.core.time import adjust_to_business_day
 from jactus.utilities import contract_role_sign, generate_schedule, year_fraction
 
 
@@ -147,7 +152,7 @@ class PAMPayoffFunction(BasePayoffFunction):
         """
         handler = self._build_dispatch_table().get(event_type)
         if handler is not None:
-            return handler(state, attributes, time, risk_factor_observer)
+            return handler(state, attributes, time, risk_factor_observer)  # type: ignore[no-any-return]
         # Unknown event type - return 0
         return jnp.array(0.0, dtype=jnp.float32)
 
@@ -242,7 +247,7 @@ class PAMPayoffFunction(BasePayoffFunction):
         """
         # Observe prepayment amount from risk factor observer
         try:
-            pp_amount = risk_factor_observer._get_event_data(
+            pp_amount = risk_factor_observer.observe_event(
                 attributes.contract_id or "",
                 EventType.PP,
                 time,
@@ -274,13 +279,12 @@ class PAMPayoffFunction(BasePayoffFunction):
 
         if pytp == "A":
             return jnp.array(pyrt, dtype=jnp.float32)
-        elif pytp == "N" or pytp == "I":
+        if pytp == "N" or pytp == "I":
             dcc = attributes.day_count_convention or DayCountConvention.A360
             yf = year_fraction(state.sd, time, dcc)
             nt = float(state.nt)
             return jnp.array(yf * nt * pyrt, dtype=jnp.float32)
-        else:
-            return jnp.array(0.0, dtype=jnp.float32)
+        return jnp.array(0.0, dtype=jnp.float32)
 
     def _pof_fp(
         self,
@@ -302,15 +306,14 @@ class PAMPayoffFunction(BasePayoffFunction):
 
         if feb == FeeBasis.A:
             return jnp.array(fer, dtype=jnp.float32)
-        elif feb == FeeBasis.N:
+        if feb == FeeBasis.N:
             dcc = attributes.day_count_convention or DayCountConvention.A360
             yf = year_fraction(state.sd, time, dcc)
             nt = float(state.nt)
             feac = float(state.feac)
             return jnp.array(yf * nt * fer + feac, dtype=jnp.float32)
-        else:
-            feac = float(state.feac)
-            return jnp.array(feac, dtype=jnp.float32)
+        feac = float(state.feac)
+        return jnp.array(feac, dtype=jnp.float32)
 
     def _pof_prd(
         self,
@@ -530,7 +533,7 @@ class PAMStateTransitionFunction(BaseStateTransitionFunction):
         """
         handler = self._build_dispatch_table().get(event_type)
         if handler is not None:
-            return handler(state_pre, attributes, time, risk_factor_observer)
+            return handler(state_pre, attributes, time, risk_factor_observer)  # type: ignore[no-any-return]
         # Unknown event type - return unchanged state
         return state_pre
 
@@ -805,12 +808,16 @@ class PAMStateTransitionFunction(BaseStateTransitionFunction):
 
         # Observe new market rate
         market_object = attributes.rate_reset_market_object or ""
-        observed_rate = float(risk_factor_observer.observe_risk_factor(
-            market_object, time, state_pre, attributes
-        ))
+        observed_rate = float(
+            risk_factor_observer.observe_risk_factor(market_object, time, state_pre, attributes)
+        )
 
         # Apply rate multiplier and spread
-        multiplier = attributes.rate_reset_multiplier if attributes.rate_reset_multiplier is not None else 1.0
+        multiplier = (
+            attributes.rate_reset_multiplier
+            if attributes.rate_reset_multiplier is not None
+            else 1.0
+        )
         spread = attributes.rate_reset_spread if attributes.rate_reset_spread is not None else 0.0
         new_rate = multiplier * observed_rate + spread
 
@@ -852,7 +859,11 @@ class PAMStateTransitionFunction(BaseStateTransitionFunction):
         ipac = float(state_pre.ipac) + yf * float(state_pre.ipnr) * float(state_pre.nt)
 
         # Set rate to next predefined value
-        new_rate = attributes.rate_reset_next if attributes.rate_reset_next is not None else float(state_pre.ipnr)
+        new_rate = (
+            attributes.rate_reset_next
+            if attributes.rate_reset_next is not None
+            else float(state_pre.ipnr)
+        )
 
         return ContractState(
             sd=time,
@@ -980,7 +991,8 @@ class PrincipalAtMaturityContract(BaseContract):
         md = attrs.maturity_date
         sd = attrs.status_date
         currency = attrs.currency or "XXX"
-        assert ied is not None and md is not None
+        assert ied is not None
+        assert md is not None
 
         bdc = attrs.business_day_convention
         eomc = attrs.end_of_month_convention
@@ -990,21 +1002,27 @@ class PrincipalAtMaturityContract(BaseContract):
         # then shift event_time while preserving original date for calculations.
         # SC (Shift/Calculate) conventions: BDC applied during schedule generation.
         is_cs = bdc in (
-            BusinessDayConvention.CSF, BusinessDayConvention.CSMF,
-            BusinessDayConvention.CSP, BusinessDayConvention.CSMP,
+            BusinessDayConvention.CSF,
+            BusinessDayConvention.CSMF,
+            BusinessDayConvention.CSP,
+            BusinessDayConvention.CSMP,
         )
         sched_bdc = BusinessDayConvention.NULL if is_cs else (bdc or BusinessDayConvention.NULL)
 
-        def _sched(anchor, cycle, end):
+        def _sched(anchor: ActusDateTime, cycle: str, end: ActusDateTime) -> list[ActusDateTime]:
             """Generate schedule with EOMC/calendar from attributes."""
             return generate_schedule(
-                start=anchor, cycle=cycle, end=end,
+                start=anchor,
+                cycle=cycle,
+                end=end,
                 end_of_month_convention=eomc or EndOfMonthConvention.SD,
                 business_day_convention=sched_bdc,
                 calendar=cal or Calendar.NO_CALENDAR,
             )
 
-        def _add(etype, time, calc_time=None):
+        def _add(
+            etype: EventType, time: ActusDateTime, calc_time: ActusDateTime | None = None
+        ) -> None:
             """Add event. For CS conventions on cycle dates, shift time and set calc_time."""
             event_time = time
             event_calc_time = calc_time
@@ -1014,12 +1032,16 @@ class PrincipalAtMaturityContract(BaseContract):
                 if shifted != time:
                     event_calc_time = time
                     event_time = shifted
-            events.append(ContractEvent(
-                event_type=etype, event_time=event_time,
-                payoff=jnp.array(0.0, dtype=jnp.float32),
-                currency=currency, sequence=0,
-                calculation_time=event_calc_time,
-            ))
+            events.append(
+                ContractEvent(
+                    event_type=etype,
+                    event_time=event_time,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
+                    currency=currency,
+                    sequence=0,
+                    calculation_time=event_calc_time,
+                )
+            )
 
         # IED: only if IED >= SD
         if ied >= sd:
@@ -1102,11 +1124,14 @@ class PrincipalAtMaturityContract(BaseContract):
         # If PRD exists, remove IED and events before PRD
         if attrs.purchase_date:
             events = [
-                e for e in events
+                e
+                for e in events
                 if e.event_type != EventType.IED and e.event_time >= attrs.purchase_date
             ]
 
-        events.sort(key=lambda e: (e.event_time.to_iso(), EVENT_SCHEDULE_PRIORITY.get(e.event_type, 99)))
+        events.sort(
+            key=lambda e: (e.event_time.to_iso(), EVENT_SCHEDULE_PRIORITY.get(e.event_type, 99))
+        )
 
         # If TD exists, remove all events after TD (except TD itself)
         if attrs.termination_date:

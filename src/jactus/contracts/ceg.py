@@ -56,8 +56,10 @@ from jactus.core import (
     EventSchedule,
     EventType,
 )
+from jactus.core.types import DayCountConvention
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.observers import ChildContractObserver, RiskFactorObserver
+from jactus.observers.child_contract import SimulatedChildContractObserver
 from jactus.utilities.schedules import generate_schedule
 
 
@@ -197,7 +199,7 @@ class CreditEnhancementGuaranteeContract(BaseContract):
 
         # Default credit event type to "DF" (default) if not specified
         if attributes.credit_event_type is None:
-            attributes.credit_event_type = "DF"
+            attributes.credit_event_type = ContractPerformance("DF")
 
         # Default guarantee extent to "NO" (notional only) if not specified
         if attributes.credit_enhancement_guarantee_extent is None:
@@ -217,7 +219,7 @@ class CreditEnhancementGuaranteeContract(BaseContract):
         Returns:
             Dictionary with CoveredContract or CoveredContracts key
         """
-        return json.loads(self.attributes.contract_structure)
+        return dict(json.loads(self.attributes.contract_structure or "{}"))
 
     def _get_covered_contract_ids(self) -> list[str]:
         """Get list of covered contract IDs.
@@ -248,6 +250,7 @@ class CreditEnhancementGuaranteeContract(BaseContract):
         Returns:
             Total coverage amount
         """
+        assert self.child_contract_observer is not None
         covered_ids = self._get_covered_contract_ids()
         cege = self.attributes.credit_enhancement_guarantee_extent
         total_amount = 0.0
@@ -280,7 +283,7 @@ class CreditEnhancementGuaranteeContract(BaseContract):
             total_amount += abs(amount)  # Use absolute value for coverage
 
         # Apply coverage ratio
-        coverage_ratio = float(self.attributes.coverage)
+        coverage_ratio = float(self.attributes.coverage or 0.0)
         return coverage_ratio * total_amount
 
     def _detect_credit_event(self, time: ActusDateTime) -> bool:
@@ -292,6 +295,7 @@ class CreditEnhancementGuaranteeContract(BaseContract):
         Returns:
             True if credit event detected, False otherwise
         """
+        assert self.child_contract_observer is not None
         covered_ids = self._get_covered_contract_ids()
         target_performance = self.attributes.credit_event_type
 
@@ -331,7 +335,7 @@ class CreditEnhancementGuaranteeContract(BaseContract):
                     ContractEvent(
                         event_type=EventType.AD,
                         event_time=ad_time,
-                        payoff=0.0,
+                        payoff=jnp.array(0.0, dtype=jnp.float32),
                         currency=self.attributes.currency or "USD",
                     )
                 )
@@ -352,7 +356,7 @@ class CreditEnhancementGuaranteeContract(BaseContract):
                     ContractEvent(
                         event_type=EventType.FP,
                         event_time=self.attributes.maturity_date,
-                        payoff=fee_amount,
+                        payoff=jnp.array(fee_amount, dtype=jnp.float32),
                         currency=self.attributes.currency or "USD",
                     )
                 )
@@ -367,7 +371,7 @@ class CreditEnhancementGuaranteeContract(BaseContract):
                 ContractEvent(
                     event_type=EventType.TD,
                     event_time=self.attributes.termination_date,
-                    payoff=0.0,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
                     currency=self.attributes.currency or "USD",
                 )
             )
@@ -378,7 +382,7 @@ class CreditEnhancementGuaranteeContract(BaseContract):
                 ContractEvent(
                     event_type=EventType.MD,
                     event_time=self.attributes.maturity_date,
-                    payoff=0.0,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
                     currency=self.attributes.currency or "USD",
                 )
             )
@@ -451,10 +455,8 @@ class CreditEnhancementGuaranteeContract(BaseContract):
         Generates PRD, FP, XD, STD, and MD events based on covered contract
         states and credit events observed through the child observer.
         """
-        from datetime import timedelta
 
-        from jactus.utilities.conventions import year_fraction
-
+        assert self.child_contract_observer is not None
         role_sign = self.attributes.contract_role.get_sign()
         currency = self.attributes.currency or "USD"
         events: list[ContractEvent] = []
@@ -462,7 +464,9 @@ class CreditEnhancementGuaranteeContract(BaseContract):
 
         # Determine effective maturity (from attributes or inferred from children)
         effective_maturity = self.attributes.maturity_date
-        if effective_maturity is None:
+        if effective_maturity is None and isinstance(
+            self.child_contract_observer, SimulatedChildContractObserver
+        ):
             for cid in covered_ids:
                 try:
                     child_attrs = self.child_contract_observer._attributes.get(cid)
@@ -502,14 +506,16 @@ class CreditEnhancementGuaranteeContract(BaseContract):
             prd_time = self.attributes.purchase_date
             prd_payoff = -role_sign * (self.attributes.price_at_purchase_date or 0.0)
             prd_state = _make_state(prd_time, current_nt)
-            events.append(ContractEvent(
-                event_type=EventType.PRD,
-                event_time=prd_time,
-                payoff=jnp.array(prd_payoff, dtype=jnp.float32),
-                currency=currency,
-                state_pre=prd_state,
-                state_post=prd_state,
-            ))
+            events.append(
+                ContractEvent(
+                    event_type=EventType.PRD,
+                    event_time=prd_time,
+                    payoff=jnp.array(prd_payoff, dtype=jnp.float32),
+                    currency=currency,
+                    state_pre=prd_state,
+                    state_post=prd_state,
+                )
+            )
 
         # FP events from fee payment schedule
         if self.attributes.fee_payment_cycle and self.attributes.fee_rate is not None:
@@ -532,14 +538,16 @@ class CreditEnhancementGuaranteeContract(BaseContract):
                     fp_nt = current_nt
                 fp_state = _make_state(fp_time, fp_nt)
                 fp_payoff = role_sign * (self.attributes.fee_rate or 0.0)
-                events.append(ContractEvent(
-                    event_type=EventType.FP,
-                    event_time=fp_time,
-                    payoff=jnp.array(fp_payoff, dtype=jnp.float32),
-                    currency=currency,
-                    state_pre=fp_state,
-                    state_post=fp_state,
-                ))
+                events.append(
+                    ContractEvent(
+                        event_type=EventType.FP,
+                        event_time=fp_time,
+                        payoff=jnp.array(fp_payoff, dtype=jnp.float32),
+                        currency=currency,
+                        state_pre=fp_state,
+                        state_post=fp_state,
+                    )
+                )
 
         # Detect credit events from child observer
         target_perf = self.attributes.credit_event_type or "DF"
@@ -556,9 +564,9 @@ class CreditEnhancementGuaranteeContract(BaseContract):
             for ce in child_events:
                 if ce.event_type == EventType.CE and ce.state_post is not None:
                     # Check performance matches target
-                    prf_match = (
-                        str(ce.state_post.prf) == target_perf
-                        or (hasattr(ce.state_post.prf, "value") and ce.state_post.prf.value == target_perf)
+                    prf_match = str(ce.state_post.prf) == target_perf or (
+                        hasattr(ce.state_post.prf, "value")
+                        and ce.state_post.prf.value == target_perf
                     )
                     if not prf_match:
                         continue
@@ -576,14 +584,16 @@ class CreditEnhancementGuaranteeContract(BaseContract):
             exercised = True
             xd_nt = role_sign * exercise_amount
             xd_state = _make_state(ce_time, xd_nt)
-            events.append(ContractEvent(
-                event_type=EventType.XD,
-                event_time=ce_time,
-                payoff=jnp.array(0.0, dtype=jnp.float32),
-                currency=currency,
-                state_pre=xd_state,
-                state_post=xd_state,
-            ))
+            events.append(
+                ContractEvent(
+                    event_type=EventType.XD,
+                    event_time=ce_time,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
+                    currency=currency,
+                    state_pre=xd_state,
+                    state_post=xd_state,
+                )
+            )
 
             # STD time = XD + settlementPeriod (with business day adjustment)
             std_time = self._compute_settlement_time(ce_time)
@@ -600,39 +610,43 @@ class CreditEnhancementGuaranteeContract(BaseContract):
                 std_payoff += role_sign * accrual
 
             std_state = _make_state(std_time, 0.0)
-            events.append(ContractEvent(
-                event_type=EventType.STD,
-                event_time=std_time,
-                payoff=jnp.array(std_payoff, dtype=jnp.float32),
-                currency=currency,
-                state_pre=xd_state,
-                state_post=std_state,
-            ))
+            events.append(
+                ContractEvent(
+                    event_type=EventType.STD,
+                    event_time=std_time,
+                    payoff=jnp.array(std_payoff, dtype=jnp.float32),
+                    currency=currency,
+                    state_pre=xd_state,
+                    state_post=std_state,
+                )
+            )
 
         # MD event at effective maturity (if not exercised)
         if effective_maturity and not exercised:
             md_state = _make_state(effective_maturity, 0.0)
-            events.append(ContractEvent(
-                event_type=EventType.MD,
-                event_time=effective_maturity,
-                payoff=jnp.array(0.0, dtype=jnp.float32),
-                currency=currency,
-                state_pre=_make_state(effective_maturity, current_nt),
-                state_post=md_state,
-            ))
+            events.append(
+                ContractEvent(
+                    event_type=EventType.MD,
+                    event_time=effective_maturity,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
+                    currency=currency,
+                    state_pre=_make_state(effective_maturity, current_nt),
+                    state_post=md_state,
+                )
+            )
 
         # Sort events
-        events.sort(key=lambda e: (
-            e.event_time.year, e.event_time.month, e.event_time.day, e.sequence
-        ))
+        events.sort(
+            key=lambda e: (e.event_time.year, e.event_time.month, e.event_time.day, e.sequence)
+        )
 
         # Filter out FP events at or after STD if exercised
         if exercised and ce_time:
             std_time = self._compute_settlement_time(ce_time)
             events = [
-                e for e in events
-                if e.event_time < std_time
-                or e.event_type in (EventType.XD, EventType.STD)
+                e
+                for e in events
+                if e.event_time < std_time or e.event_type in (EventType.XD, EventType.STD)
             ]
 
         initial_state = _make_state(self.attributes.status_date, current_nt)
@@ -646,15 +660,15 @@ class CreditEnhancementGuaranteeContract(BaseContract):
             final_state=final_state,
         )
 
-    def _get_child_dcc(self, child_id: str):
+    def _get_child_dcc(self, child_id: str) -> DayCountConvention:
         """Get day count convention for a child contract."""
-        try:
-            child_attrs = self.child_contract_observer._attributes.get(child_id)
-            if child_attrs and child_attrs.day_count_convention:
-                return child_attrs.day_count_convention
-        except (AttributeError, KeyError):
-            pass
-        from jactus.core.types import DayCountConvention
+        if isinstance(self.child_contract_observer, SimulatedChildContractObserver):
+            try:
+                child_attrs = self.child_contract_observer._attributes.get(child_id)
+                if child_attrs and child_attrs.day_count_convention:
+                    return child_attrs.day_count_convention
+            except (AttributeError, KeyError):
+                pass
         return DayCountConvention.A365
 
     def _calculate_coverage_with_accrual(self, time: ActusDateTime) -> float:
@@ -666,9 +680,10 @@ class CreditEnhancementGuaranteeContract(BaseContract):
         """
         from jactus.utilities.conventions import year_fraction
 
+        assert self.child_contract_observer is not None
         covered_ids = self._get_covered_contract_ids()
         cege = self.attributes.credit_enhancement_guarantee_extent
-        coverage_ratio = float(self.attributes.coverage)
+        coverage_ratio = float(self.attributes.coverage or 0.0)
         total = 0.0
 
         for cid in covered_ids:
@@ -692,11 +707,14 @@ class CreditEnhancementGuaranteeContract(BaseContract):
         return coverage_ratio * total
 
     def _compute_accrual_between(
-        self, start: ActusDateTime, end: ActusDateTime,
+        self,
+        start: ActusDateTime,
+        end: ActusDateTime,
     ) -> float:
         """Compute total accrued interest on covered contracts between two times."""
         from jactus.utilities.conventions import year_fraction
 
+        assert self.child_contract_observer is not None
         covered_ids = self._get_covered_contract_ids()
         total = 0.0
         for cid in covered_ids:
@@ -714,12 +732,13 @@ class CreditEnhancementGuaranteeContract(BaseContract):
     def _get_settlement_period_days(self) -> int:
         """Parse settlement period and return the number of days (0 for P0D)."""
         import re
+
         sp = self.attributes.settlement_period
         if not sp:
             return 0
         sp = sp[1:] if sp.startswith("P") else sp
         if "L" in sp:
-            sp = sp[:sp.index("L")]
+            sp = sp[: sp.index("L")]
         m = re.match(r"(\d+)([DWMY])", sp)
         if not m:
             return 0
@@ -734,12 +753,13 @@ class CreditEnhancementGuaranteeContract(BaseContract):
     def _compute_raw_settlement_end(self, xd_time: ActusDateTime) -> ActusDateTime:
         """Compute settlement end date without business day adjustment."""
         import re
+
         sp = self.attributes.settlement_period
         if not sp:
             return xd_time
         sp_str = sp[1:] if sp.startswith("P") else sp
         if "L" in sp_str:
-            sp_str = sp_str[:sp_str.index("L")]
+            sp_str = sp_str[: sp_str.index("L")]
         m = re.match(r"(\d+)([DWMY])", sp_str)
         if not m:
             return xd_time
@@ -747,6 +767,7 @@ class CreditEnhancementGuaranteeContract(BaseContract):
         if n == 0:
             return xd_time
         from dateutil.relativedelta import relativedelta
+
         xd_py = xd_time.to_datetime()
         delta_map = {
             "D": relativedelta(days=n),
@@ -755,7 +776,9 @@ class CreditEnhancementGuaranteeContract(BaseContract):
             "Y": relativedelta(years=n),
         }
         end_py = xd_py + delta_map.get(unit, relativedelta())
-        return ActusDateTime(end_py.year, end_py.month, end_py.day, end_py.hour, end_py.minute, end_py.second)
+        return ActusDateTime(
+            end_py.year, end_py.month, end_py.day, end_py.hour, end_py.minute, end_py.second
+        )
 
     def _adjust_business_day(self, time: ActusDateTime) -> ActusDateTime:
         """Adjust date to next business day if it falls on a weekend.
@@ -763,12 +786,14 @@ class CreditEnhancementGuaranteeContract(BaseContract):
         Only applies when the contract has a non-trivial calendar (e.g., MF).
         """
         from jactus.core.types import Calendar
+
         calendar = self.attributes.calendar
         if calendar in (Calendar.NO_CALENDAR, None):
             return time
         dt = time.to_datetime()
         while dt.weekday() >= 5:  # Saturday=5, Sunday=6
             from datetime import timedelta
+
             dt += timedelta(days=1)
         return ActusDateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
 
@@ -780,11 +805,12 @@ class CreditEnhancementGuaranteeContract(BaseContract):
 
         # Parse settlement period (e.g., "P0D", "P5DL0")
         import re
+
         sp = settlement_period
         if sp.startswith("P"):
             sp = sp[1:]
         if "L" in sp:
-            sp = sp[:sp.index("L")]
+            sp = sp[: sp.index("L")]
         m = re.match(r"(\d+)([DWMY])", sp)
         if not m:
             return self._adjust_business_day(xd_time)
@@ -794,6 +820,7 @@ class CreditEnhancementGuaranteeContract(BaseContract):
             return self._adjust_business_day(xd_time)
 
         from dateutil.relativedelta import relativedelta
+
         xd_py = xd_time.to_datetime()
         delta_map = {
             "D": relativedelta(days=n),
@@ -803,7 +830,11 @@ class CreditEnhancementGuaranteeContract(BaseContract):
         }
         std_py = xd_py + delta_map.get(unit, relativedelta())
         result = ActusDateTime(
-            std_py.year, std_py.month, std_py.day,
-            std_py.hour, std_py.minute, std_py.second,
+            std_py.year,
+            std_py.month,
+            std_py.day,
+            std_py.hour,
+            std_py.minute,
+            std_py.second,
         )
         return self._adjust_business_day(result)

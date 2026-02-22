@@ -18,10 +18,24 @@ BASE_URL = "https://raw.githubusercontent.com/actusfrf/actus-tests/master/tests"
 
 # Contract types that have official test files
 AVAILABLE_TEST_FILES = [
-    "pam", "lam", "nam", "ann", "clm", "lax",
-    "ump", "csh", "stk", "com",
-    "fxout", "optns", "futur", "swppv", "swaps", "capfl",
-    "ceg", "cec",
+    "pam",
+    "lam",
+    "nam",
+    "ann",
+    "clm",
+    "lax",
+    "ump",
+    "csh",
+    "stk",
+    "com",
+    "fxout",
+    "optns",
+    "futur",
+    "swppv",
+    "swaps",
+    "capfl",
+    "ceg",
+    "cec",
 ]
 
 

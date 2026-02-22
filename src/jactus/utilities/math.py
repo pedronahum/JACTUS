@@ -531,4 +531,5 @@ def calculate_actus_annuity_jax(
     actus_payment = (notional + accrued_interest) / denominator
 
     # Return simple payment if rate is zero, otherwise ACTUS payment
-    return jnp.where(is_zero_rate, simple_payment, actus_payment)
+    result: float = jnp.where(is_zero_rate, simple_payment, actus_payment)  # type: ignore[assignment]
+    return result

@@ -65,6 +65,7 @@ from jactus.core import (
     ContractEvent,
     ContractState,
     ContractType,
+    DayCountConvention,
     EventSchedule,
     EventType,
 )
@@ -122,7 +123,7 @@ def generate_array_schedule(
 
     all_events = []
 
-    for i, (anchor, cycle) in enumerate(zip(anchors, cycles)):
+    for i, (anchor, cycle) in enumerate(zip(anchors, cycles, strict=False)):
         # Skip if filter doesn't match
         if filter_values is not None and filter_target is not None:
             if filter_values[i] != filter_target:
@@ -168,7 +169,9 @@ class LAXPayoffFunction(BasePayoffFunction):
         PRF: Principal Redemption Amount Fixing (update Prnxt)
     """
 
-    def __init__(self, contract_role, currency, settlement_currency=None):
+    def __init__(
+        self, contract_role: Any, currency: str, settlement_currency: str | None = None
+    ) -> None:
         """Initialize LAX payoff function.
 
         Args:
@@ -262,7 +265,8 @@ class LAXPayoffFunction(BasePayoffFunction):
 
         No role_sign — state.prnxt is already signed.
         """
-        return state.nsc * state.prnxt
+        prnxt = state.prnxt or jnp.array(0.0, dtype=jnp.float32)
+        return state.nsc * prnxt
 
     def _pof_pi(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
@@ -272,7 +276,8 @@ class LAXPayoffFunction(BasePayoffFunction):
         PI payoff is the negative of PR — the sign is already handled
         by the event type. No role_sign — state.prnxt is already signed.
         """
-        return -state.nsc * state.prnxt
+        prnxt = state.prnxt or jnp.array(0.0, dtype=jnp.float32)
+        return -state.nsc * prnxt
 
     def _pof_md(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
@@ -315,7 +320,7 @@ class LAXPayoffFunction(BasePayoffFunction):
 
         No role_sign — state vars are already signed.
         """
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
         ipcb = state.ipcb if state.ipcb is not None else state.nt
         accrued = yf * state.ipnr * ipcb
         return state.nsc * (state.nt + state.ipac + accrued)
@@ -327,7 +332,7 @@ class LAXPayoffFunction(BasePayoffFunction):
 
         No role_sign — state vars are already signed.
         """
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
         ipcb = state.ipcb if state.ipcb is not None else state.nt
         accrued = yf * state.ipnr * ipcb
         return state.isc * (state.ipac + accrued)
@@ -515,25 +520,28 @@ class LAXStateTransitionFunction(BaseStateTransitionFunction):
 
         Same as LAM: Nt -= Prnxt (both are signed state variables).
         """
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
 
         # Calculate accrued interest using current IPCB
         ipcb = state.ipcb if state.ipcb is not None else state.nt
         new_ipac = state.ipac + yf * state.ipnr * ipcb
 
         # Reduce notional by prnxt (both signed, cap at remaining notional)
-        effective_prnxt = jnp.sign(state.prnxt) * jnp.minimum(
-            jnp.abs(state.prnxt), jnp.abs(state.nt))
+        prnxt = state.prnxt or jnp.array(0.0, dtype=jnp.float32)
+        effective_prnxt = jnp.sign(prnxt) * jnp.minimum(jnp.abs(prnxt), jnp.abs(state.nt))
         new_nt = state.nt - effective_prnxt
 
         # Update IPCB if mode is 'NT'
         ipcb_mode = attrs.interest_calculation_base or "NT"
+        new_ipcb: jnp.ndarray
         if ipcb_mode == "NT":
             new_ipcb = new_nt
         elif ipcb_mode == "NTIED":
-            new_ipcb = state.ipcb  # Fixed at IED
+            new_ipcb = state.ipcb or jnp.array(0.0, dtype=jnp.float32)  # Fixed at IED
         else:  # NTL
-            new_ipcb = state.ipcb  # Only updated at IPCB events
+            new_ipcb = state.ipcb or jnp.array(
+                0.0, dtype=jnp.float32
+            )  # Only updated at IPCB events
 
         return state.replace(
             sd=time,
@@ -553,23 +561,27 @@ class LAXStateTransitionFunction(BaseStateTransitionFunction):
 
         Opposite of PR: Nt += Prnxt (both are signed state variables).
         """
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
 
         # Calculate accrued interest using current IPCB
         ipcb = state.ipcb if state.ipcb is not None else state.nt
         new_ipac = state.ipac + yf * state.ipnr * ipcb
 
         # Increase notional by prnxt (both signed)
-        new_nt = state.nt + state.prnxt
+        prnxt = state.prnxt or jnp.array(0.0, dtype=jnp.float32)
+        new_nt = state.nt + prnxt
 
         # Update IPCB if mode is 'NT'
         ipcb_mode = attrs.interest_calculation_base or "NT"
+        new_ipcb: jnp.ndarray
         if ipcb_mode == "NT":
             new_ipcb = new_nt
         elif ipcb_mode == "NTIED":
-            new_ipcb = state.ipcb  # Fixed at IED
+            new_ipcb = state.ipcb or jnp.array(0.0, dtype=jnp.float32)  # Fixed at IED
         else:  # NTL
-            new_ipcb = state.ipcb  # Only updated at IPCB events
+            new_ipcb = state.ipcb or jnp.array(
+                0.0, dtype=jnp.float32
+            )  # Only updated at IPCB events
 
         return state.replace(
             sd=time,
@@ -622,15 +634,6 @@ class LAXStateTransitionFunction(BaseStateTransitionFunction):
         risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
         """STF_FP: Fee Payment - reset accrued fees."""
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
-
-        # Accrue any remaining fees
-        if attrs.fee_rate and attrs.fee_basis:
-            # Simplified fee accrual on notional
-            new_feac = state.feac + yf * attrs.fee_rate * abs(state.nt)
-        else:
-            new_feac = state.feac
-
         # Reset fees after payment
         return state.replace(sd=time, feac=jnp.array(0.0, dtype=jnp.float32))
 
@@ -668,10 +671,6 @@ class LAXStateTransitionFunction(BaseStateTransitionFunction):
         risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
         """STF_IP: Interest Payment - reset accrued interest."""
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
-        ipcb = state.ipcb if state.ipcb is not None else state.nt
-        accrued = yf * state.ipnr * ipcb
-
         # Reset interest after payment
         return state.replace(sd=time, ipac=jnp.array(0.0, dtype=jnp.float32))
 
@@ -684,7 +683,7 @@ class LAXStateTransitionFunction(BaseStateTransitionFunction):
     ) -> ContractState:
         """STF_IPCI: Interest Capitalization - add accrued interest to notional."""
         role_sign = contract_role_sign(attrs.contract_role)
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
         ipcb = state.ipcb if state.ipcb is not None else state.nt
         accrued = yf * state.ipnr * ipcb
 
@@ -693,10 +692,11 @@ class LAXStateTransitionFunction(BaseStateTransitionFunction):
 
         # Update IPCB if mode is 'NT'
         ipcb_mode = attrs.interest_calculation_base or "NT"
+        new_ipcb: jnp.ndarray
         if ipcb_mode == "NT":
             new_ipcb = new_nt
         else:
-            new_ipcb = state.ipcb
+            new_ipcb = state.ipcb or jnp.array(0.0, dtype=jnp.float32)
 
         return state.replace(
             sd=time,
@@ -717,11 +717,12 @@ class LAXStateTransitionFunction(BaseStateTransitionFunction):
         Only applies when IPCB mode is 'NTL' (lagged notional).
         """
         ipcb_mode = attrs.interest_calculation_base or "NT"
+        new_ipcb: jnp.ndarray
         if ipcb_mode == "NTL":
             # Fix IPCB to current notional
             new_ipcb = state.nt
         else:
-            new_ipcb = state.ipcb
+            new_ipcb = state.ipcb or jnp.array(0.0, dtype=jnp.float32)
 
         return state.replace(sd=time, ipcb=new_ipcb)
 
@@ -748,7 +749,7 @@ class LAXStateTransitionFunction(BaseStateTransitionFunction):
 
             new_prnxt = jnp.array(role_sign * prnxt_value, dtype=jnp.float32)
         else:
-            new_prnxt = state.prnxt
+            new_prnxt = state.prnxt or jnp.array(0.0, dtype=jnp.float32)
 
         return state.replace(sd=time, prnxt=new_prnxt)
 
@@ -763,7 +764,7 @@ class LAXStateTransitionFunction(BaseStateTransitionFunction):
 
         For LAX with array_rate, the array value acts as the spread for each segment.
         """
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
         ipcb = state.ipcb if state.ipcb is not None else state.nt
         new_ipac = state.ipac + yf * state.ipnr * ipcb
 
@@ -798,7 +799,7 @@ class LAXStateTransitionFunction(BaseStateTransitionFunction):
 
         Accrue interest, then set rate from array schedule.
         """
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
         ipcb = state.ipcb if state.ipcb is not None else state.nt
         new_ipac = state.ipac + yf * state.ipnr * ipcb
 
@@ -888,7 +889,7 @@ class ExoticLinearAmortizerContract(BaseContract):
 
         return ContractState(
             sd=self.attributes.status_date,
-            tmd=self.attributes.maturity_date,
+            tmd=self.attributes.maturity_date or self.attributes.status_date,
             nt=jnp.array(0.0, dtype=jnp.float32),  # Set at IED
             ipnr=jnp.array(0.0, dtype=jnp.float32),  # Set at IED
             ipac=jnp.array(0.0, dtype=jnp.float32),
@@ -939,7 +940,7 @@ class ExoticLinearAmortizerContract(BaseContract):
         md = attributes.maturity_date
 
         if not ied or not md:
-            return EventSchedule(events=[], contract_id=attributes.contract_id)
+            return EventSchedule(events=(), contract_id=attributes.contract_id)
 
         # AD: Analysis Date
         events.append(
@@ -1150,7 +1151,7 @@ class ExoticLinearAmortizerContract(BaseContract):
         }
         events.sort(key=lambda e: (e.event_time, event_order.get(e.event_type, 99)))
 
-        return EventSchedule(events=events, contract_id=attributes.contract_id)
+        return EventSchedule(events=tuple(events), contract_id=attributes.contract_id)
 
     def _get_prnxt_for_time(self, time: ActusDateTime) -> float | None:
         """Look up the prnxt value from array for a given event time.
@@ -1178,7 +1179,6 @@ class ExoticLinearAmortizerContract(BaseContract):
         Before each PR/PI event, updates state.prnxt from the array schedule
         so the correct principal amount is used without explicit PRF events.
         """
-        from jactus.observers import ChildContractObserver
 
         risk_obs = risk_factor_observer or self.risk_factor_observer
         role_sign = contract_role_sign(self.attributes.contract_role)
@@ -1198,9 +1198,7 @@ class ExoticLinearAmortizerContract(BaseContract):
             if event.event_type in (EventType.PR, EventType.PI, EventType.PRF):
                 prnxt_val = self._get_prnxt_for_time(calc_time)
                 if prnxt_val is not None:
-                    state = state.replace(
-                        prnxt=jnp.array(role_sign * prnxt_val, dtype=jnp.float32)
-                    )
+                    state = state.replace(prnxt=jnp.array(role_sign * prnxt_val, dtype=jnp.float32))
 
             payoff = pof(
                 event_type=event.event_type,

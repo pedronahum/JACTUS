@@ -117,8 +117,7 @@ def calculate_intrinsic_value(
         return call_value + put_value
 
     raise ValueError(
-        f"Unknown option type: {option_type}. "
-        f"Expected 'C'/'CALL', 'P'/'PUT', or 'CP'/'COLLAR'"
+        f"Unknown option type: {option_type}. Expected 'C'/'CALL', 'P'/'PUT', or 'CP'/'COLLAR'"
     )
 
 

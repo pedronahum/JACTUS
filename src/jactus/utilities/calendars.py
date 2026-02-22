@@ -305,9 +305,7 @@ def get_calendar(calendar_name: str) -> HolidayCalendar:
         return NoHolidayCalendar()
     if calendar_name_upper in ("MONDAY_TO_FRIDAY", "MTF"):
         return MondayToFridayCalendar()
-    raise ValueError(
-        f"Unknown calendar: {calendar_name}. " f"Supported: NO_CALENDAR, MONDAY_TO_FRIDAY"
-    )
+    raise ValueError(f"Unknown calendar: {calendar_name}. Supported: NO_CALENDAR, MONDAY_TO_FRIDAY")
 
 
 def is_weekend(date: ActusDateTime) -> bool:

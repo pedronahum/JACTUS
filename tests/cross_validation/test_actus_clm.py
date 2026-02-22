@@ -32,4 +32,4 @@ class TestCLMCrossValidation:
             else:
                 lines.append(f"  {test_id}: PASS")
 
-        print(f"\n" + "\n".join(lines))
+        print("\n" + "\n".join(lines))

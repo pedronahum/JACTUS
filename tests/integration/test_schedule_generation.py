@@ -7,10 +7,6 @@ verifying that events are properly sequenced and complete.
 import pytest
 
 from jactus.contracts import (
-    CashContract,
-    CommodityContract,
-    PrincipalAtMaturityContract,
-    StockContract,
     create_contract,
 )
 from jactus.core import (
@@ -359,7 +355,7 @@ class TestFactoryIntegration:
             ),
         }
 
-        for contract_type, attrs in test_configs.items():
+        for _contract_type, attrs in test_configs.items():
             # Create via factory
             contract = create_contract(attrs, rf_obs)
 

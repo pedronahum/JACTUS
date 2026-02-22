@@ -254,7 +254,7 @@ class FuturePayoffFunction(BasePayoffFunction):
         Returns:
             Settlement amount (positive or negative)
         """
-        xa = float(state.xa) if hasattr(state, "xa") else 0.0
+        xa = float(state.xa) if state.xa is not None else 0.0
         role_sign = contract_role_sign(attributes.contract_role)
 
         return jnp.array(role_sign * xa, dtype=jnp.float32)
@@ -308,7 +308,7 @@ class FutureStateTransitionFunction(BaseStateTransitionFunction):
         event = ContractEvent(
             event_type=event_type,
             event_time=time,
-            payoff=0.0,
+            payoff=jnp.array(0.0, dtype=jnp.float32),
             currency=attributes.currency,
             sequence=0,
         )
@@ -515,19 +515,20 @@ class FutureContract(BaseContract):
 
         # Pre-exercised: only generate STD at exercise_date + settlement period
         if self._is_pre_exercised():
+            assert self.attributes.exercise_date is not None
             settlement_date = self._apply_settlement_period(self.attributes.exercise_date)
             events.append(
                 ContractEvent(
                     event_type=EventType.STD,
                     event_time=settlement_date,
-                    payoff=0.0,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
                     currency=self.attributes.currency,
                     sequence=0,
                 )
             )
             return EventSchedule(
                 contract_id=self.attributes.contract_id,
-                events=events,
+                events=tuple(events),
             )
 
         # Analysis dates (if specified)
@@ -537,7 +538,7 @@ class FutureContract(BaseContract):
                     ContractEvent(
                         event_type=EventType.AD,
                         event_time=ad_time,
-                        payoff=0.0,
+                        payoff=jnp.array(0.0, dtype=jnp.float32),
                         currency=self.attributes.currency,
                         sequence=0,
                     )
@@ -549,7 +550,7 @@ class FutureContract(BaseContract):
                 ContractEvent(
                     event_type=EventType.PRD,
                     event_time=self.attributes.purchase_date,
-                    payoff=0.0,  # No premium for futures
+                    payoff=jnp.array(0.0, dtype=jnp.float32),  # No premium for futures
                     currency=self.attributes.currency,
                     sequence=1,
                 )
@@ -561,18 +562,19 @@ class FutureContract(BaseContract):
                 ContractEvent(
                     event_type=EventType.TD,
                     event_time=self.attributes.termination_date,
-                    payoff=0.0,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
                     currency=self.attributes.currency,
                     sequence=2,
                 )
             )
 
         # Maturity date
+        assert self.attributes.maturity_date is not None
         events.append(
             ContractEvent(
                 event_type=EventType.MD,
                 event_time=self.attributes.maturity_date,
-                payoff=0.0,
+                payoff=jnp.array(0.0, dtype=jnp.float32),
                 currency=self.attributes.currency,
                 sequence=3,
             )
@@ -583,7 +585,7 @@ class FutureContract(BaseContract):
             ContractEvent(
                 event_type=EventType.XD,
                 event_time=self.attributes.maturity_date,
-                payoff=0.0,
+                payoff=jnp.array(0.0, dtype=jnp.float32),
                 currency=self.attributes.currency,
                 sequence=4,
             )
@@ -596,7 +598,7 @@ class FutureContract(BaseContract):
             ContractEvent(
                 event_type=EventType.STD,
                 event_time=settlement_date,
-                payoff=0.0,
+                payoff=jnp.array(0.0, dtype=jnp.float32),
                 currency=self.attributes.currency,
                 sequence=5,
             )
@@ -607,7 +609,7 @@ class FutureContract(BaseContract):
 
         return EventSchedule(
             contract_id=self.attributes.contract_id,
-            events=events,
+            events=tuple(events),
         )
 
     def _apply_settlement_period(self, base_date: ActusDateTime) -> ActusDateTime:
@@ -631,12 +633,16 @@ class FutureContract(BaseContract):
             from dateutil.relativedelta import relativedelta
 
             py_dt = base_date.to_datetime() + relativedelta(months=mult)
-            return ActusDateTime(py_dt.year, py_dt.month, py_dt.day, py_dt.hour, py_dt.minute, py_dt.second)
+            return ActusDateTime(
+                py_dt.year, py_dt.month, py_dt.day, py_dt.hour, py_dt.minute, py_dt.second
+            )
         else:
             delta = timedelta(days=mult)
 
         py_dt = base_date.to_datetime() + delta
-        return ActusDateTime(py_dt.year, py_dt.month, py_dt.day, py_dt.hour, py_dt.minute, py_dt.second)
+        return ActusDateTime(
+            py_dt.year, py_dt.month, py_dt.day, py_dt.hour, py_dt.minute, py_dt.second
+        )
 
     def _apply_bdc(self, date: ActusDateTime) -> ActusDateTime:
         """Apply business day convention adjustment to a date."""
@@ -667,6 +673,7 @@ class FutureContract(BaseContract):
         # Pre-exercised: xa is the known exercise amount
         xa = self.attributes.exercise_amount if self._is_pre_exercised() else 0.0
 
+        assert self.attributes.maturity_date is not None
         return ContractState(
             sd=self.attributes.status_date,
             tmd=self.attributes.maturity_date,

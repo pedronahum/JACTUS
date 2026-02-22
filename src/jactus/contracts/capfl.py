@@ -71,7 +71,11 @@ class CapFloorPayoffFunction(BasePayoffFunction):
         notional: float = 0.0,
         day_count_convention: DayCountConvention = DayCountConvention.A365,
     ):
-        super().__init__(contract_role, currency, settlement_currency)
+        super().__init__(
+            contract_role or ContractRole.RPA,
+            currency or "USD",
+            settlement_currency,
+        )
         self.cap_rate = cap_rate
         self.floor_rate = floor_rate
         self.notional = notional
@@ -208,19 +212,13 @@ class CapFloorContract(BaseContract):
         child_contract_observer: ChildContractObserver | None = None,
     ):
         if attributes.contract_type != ContractType.CAPFL:
-            raise ValueError(
-                f"Expected contract_type=CAPFL, got {attributes.contract_type}"
-            )
+            raise ValueError(f"Expected contract_type=CAPFL, got {attributes.contract_type}")
 
         if child_contract_observer is None:
-            raise ValueError(
-                "child_contract_observer is required for CAPFL contracts"
-            )
+            raise ValueError("child_contract_observer is required for CAPFL contracts")
 
         if attributes.contract_structure is None:
-            raise ValueError(
-                "contract_structure (CTST) is required and must contain Underlying"
-            )
+            raise ValueError("contract_structure (CTST) is required and must contain Underlying")
 
         # Parse contract structure (JSON string)
         try:
@@ -248,7 +246,7 @@ class CapFloorContract(BaseContract):
         super().__init__(attributes, risk_factor_observer, child_contract_observer)
 
     def _parse_contract_structure(self) -> dict[str, Any]:
-        return json.loads(self.attributes.contract_structure)
+        return dict(json.loads(self.attributes.contract_structure or "{}"))
 
     def generate_event_schedule(self) -> EventSchedule:
         """Generate event schedule for CAPFL contract.
@@ -360,7 +358,7 @@ class CapFloorContract(BaseContract):
 
         return events
 
-    def _derive_start_from_md(self, md: ActusDateTime, terms: dict) -> ActusDateTime:
+    def _derive_start_from_md(self, md: ActusDateTime, terms: dict[str, Any]) -> ActusDateTime:
         """Derive schedule start by stepping backward from MD in cycle increments.
 
         When no IED is specified, find the earliest cycle-aligned date
@@ -405,6 +403,7 @@ class CapFloorContract(BaseContract):
 
     def _generate_child_observer_schedule(self) -> list[ContractEvent]:
         """Generate schedule using child observer (legacy approach)."""
+        assert self.child_contract_observer is not None
         events: list[ContractEvent] = []
 
         ctst = self._parse_contract_structure()
@@ -433,12 +432,8 @@ class CapFloorContract(BaseContract):
 
         all_times = set(uncapped_map.keys()) | set(capped_map.keys())
         for time in all_times:
-            uncapped_payoff = (
-                float(uncapped_map[time].payoff) if time in uncapped_map else 0.0
-            )
-            capped_payoff = (
-                float(capped_map[time].payoff) if time in capped_map else 0.0
-            )
+            uncapped_payoff = float(uncapped_map[time].payoff) if time in uncapped_map else 0.0
+            capped_payoff = float(capped_map[time].payoff) if time in capped_map else 0.0
             differential = abs(uncapped_payoff - capped_payoff)
             if differential > 0.0:
                 events.append(
@@ -509,9 +504,7 @@ class CapFloorContract(BaseContract):
             day_count_convention=dcc,
         )
 
-    def get_state_transition_function(
-        self, event_type: Any
-    ) -> CapFloorStateTransitionFunction:
+    def get_state_transition_function(self, event_type: Any) -> CapFloorStateTransitionFunction:
         dcc = DayCountConvention.A365
         if self._underlier_terms:
             dcc_str = self._underlier_terms.get("dayCountConvention", "A365")

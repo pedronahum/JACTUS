@@ -51,7 +51,7 @@ from typing import Any
 
 import jax.numpy as jnp
 
-from jactus.contracts.base import BaseContract
+from jactus.contracts.base import BaseContract, SimulationHistory
 from jactus.core import (
     ActusDateTime,
     ContractAttributes,
@@ -575,8 +575,12 @@ class FXOutrightContract(BaseContract):
 
         py_dt = base_date.to_datetime() + delta
         return ActusDateTime(
-            py_dt.year, py_dt.month, py_dt.day,
-            py_dt.hour, py_dt.minute, py_dt.second,
+            py_dt.year,
+            py_dt.month,
+            py_dt.day,
+            py_dt.hour,
+            py_dt.minute,
+            py_dt.second,
         )
 
     def _has_early_termination(self) -> bool:
@@ -604,7 +608,7 @@ class FXOutrightContract(BaseContract):
         Returns:
             EventSchedule with contract events
         """
-        events = []
+        events: list[ContractEvent] = []
         maturity_date = self.attributes.settlement_date or self.attributes.maturity_date
         early_term = self._has_early_termination()
 
@@ -676,7 +680,7 @@ class FXOutrightContract(BaseContract):
             event.sequence = i
 
         return EventSchedule(
-            events=events,
+            events=tuple(events),
             contract_id=self.attributes.contract_id or "FXOUT-UNKNOWN",
         )
 
@@ -697,6 +701,7 @@ class FXOutrightContract(BaseContract):
         """
         # Determine maturity date
         tmd = self.attributes.settlement_date or self.attributes.maturity_date
+        assert tmd is not None
 
         # Get contract performance
         prf = self.attributes.contract_performance
@@ -743,15 +748,13 @@ class FXOutrightContract(BaseContract):
         self,
         risk_factor_observer: RiskFactorObserver | None = None,
         child_contract_observer: ChildContractObserver | None = None,
-    ):
+    ) -> SimulationHistory:
         """Simulate FXOUT contract with dual-currency MD and net STD handling.
 
         Overrides base simulate() to compute:
         - Per-leg payoffs for gross settlement (MD events)
         - Net settlement payoff for cash settlement (STD events)
         """
-        from jactus.contracts.base import SimulationHistory
-
         risk_obs = risk_factor_observer or self.risk_factor_observer
         state = self.initialize_state()
         initial_state = state

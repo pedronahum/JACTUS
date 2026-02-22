@@ -59,9 +59,15 @@ from jactus.core import (
     EventSchedule,
     EventType,
 )
+from jactus.core.types import (
+    BusinessDayConvention,
+    Calendar,
+    ContractRole,
+    DayCountConvention,
+    EndOfMonthConvention,
+)
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.observers import RiskFactorObserver
-from jactus.core.types import BusinessDayConvention, Calendar, EndOfMonthConvention
 from jactus.utilities import contract_role_sign, generate_schedule, year_fraction
 
 
@@ -89,7 +95,9 @@ class CLMPayoffFunction(BasePayoffFunction):
         CE: Credit Event
     """
 
-    def __init__(self, contract_role, currency, settlement_currency=None):
+    def __init__(
+        self, contract_role: ContractRole, currency: str, settlement_currency: str | None = None
+    ) -> None:
         """Initialize CLM payoff function.
 
         Args:
@@ -197,7 +205,7 @@ class CLMPayoffFunction(BasePayoffFunction):
         For CLM, this typically only occurs at maturity.
         No role_sign needed — state variables are already signed.
         """
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
         accrued = yf * state.ipnr * state.nt
         return state.isc * (state.ipac + accrued)
 
@@ -319,7 +327,7 @@ class CLMStateTransitionFunction(BaseStateTransitionFunction):
         For CLM, principal repayments reduce the notional.
         The amount comes from observed events.
         """
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
 
         # Accrue interest
         new_ipac = state.ipac + yf * state.ipnr * state.nt
@@ -375,7 +383,7 @@ class CLMStateTransitionFunction(BaseStateTransitionFunction):
         risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
         """STF_IPCI: Interest Capitalization - add accrued interest to notional."""
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
         accrued = yf * state.ipnr * state.nt
 
         # Add accrued interest to notional (no role_sign - nt is already signed)
@@ -393,7 +401,7 @@ class CLMStateTransitionFunction(BaseStateTransitionFunction):
     ) -> ContractState:
         """STF_RR: Rate Reset - accrue interest, then update rate from observer."""
         # Accrue interest up to this point
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
         new_ipac = state.ipac + yf * state.ipnr * state.nt
 
         # Get new rate from observer (use observation_time for BDC-shifted RR events)
@@ -502,7 +510,7 @@ class CallMoneyContract(BaseContract):
 
         return ContractState(
             sd=attrs.status_date,
-            tmd=attrs.maturity_date,
+            tmd=attrs.maturity_date or attrs.status_date,
             nt=nt,
             ipnr=ipnr,
             ipac=ipac,
@@ -617,16 +625,18 @@ class CallMoneyContract(BaseContract):
         ied = attributes.initial_exchange_date
 
         if not ied:
-            return EventSchedule(events=[], contract_id=attributes.contract_id)
+            return EventSchedule(events=(), contract_id=attributes.contract_id)
 
         sd = attributes.status_date
         bdc = attributes.business_day_convention or BusinessDayConvention.NULL
         cal = attributes.calendar or Calendar.NO_CALENDAR
         eomc = attributes.end_of_month_convention or EndOfMonthConvention.SD
 
-        def _sched(anchor, cycle, end):
+        def _sched(anchor: ActusDateTime, cycle: str, end: ActusDateTime) -> list[ActusDateTime]:
             return generate_schedule(
-                start=anchor, cycle=cycle, end=end,
+                start=anchor,
+                cycle=cycle,
+                end=end,
                 end_of_month_convention=eomc,
                 business_day_convention=bdc,
                 calendar=cal,
@@ -692,7 +702,7 @@ class CallMoneyContract(BaseContract):
                     end_of_month_convention=eomc,
                 )
                 # Map adjusted→unadjusted dates
-                for adj, unadj in zip(rr_adjusted, rr_unadjusted):
+                for adj, unadj in zip(rr_adjusted, rr_unadjusted, strict=False):
                     if adj != unadj:
                         self._rr_observation_dates[adj.to_iso()] = unadj
 
@@ -742,4 +752,4 @@ class CallMoneyContract(BaseContract):
         # Sort events by time
         events.sort(key=lambda e: (e.event_time, e.event_type.value))
 
-        return EventSchedule(events=events, contract_id=attributes.contract_id)
+        return EventSchedule(events=tuple(events), contract_id=attributes.contract_id)

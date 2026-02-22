@@ -290,9 +290,16 @@ class TestGetAvailableContractTypes:
         types = get_available_contract_types()
 
         # These derivative types should all be implemented
-        derivatives = [ContractType.FXOUT, ContractType.SWPPV, ContractType.SWAPS,
-                      ContractType.OPTNS, ContractType.FUTUR, ContractType.CAPFL,
-                      ContractType.CEG, ContractType.CEC]
+        derivatives = [
+            ContractType.FXOUT,
+            ContractType.SWPPV,
+            ContractType.SWAPS,
+            ContractType.OPTNS,
+            ContractType.FUTUR,
+            ContractType.CAPFL,
+            ContractType.CEG,
+            ContractType.CEC,
+        ]
 
         for contract_type in derivatives:
             assert contract_type in types

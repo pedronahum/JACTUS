@@ -308,7 +308,7 @@ class TestCashContract:
         from pydantic_core import ValidationError
 
         with pytest.raises(ValidationError) as exc_info:
-            attrs = ContractAttributes(
+            _attrs = ContractAttributes(
                 contract_id="CSH-001",
                 contract_type=ContractType.CSH,
                 contract_role=None,  # Missing!
@@ -326,7 +326,7 @@ class TestCashContract:
         from pydantic_core import ValidationError
 
         with pytest.raises(ValidationError) as exc_info:
-            attrs = ContractAttributes(
+            _attrs = ContractAttributes(
                 contract_id="CSH-001",
                 contract_type=ContractType.CSH,
                 contract_role=ContractRole.RPA,

@@ -154,7 +154,7 @@ def create_contract(
     if contract_type not in CONTRACT_REGISTRY:
         available_types = ", ".join(ct.value for ct in CONTRACT_REGISTRY)
         raise ValueError(
-            f"Unknown contract type: {contract_type.value}. " f"Available types: {available_types}"
+            f"Unknown contract type: {contract_type.value}. Available types: {available_types}"
         )
 
     # Get the contract class

@@ -436,7 +436,9 @@ class TestCrossContractInteractions:
                 future_price=105000.0 if contract_type == ContractType.FUTUR else None,
                 # Additional required attributes
                 delivery_settlement="D" if contract_type == ContractType.FXOUT else None,
-                contract_structure='{"Underlier": "UNDERLIER-001"}' if contract_type in [ContractType.OPTNS, ContractType.FUTUR] else None,
+                contract_structure='{"Underlier": "UNDERLIER-001"}'
+                if contract_type in [ContractType.OPTNS, ContractType.FUTUR]
+                else None,
                 interest_payment_cycle="3M" if contract_type == ContractType.SWPPV else None,
                 rate_reset_cycle="3M" if contract_type == ContractType.SWPPV else None,
             )

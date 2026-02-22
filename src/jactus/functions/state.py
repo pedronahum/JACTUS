@@ -301,7 +301,9 @@ def create_state_pre(
 
 
 def validate_state_transition(
-    state_pre: ContractState, state_post: ContractState, event_type: EventType  # noqa: ARG001
+    state_pre: ContractState,
+    state_post: ContractState,
+    event_type: EventType,  # noqa: ARG001
 ) -> bool:
     """Validate that a state transition is consistent.
 

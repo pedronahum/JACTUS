@@ -26,24 +26,24 @@ from jactus.core.time import (
 from jactus.core.types import (
     # Type aliases
     Amount,
-    Cycle,
-    Percentage,
-    Rate,
-    Timestamp,
     # Enumerations
     BusinessDayConvention,
     Calendar,
     ContractPerformance,
     ContractRole,
     ContractType,
+    Cycle,
     CyclePointOfInterestPayment,
     DayCountConvention,
     EndOfMonthConvention,
     EventType,
     FeeBasis,
     InterestCalculationBase,
+    Percentage,
     PrepaymentEffect,
+    Rate,
     ScalingEffect,
+    Timestamp,
 )
 
 __all__ = [

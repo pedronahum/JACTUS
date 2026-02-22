@@ -263,7 +263,7 @@ class GenericSwapContract(BaseContract):
         Returns:
             Dictionary with FirstLeg and SecondLeg keys
         """
-        return json.loads(self.attributes.contract_structure)
+        return json.loads(self.attributes.contract_structure or "{}")  # type: ignore[no-any-return]
 
     def generate_event_schedule(self) -> EventSchedule:
         """Generate event schedule for SWAPS contract.
@@ -288,6 +288,9 @@ class GenericSwapContract(BaseContract):
 
         # Get delivery settlement mode
         ds_mode = self.attributes.delivery_settlement or "D"
+
+        # child_contract_observer is validated as non-None in __init__
+        assert self.child_contract_observer is not None
 
         # Query events from first leg
         # Note: The child contract already has its role set
@@ -388,7 +391,8 @@ class GenericSwapContract(BaseContract):
         if self.attributes.termination_date:
             td_time = self.attributes.termination_date
             events = [
-                e for e in events
+                e
+                for e in events
                 if e.event_time < td_time
                 or (e.event_time == td_time and e.event_type != EventType.MD)
             ]
@@ -423,7 +427,7 @@ class GenericSwapContract(BaseContract):
                     ContractEvent(
                         event_type=EventType.AD,
                         event_time=ad_time,
-                        payoff=0.0,
+                        payoff=jnp.array(0.0, dtype=jnp.float32),
                         currency=currency,
                     )
                 )
@@ -453,6 +457,9 @@ class GenericSwapContract(BaseContract):
 
         # Determine leg roles
         first_leg_role, second_leg_role = determine_leg_roles(self.attributes.contract_role)
+
+        # child_contract_observer is validated as non-None in __init__
+        assert self.child_contract_observer is not None
 
         # Query initial states from both legs
         first_state = self.child_contract_observer.observe_state(

@@ -68,28 +68,30 @@ class TestScheduleMonotonicity:
         """All schedules must be strictly increasing."""
         start, end = date_range
         # Skip if cycle would generate too many dates
-        assume(not (cycle.endswith("D") and int(cycle[:-1]) == 1 and \
-                   start.days_between(end) > 1000))
+        assume(
+            not (cycle.endswith("D") and int(cycle[:-1]) == 1 and start.days_between(end) > 1000)
+        )
 
         schedule = generate_schedule(start=start, cycle=cycle, end=end)
 
         # Check strictly increasing
         for i in range(1, len(schedule)):
-            assert schedule[i] > schedule[i-1], \
-                f"Schedule not increasing at index {i}: {schedule[i-1]} >= {schedule[i]}"
+            assert schedule[i] > schedule[i - 1], (
+                f"Schedule not increasing at index {i}: {schedule[i - 1]} >= {schedule[i]}"
+            )
 
     @given(date_range=valid_date_range(), cycle=valid_cycle())
     def test_schedule_no_duplicates(self, date_range, cycle):
         """Schedules should not contain duplicate dates."""
         start, end = date_range
-        assume(not (cycle.endswith("D") and int(cycle[:-1]) == 1 and \
-                   start.days_between(end) > 1000))
+        assume(
+            not (cycle.endswith("D") and int(cycle[:-1]) == 1 and start.days_between(end) > 1000)
+        )
 
         schedule = generate_schedule(start=start, cycle=cycle, end=end)
 
         # Check no duplicates
-        assert len(schedule) == len(set(schedule)), \
-            "Schedule contains duplicate dates"
+        assert len(schedule) == len(set(schedule)), "Schedule contains duplicate dates"
 
 
 class TestScheduleBounds:
@@ -99,8 +101,9 @@ class TestScheduleBounds:
     def test_all_dates_within_bounds(self, date_range, cycle):
         """All schedule dates must be between start and end (inclusive with adjustment)."""
         start, end = date_range
-        assume(not (cycle.endswith("D") and int(cycle[:-1]) == 1 and \
-                   start.days_between(end) > 1000))
+        assume(
+            not (cycle.endswith("D") and int(cycle[:-1]) == 1 and start.days_between(end) > 1000)
+        )
 
         schedule = generate_schedule(start=start, cycle=cycle, end=end)
 
@@ -118,15 +121,15 @@ class TestScheduleBounds:
             max_allowed.year, max_allowed.month, max_allowed.day, 0, 0, 0
         )
         for date in schedule:
-            assert date <= max_allowed_actus, \
-                f"Date {date} too far beyond end {end}"
+            assert date <= max_allowed_actus, f"Date {date} too far beyond end {end}"
 
     @given(date_range=valid_date_range(), cycle=valid_cycle())
     def test_schedule_starts_at_start(self, date_range, cycle):
         """Schedule must always start at the start date."""
         start, end = date_range
-        assume(not (cycle.endswith("D") and int(cycle[:-1]) == 1 and \
-                   start.days_between(end) > 1000))
+        assume(
+            not (cycle.endswith("D") and int(cycle[:-1]) == 1 and start.days_between(end) > 1000)
+        )
 
         schedule = generate_schedule(start=start, cycle=cycle, end=end)
 
@@ -143,21 +146,14 @@ class TestBusinessDayConventionIdempotence:
         calendar = MondayToFridayCalendar()
 
         # Apply once
-        adjusted1 = apply_business_day_convention(
-            [date],
-            BusinessDayConvention.SCF,
-            calendar
-        )[0]
+        adjusted1 = apply_business_day_convention([date], BusinessDayConvention.SCF, calendar)[0]
 
         # Apply twice
-        adjusted2 = apply_business_day_convention(
-            [adjusted1],
-            BusinessDayConvention.SCF,
-            calendar
-        )[0]
+        adjusted2 = apply_business_day_convention([adjusted1], BusinessDayConvention.SCF, calendar)[
+            0
+        ]
 
-        assert adjusted1 == adjusted2, \
-            f"BDC not idempotent: {date} -> {adjusted1} -> {adjusted2}"
+        assert adjusted1 == adjusted2, f"BDC not idempotent: {date} -> {adjusted1} -> {adjusted2}"
 
     @given(date=actus_datetime())
     def test_bdc_scp_idempotent(self, date):
@@ -165,21 +161,14 @@ class TestBusinessDayConventionIdempotence:
         calendar = MondayToFridayCalendar()
 
         # Apply once
-        adjusted1 = apply_business_day_convention(
-            [date],
-            BusinessDayConvention.SCP,
-            calendar
-        )[0]
+        adjusted1 = apply_business_day_convention([date], BusinessDayConvention.SCP, calendar)[0]
 
         # Apply twice
-        adjusted2 = apply_business_day_convention(
-            [adjusted1],
-            BusinessDayConvention.SCP,
-            calendar
-        )[0]
+        adjusted2 = apply_business_day_convention([adjusted1], BusinessDayConvention.SCP, calendar)[
+            0
+        ]
 
-        assert adjusted1 == adjusted2, \
-            f"BDC not idempotent: {date} -> {adjusted1} -> {adjusted2}"
+        assert adjusted1 == adjusted2, f"BDC not idempotent: {date} -> {adjusted1} -> {adjusted2}"
 
     @given(date=actus_datetime())
     def test_adjusted_date_is_business_day(self, date):
@@ -187,11 +176,15 @@ class TestBusinessDayConventionIdempotence:
         calendar = MondayToFridayCalendar()
 
         # Skip SCMP and CSMP as they have known issues with month boundaries
-        for bdc in [BusinessDayConvention.SCF, BusinessDayConvention.SCP,
-                    BusinessDayConvention.SCMF]:
+        for bdc in [
+            BusinessDayConvention.SCF,
+            BusinessDayConvention.SCP,
+            BusinessDayConvention.SCMF,
+        ]:
             adjusted = apply_business_day_convention([date], bdc, calendar)[0]
-            assert calendar.is_business_day(adjusted), \
+            assert calendar.is_business_day(adjusted), (
                 f"After {bdc}, {adjusted} is not a business day"
+            )
 
 
 class TestZeroPeriodInvariance:
@@ -209,8 +202,10 @@ class TestZeroPeriodInvariance:
 class TestEndOfMonthPreservation:
     """Test that EOM convention preserves month-end dates."""
 
-    @given(year=st.integers(min_value=2020, max_value=2030),
-           month=st.integers(min_value=1, max_value=11))
+    @given(
+        year=st.integers(min_value=2020, max_value=2030),
+        month=st.integers(min_value=1, max_value=11),
+    )
     def test_eom_preserves_month_end(self, year, month):
         """EOM convention should preserve end-of-month dates."""
         # Start on last day of month
@@ -229,10 +224,7 @@ class TestEndOfMonthPreservation:
         end = ActusDateTime(end_year, end_month, 28, 0, 0, 0)
 
         schedule = generate_schedule(
-            start=start,
-            cycle="1M",
-            end=end,
-            end_of_month_convention=EndOfMonthConvention.EOM
+            start=start, cycle="1M", end=end, end_of_month_convention=EndOfMonthConvention.EOM
         )
 
         # All dates should be end-of-month (or last valid day)
@@ -258,17 +250,24 @@ class TestScheduleConsistency:
         cal1 = NoHolidayCalendar()
         cal2 = MondayToFridayCalendar()
 
-        schedule1 = generate_schedule(start=start, cycle=cycle, end=end,
-                                     business_day_convention=BusinessDayConvention.NULL,
-                                     calendar=cal1)
+        schedule1 = generate_schedule(
+            start=start,
+            cycle=cycle,
+            end=end,
+            business_day_convention=BusinessDayConvention.NULL,
+            calendar=cal1,
+        )
 
-        schedule2 = generate_schedule(start=start, cycle=cycle, end=end,
-                                     business_day_convention=BusinessDayConvention.NULL,
-                                     calendar=cal2)
+        schedule2 = generate_schedule(
+            start=start,
+            cycle=cycle,
+            end=end,
+            business_day_convention=BusinessDayConvention.NULL,
+            calendar=cal2,
+        )
 
         # With NULL BDC (no adjustment), calendars shouldn't matter
-        assert schedule1 == schedule2, \
-            "Schedules differ with NULL convention"
+        assert schedule1 == schedule2, "Schedules differ with NULL convention"
 
     @given(date_range=valid_date_range(), cycle=valid_cycle())
     def test_schedule_length_reasonable(self, date_range, cycle):

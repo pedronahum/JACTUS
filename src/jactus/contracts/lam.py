@@ -48,9 +48,8 @@ Example:
     >>> result = contract.simulate()
 """
 
-from typing import Any
-
 import math
+from typing import Any
 
 import jax.numpy as jnp
 
@@ -59,14 +58,18 @@ from jactus.core import (
     ActusDateTime,
     ContractAttributes,
     ContractEvent,
-    ContractRole,
     ContractState,
     ContractType,
     DayCountConvention,
     EventSchedule,
     EventType,
 )
-from jactus.core.types import BusinessDayConvention, Calendar, EndOfMonthConvention, EVENT_SCHEDULE_PRIORITY
+from jactus.core.types import (
+    EVENT_SCHEDULE_PRIORITY,
+    BusinessDayConvention,
+    Calendar,
+    EndOfMonthConvention,
+)
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.observers import RiskFactorObserver
 from jactus.utilities import contract_role_sign, generate_schedule, year_fraction
@@ -148,7 +151,7 @@ class LAMPayoffFunction(BasePayoffFunction):
         """
         handler = self._build_dispatch_table().get(event_type)
         if handler is not None:
-            return handler(state, attributes, time, risk_factor_observer)
+            return handler(state, attributes, time, risk_factor_observer)  # type: ignore[no-any-return]
         return jnp.array(0.0, dtype=jnp.float32)
 
     def _pof_ad(self, state: ContractState, attrs: ContractAttributes) -> jnp.ndarray:
@@ -161,7 +164,11 @@ class LAMPayoffFunction(BasePayoffFunction):
         Formula: R(CNTRL) × (-1) × Nsc × NT
         """
         role_sign = contract_role_sign(self.contract_role)
-        return jnp.array(role_sign * (-1.0), dtype=jnp.float32) * state.nsc * attrs.notional_principal
+        return (
+            jnp.array(role_sign * (-1.0), dtype=jnp.float32)
+            * state.nsc
+            * (attrs.notional_principal or 0.0)
+        )
 
     def _pof_pr(self, state: ContractState, attrs: ContractAttributes) -> jnp.ndarray:
         """POF_PR: Principal Redemption - pay fixed principal amount.
@@ -170,9 +177,8 @@ class LAMPayoffFunction(BasePayoffFunction):
         No R(CNTRL) — Prnxt is a signed state variable.
         """
         # Cap redemption at remaining notional to avoid overshoot
-        effective_prnxt = jnp.sign(state.prnxt) * jnp.minimum(
-            jnp.abs(state.prnxt), jnp.abs(state.nt)
-        )
+        prnxt = state.prnxt or jnp.array(0.0, dtype=jnp.float32)
+        effective_prnxt = jnp.sign(prnxt) * jnp.minimum(jnp.abs(prnxt), jnp.abs(state.nt))
         return state.nsc * effective_prnxt
 
     def _pof_md(self, state: ContractState, attrs: ContractAttributes) -> jnp.ndarray:
@@ -230,16 +236,15 @@ class LAMPayoffFunction(BasePayoffFunction):
         Formula: R(CNTRL) × (-1) × (PPRD + Ipac + Y(Sd, t) × Ipnr × Ipcb)
         R(CNTRL) needed because PPRD is an unsigned attribute.
         """
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
 
         ipcb = state.ipcb if state.ipcb is not None else state.nt
         accrued_interest = yf * state.ipnr * ipcb
 
         role_sign = contract_role_sign(self.contract_role)
         pprd = attrs.price_at_purchase_date or 0.0
-        return (
-            jnp.array(role_sign * -1.0, dtype=jnp.float32)
-            * (jnp.array(pprd, dtype=jnp.float32) + state.ipac + accrued_interest)
+        return jnp.array(role_sign * -1.0, dtype=jnp.float32) * (
+            jnp.array(pprd, dtype=jnp.float32) + state.ipac + accrued_interest
         )
 
     def _pof_td(
@@ -250,14 +255,16 @@ class LAMPayoffFunction(BasePayoffFunction):
         Formula: R(CNTRL) × (PTD + Ipac + Y(Sd, t) × Ipnr × Ipcb)
         R(CNTRL) needed because PTD is an unsigned attribute.
         """
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
 
         ipcb = state.ipcb if state.ipcb is not None else state.nt
         accrued_interest = yf * state.ipnr * ipcb
 
         role_sign = contract_role_sign(self.contract_role)
         ptd = attrs.price_at_termination_date or 0.0
-        return jnp.array(role_sign, dtype=jnp.float32) * (jnp.array(ptd, dtype=jnp.float32) + state.ipac + accrued_interest)
+        return jnp.array(role_sign, dtype=jnp.float32) * (
+            jnp.array(ptd, dtype=jnp.float32) + state.ipac + accrued_interest
+        )
 
     def _pof_ip(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
@@ -267,7 +274,7 @@ class LAMPayoffFunction(BasePayoffFunction):
         Formula: Isc × (Ipac + Y(Sd, t) × Ipnr × Ipcb)
         No R(CNTRL) — all signed state variables.
         """
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
 
         ipcb = state.ipcb if state.ipcb is not None else state.nt
         accrued_interest = yf * state.ipnr * ipcb
@@ -352,7 +359,7 @@ class LAMStateTransitionFunction(BaseStateTransitionFunction):
         """
         handler = self._build_dispatch_table().get(event_type)
         if handler is not None:
-            return handler(state, attributes, time, risk_factor_observer)
+            return handler(state, attributes, time, risk_factor_observer)  # type: ignore[no-any-return]
         return state
 
     def _stf_ad(
@@ -392,14 +399,14 @@ class LAMStateTransitionFunction(BaseStateTransitionFunction):
         if attrs.next_principal_redemption_amount is not None:
             prnxt = role_sign * jnp.array(attrs.next_principal_redemption_amount, dtype=jnp.float32)
         else:
-            prnxt = state.prnxt  # Keep auto-calculated value
+            prnxt = state.prnxt or jnp.array(0.0, dtype=jnp.float32)  # Keep auto-calculated value
 
         # Use accrued_interest from attributes if provided (signed with role_sign)
         ipac_val = role_sign * attrs.accrued_interest if attrs.accrued_interest is not None else 0.0
 
         return state.replace(
             sd=time,
-            nt=role_sign * jnp.array(attrs.notional_principal, dtype=jnp.float32),
+            nt=role_sign * jnp.array(attrs.notional_principal or 0.0, dtype=jnp.float32),
             ipnr=jnp.array(attrs.nominal_interest_rate or 0.0, dtype=jnp.float32),
             ipac=jnp.array(ipac_val, dtype=jnp.float32),
             feac=jnp.array(0.0, dtype=jnp.float32),
@@ -423,24 +430,26 @@ class LAMStateTransitionFunction(BaseStateTransitionFunction):
             Ipac = Ipac + Y(Sd, t) × Ipnr × Ipcb
             Ipcb = Nt (if IPCB='NT')
         """
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
 
         # Calculate accrued interest using current IPCB
         ipcb = state.ipcb if state.ipcb is not None else state.nt
         new_ipac = state.ipac + yf * state.ipnr * ipcb
 
         # Reduce notional (prnxt is signed), cap at remaining notional
-        effective_prnxt = jnp.sign(state.prnxt) * jnp.minimum(
-            jnp.abs(state.prnxt), jnp.abs(state.nt)
-        )
+        prnxt = state.prnxt or jnp.array(0.0, dtype=jnp.float32)
+        effective_prnxt = jnp.sign(prnxt) * jnp.minimum(jnp.abs(prnxt), jnp.abs(state.nt))
         new_nt = state.nt - effective_prnxt
 
         # Update IPCB based on mode
         ipcb_mode = attrs.interest_calculation_base or "NT"
+        new_ipcb: jnp.ndarray
         if ipcb_mode in ("NT", "NTIED"):
             new_ipcb = new_nt  # Track current notional
         else:  # NTL
-            new_ipcb = state.ipcb  # Only updated at IPCB events
+            new_ipcb = state.ipcb or jnp.array(
+                0.0, dtype=jnp.float32
+            )  # Only updated at IPCB events
 
         return state.replace(
             sd=time,
@@ -489,7 +498,7 @@ class LAMStateTransitionFunction(BaseStateTransitionFunction):
 
         Note: Not yet fully implemented.
         """
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
         ipcb = state.ipcb if state.ipcb is not None else state.nt
         new_ipac = state.ipac + yf * state.ipnr * ipcb
 
@@ -506,7 +515,7 @@ class LAMStateTransitionFunction(BaseStateTransitionFunction):
 
         Note: Not yet fully implemented.
         """
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
         ipcb = state.ipcb if state.ipcb is not None else state.nt
         new_ipac = state.ipac + yf * state.ipnr * ipcb
 
@@ -565,7 +574,7 @@ class LAMStateTransitionFunction(BaseStateTransitionFunction):
             Ipac = 0
             Ipcb = Nt (if IPCB='NT')
         """
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
         ipcb = state.ipcb if state.ipcb is not None else state.nt
         accrued = yf * state.ipnr * ipcb
 
@@ -573,10 +582,11 @@ class LAMStateTransitionFunction(BaseStateTransitionFunction):
 
         # Update IPCB if mode is 'NT'
         ipcb_mode = attrs.interest_calculation_base or "NT"
+        new_ipcb: jnp.ndarray
         if ipcb_mode == "NT":
             new_ipcb = new_nt
         else:
-            new_ipcb = state.ipcb
+            new_ipcb = state.ipcb or jnp.array(0.0, dtype=jnp.float32)
 
         return state.replace(
             sd=time, nt=new_nt, ipac=jnp.array(0.0, dtype=jnp.float32), ipcb=new_ipcb
@@ -597,7 +607,7 @@ class LAMStateTransitionFunction(BaseStateTransitionFunction):
 
         Key Feature: Only used when IPCB='NTL'.
         """
-        yf = year_fraction(state.sd, time, attrs.day_count_convention or attrs.day_count_convention)
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
         ipcb_old = state.ipcb if state.ipcb is not None else state.nt
         new_ipac = state.ipac + yf * state.ipnr * ipcb_old
 
@@ -622,9 +632,9 @@ class LAMStateTransitionFunction(BaseStateTransitionFunction):
 
         # Observe market rate
         market_object = attrs.rate_reset_market_object or ""
-        observed_rate = float(risk_factor_observer.observe_risk_factor(
-            market_object, time, state, attrs
-        ))
+        observed_rate = float(
+            risk_factor_observer.observe_risk_factor(market_object, time, state, attrs)
+        )
 
         # Apply multiplier and spread
         multiplier = attrs.rate_reset_multiplier if attrs.rate_reset_multiplier is not None else 1.0
@@ -811,9 +821,7 @@ class LinearAmortizerContract(BaseContract):
                 n_periods = math.ceil(nt / prnxt)
                 pr_anchor = attrs.principal_redemption_anchor or ied
                 # Generate enough dates to find MD
-                far_end = pr_anchor.add_period(
-                    f"{(n_periods + 2) * 12}M", EndOfMonthConvention.SD
-                )
+                far_end = pr_anchor.add_period(f"{(n_periods + 2) * 12}M", EndOfMonthConvention.SD)
                 pr_dates = generate_schedule(
                     start=pr_anchor,
                     cycle=attrs.principal_redemption_cycle,
@@ -826,20 +834,28 @@ class LinearAmortizerContract(BaseContract):
                 if len(pr_dates) >= n_periods:
                     md = pr_dates[n_periods - 1]
 
-        def _sched(anchor, cycle, end):
+        def _sched(
+            anchor: ActusDateTime, cycle: str, end: ActusDateTime | None
+        ) -> list[ActusDateTime]:
             return generate_schedule(
-                start=anchor, cycle=cycle, end=end,
+                start=anchor,
+                cycle=cycle,
+                end=end,
                 end_of_month_convention=eomc or EndOfMonthConvention.SD,
                 business_day_convention=bdc or BusinessDayConvention.NULL,
                 calendar=cal or Calendar.NO_CALENDAR,
             )
 
-        def _add(etype, time):
-            events.append(ContractEvent(
-                event_type=etype, event_time=time,
-                payoff=jnp.array(0.0, dtype=jnp.float32),
-                currency=currency, sequence=0,
-            ))
+        def _add(etype: EventType, time: ActusDateTime) -> None:
+            events.append(
+                ContractEvent(
+                    event_type=etype,
+                    event_time=time,
+                    payoff=jnp.array(0.0, dtype=jnp.float32),
+                    currency=currency,
+                    sequence=0,
+                )
+            )
 
         # IED: only if IED >= SD
         if ied >= sd:
@@ -948,12 +964,15 @@ class LinearAmortizerContract(BaseContract):
         if attrs.purchase_date:
             prd_time = attrs.purchase_date
             events = [
-                e for e in events
+                e
+                for e in events
                 if e.event_type == EventType.PRD
                 or (e.event_type != EventType.IED and e.event_time > prd_time)
             ]
 
-        events.sort(key=lambda e: (e.event_time.to_iso(), EVENT_SCHEDULE_PRIORITY.get(e.event_type, 99)))
+        events.sort(
+            key=lambda e: (e.event_time.to_iso(), EVENT_SCHEDULE_PRIORITY.get(e.event_type, 99))
+        )
 
         # If TD exists, remove all events after TD
         if attrs.termination_date:
@@ -972,9 +991,7 @@ class LinearAmortizerContract(BaseContract):
 
         return EventSchedule(events=tuple(events), contract_id=attrs.contract_id)
 
-    def _pre_simulate_to_prd(
-        self, attrs: ContractAttributes, prnxt: jnp.ndarray
-    ) -> ContractState:
+    def _pre_simulate_to_prd(self, attrs: ContractAttributes, prnxt: jnp.ndarray) -> ContractState:
         """Pre-simulate events from IED to PRD to get correct initial state.
 
         When a contract has a purchase date, events between IED and PRD
@@ -985,17 +1002,22 @@ class LinearAmortizerContract(BaseContract):
         prd = attrs.purchase_date
         sd = attrs.status_date
         md = attrs.maturity_date
-        assert ied is not None and prd is not None
+        assert ied is not None
+        assert prd is not None
 
         bdc = attrs.business_day_convention
         eomc = attrs.end_of_month_convention
         cal = attrs.calendar
 
-        def _sched(anchor, cycle, end):
+        def _sched(
+            anchor: ActusDateTime | None, cycle: str | None, end: ActusDateTime | None
+        ) -> list[ActusDateTime]:
             if anchor is None or cycle is None or end is None:
                 return []
             return generate_schedule(
-                start=anchor, cycle=cycle, end=end,
+                start=anchor,
+                cycle=cycle,
+                end=end,
                 end_of_month_convention=eomc or EndOfMonthConvention.SD,
                 business_day_convention=bdc or BusinessDayConvention.NULL,
                 calendar=cal or Calendar.NO_CALENDAR,
@@ -1057,7 +1079,7 @@ class LinearAmortizerContract(BaseContract):
         # Create initial state (pre-IED)
         state = ContractState(
             sd=ied,
-            tmd=md,
+            tmd=md or ied,
             nt=jnp.array(0.0, dtype=jnp.float32),
             ipnr=jnp.array(0.0, dtype=jnp.float32),
             ipac=jnp.array(0.0, dtype=jnp.float32),
@@ -1086,8 +1108,8 @@ class LinearAmortizerContract(BaseContract):
             ipcb = state.ipcb if state.ipcb is not None else state.nt
             new_ipac = yf * state.ipnr * ipcb  # Reset ipac to accrual from last event to SD
             if attrs.accrued_interest is not None:
-                new_ipac = attrs.accrued_interest
-            state = state.replace(sd=sd, ipac=jnp.array(0.0, dtype=jnp.float32))
+                new_ipac = jnp.array(attrs.accrued_interest, dtype=jnp.float32)
+            state = state.replace(sd=sd, ipac=new_ipac)
 
         return state
 
@@ -1118,7 +1140,8 @@ class LinearAmortizerContract(BaseContract):
             # Auto-calculate: PRNXT = NT / number_of_PR_periods
             pr_anchor = attrs.principal_redemption_anchor or ied
             pr_dates = generate_schedule(
-                start=pr_anchor, cycle=attrs.principal_redemption_cycle,
+                start=pr_anchor,
+                cycle=attrs.principal_redemption_cycle,
                 end=attrs.maturity_date,
             )
             pr_dates = [d for d in pr_dates if d <= attrs.maturity_date]
@@ -1157,7 +1180,7 @@ class LinearAmortizerContract(BaseContract):
                 ipcb_val = nt  # IPCB initialized to signed notional at IED
             return ContractState(
                 sd=init_sd,
-                tmd=attrs.maturity_date,
+                tmd=attrs.maturity_date or sd,
                 nt=jnp.array(nt, dtype=jnp.float32),
                 ipnr=jnp.array(ipnr, dtype=jnp.float32),
                 ipac=jnp.array(ipac, dtype=jnp.float32),
@@ -1170,7 +1193,7 @@ class LinearAmortizerContract(BaseContract):
 
         return ContractState(
             sd=sd,
-            tmd=attrs.maturity_date,
+            tmd=attrs.maturity_date or sd,
             nt=jnp.array(0.0, dtype=jnp.float32),  # Set at IED
             ipnr=jnp.array(0.0, dtype=jnp.float32),  # Set at IED
             ipac=jnp.array(0.0, dtype=jnp.float32),

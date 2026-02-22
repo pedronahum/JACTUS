@@ -15,7 +15,6 @@ from jactus.core import ActusDateTime
 from jactus.core.types import DayCountConvention
 from jactus.utilities import year_fraction
 
-
 # Exclude E30360ISDA as it requires maturity date parameter
 TESTABLE_DCCS = [dcc for dcc in DayCountConvention if dcc != DayCountConvention.E30360ISDA]
 
@@ -39,8 +38,7 @@ def actus_datetime(draw):
 class TestYearFractionNonNegativity:
     """Test that year fractions are non-negative when s < t."""
 
-    @given(date1=actus_datetime(), date2=actus_datetime(),
-           dcc=st.sampled_from(TESTABLE_DCCS))
+    @given(date1=actus_datetime(), date2=actus_datetime(), dcc=st.sampled_from(TESTABLE_DCCS))
     def test_non_negative_for_increasing_dates(self, date1, date2, dcc):
         """Year fraction should be non-negative when start < end."""
         assume(date1 < date2)
@@ -49,8 +47,7 @@ class TestYearFractionNonNegativity:
 
         assert yf >= 0, f"Year fraction {yf} is negative for {date1} to {date2}"
 
-    @given(date=actus_datetime(),
-           dcc=st.sampled_from(TESTABLE_DCCS))
+    @given(date=actus_datetime(), dcc=st.sampled_from(TESTABLE_DCCS))
     def test_zero_for_same_date(self, date, dcc):
         """Year fraction should be zero for same date."""
         yf = year_fraction(date, date, dcc)
@@ -61,8 +58,7 @@ class TestYearFractionNonNegativity:
 class TestYearFractionAntisymmetry:
     """Test that yf(s,t) has consistent behavior."""
 
-    @given(date1=actus_datetime(), date2=actus_datetime(),
-           dcc=st.sampled_from(TESTABLE_DCCS))
+    @given(date1=actus_datetime(), date2=actus_datetime(), dcc=st.sampled_from(TESTABLE_DCCS))
     def test_consistent_ordering(self, date1, date2, dcc):
         """Year fraction should give consistent results for ordered dates."""
         assume(date1 < date2)  # Ensure forward direction only
@@ -76,8 +72,12 @@ class TestYearFractionAntisymmetry:
 class TestYearFractionTransitivity:
     """Test approximate transitivity: yf(s,t) + yf(t,u) ≈ yf(s,u)."""
 
-    @given(date1=actus_datetime(), date2=actus_datetime(), date3=actus_datetime(),
-           dcc=st.sampled_from(TESTABLE_DCCS))
+    @given(
+        date1=actus_datetime(),
+        date2=actus_datetime(),
+        date3=actus_datetime(),
+        dcc=st.sampled_from(TESTABLE_DCCS),
+    )
     def test_approximately_transitive(self, date1, date2, date3, dcc):
         """Year fraction should be approximately transitive."""
         # Sort dates
@@ -96,16 +96,16 @@ class TestYearFractionTransitivity:
 
         # Be generous: allow up to 0.01 years (about 3.65 days) difference
         # This accounts for varying month/year lengths in day count methods
-        assert error < 0.01, \
-            f"Transitivity violated: yf({s},{t})={yf_st}, yf({t},{u})={yf_tu}, " \
+        assert error < 0.01, (
+            f"Transitivity violated: yf({s},{t})={yf_st}, yf({t},{u})={yf_tu}, "
             f"yf({s},{u})={yf_su}, error={error}"
+        )
 
 
 class TestYearFractionBounds:
     """Test that year fractions are bounded reasonably."""
 
-    @given(date1=actus_datetime(), date2=actus_datetime(),
-           dcc=st.sampled_from(TESTABLE_DCCS))
+    @given(date1=actus_datetime(), date2=actus_datetime(), dcc=st.sampled_from(TESTABLE_DCCS))
     def test_reasonable_bounds(self, date1, date2, dcc):
         """Year fraction should not exceed actual year difference significantly."""
         # Calculate year difference
@@ -115,21 +115,16 @@ class TestYearFractionBounds:
 
         # Year fraction should not exceed year diff by more than 1 year
         # (accounting for day of year differences)
-        assert yf <= year_diff + 1.1, \
+        assert yf <= year_diff + 1.1, (
             f"Year fraction {yf} too large for {year_diff} year difference"
+        )
 
-    @given(date1=actus_datetime(), date2=actus_datetime(),
-           dcc=st.sampled_from(TESTABLE_DCCS))
+    @given(date1=actus_datetime(), date2=actus_datetime(), dcc=st.sampled_from(TESTABLE_DCCS))
     def test_one_year_reasonable_range(self, date1, date2, dcc):
         """Dates exactly 1 year apart should give year fraction in reasonable range."""
         # Create date exactly 1 year later (same month/day)
         date2_oneyear = ActusDateTime(
-            date1.year + 1,
-            date1.month,
-            date1.day,
-            date1.hour,
-            date1.minute,
-            date1.second
+            date1.year + 1, date1.month, date1.day, date1.hour, date1.minute, date1.second
         )
 
         yf = year_fraction(date1, date2_oneyear, dcc)
@@ -138,15 +133,18 @@ class TestYearFractionBounds:
         # A360: 366/360 = 1.0166 (leap year)
         # A365: 366/365 = 1.0027 (leap year)
         # BUS252: 262/252 = 1.0397 (business days)
-        assert 0.97 <= yf <= 1.05, \
-            f"One year apart gives yf={yf}, expected 0.97-1.05 for {dcc}"
+        assert 0.97 <= yf <= 1.05, f"One year apart gives yf={yf}, expected 0.97-1.05 for {dcc}"
 
 
 class TestYearFractionMonotonicity:
     """Test that longer periods give larger year fractions."""
 
-    @given(start=actus_datetime(), mid=actus_datetime(), end=actus_datetime(),
-           dcc=st.sampled_from(TESTABLE_DCCS))
+    @given(
+        start=actus_datetime(),
+        mid=actus_datetime(),
+        end=actus_datetime(),
+        dcc=st.sampled_from(TESTABLE_DCCS),
+    )
     def test_monotonic_with_period_length(self, start, mid, end, dcc):
         """Longer periods should give larger year fractions."""
         # Sort to get start < mid < end

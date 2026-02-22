@@ -1,6 +1,5 @@
 """Unit tests for CAPFL (Cap-Floor) contract."""
 
-import jax.numpy as jnp
 import pytest
 
 from jactus.contracts import CapFloorContract, create_contract
@@ -9,7 +8,6 @@ from jactus.core import (
     ContractAttributes,
     ContractEvent,
     ContractRole,
-    ContractState,
     ContractType,
     EventType,
 )
@@ -304,7 +302,11 @@ class TestCAPFLPayoffAndStateTransition:
 
         event_time = ActusDateTime(2024, 6, 15, 0, 0, 0)
         state_post = stf.transition_state(
-            EventType.IP, state, attrs, event_time, rf_obs,
+            EventType.IP,
+            state,
+            attrs,
+            event_time,
+            rf_obs,
         )
 
         # IP should advance sd and preserve other fields
