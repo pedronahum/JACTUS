@@ -60,10 +60,17 @@ jobs:
 
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
-        run: |
-          pip install -e ".[dev]"
-          pip install pandas matplotlib seaborn
         shell: bash
+        run: |
+          # uvloop (transitive dep via flax->orbax-checkpoint) does not support Windows.
+          # Install the package and all deps first without flax, then add flax without its
+          # orbax dependency, then install orbax without uvloop.
+          pip install -e "." --no-deps
+          pip install jax jaxlib numpy python-dateutil typing-extensions pydantic
+          pip install flax --no-deps
+          pip install orbax-checkpoint --no-deps
+          pip install pytest pytest-cov pytest-xdist hypothesis ruff mypy
+          pip install pandas matplotlib seaborn
 
       - name: Run tests
         run: pytest tests/ --ignore=tests/performance -v -s --tb=short --color=yes
