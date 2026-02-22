@@ -53,6 +53,7 @@ docs = [
     "sphinx>=7.2.0",
     "sphinx-rtd-theme>=2.0.0",
     "sphinx-autodoc-typehints>=1.25.0",
+    "myst-parser>=2.0.0",
 ]
 
 viz = [
@@ -66,10 +67,10 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/pedronahum/jactus"
-Documentation = "https://jactus.readthedocs.io"
-Repository = "https://github.com/pedronahum/jactus"
-"Bug Tracker" = "https://github.com/pedronahum/jactus/issues"
+Homepage = "https://github.com/pedronahum/JACTUS"
+Documentation = "https://pedronahum.github.io/JACTUS/"
+Repository = "https://github.com/pedronahum/JACTUS"
+"Bug Tracker" = "https://github.com/pedronahum/JACTUS/issues"
 
 [project.scripts]
 jactus-simulate = "jactus.cli:simulate"

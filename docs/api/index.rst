@@ -404,4 +404,4 @@ See Also
 * :doc:`../quickstart` - Get started with JACTUS
 * :doc:`../guides/index` - User guides and tutorials
 * :doc:`../spec/actus_overview` - ACTUS specification overview
-* `GitHub Repository <https://github.com/pedronahum/jactus>`_
+* `GitHub Repository <https://github.com/pedronahum/JACTUS>`_

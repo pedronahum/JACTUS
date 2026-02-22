@@ -1230,7 +1230,7 @@ src/jactus/
 
 - **ACTUS Standard**: https://www.actusfrf.org/
 - **JAX Documentation**: https://jax.readthedocs.io/
-- **JACTUS Repository**: https://github.com/pedronahum/jactus
+- **JACTUS Repository**: https://github.com/pedronahum/JACTUS
 - **Examples**: `examples/pam_example.py`
 
 ---

@@ -25,8 +25,8 @@ For development, clone the repository and install in editable mode:
 
 .. code-block:: bash
 
-    git clone https://github.com/pedronahum/jactus.git
-    cd jactus
+    git clone https://github.com/pedronahum/JACTUS.git
+    cd JACTUS
     pip install -e ".[dev,docs,viz]"
 
 Optional Dependencies

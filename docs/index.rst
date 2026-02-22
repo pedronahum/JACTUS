@@ -16,6 +16,9 @@ and GPU acceleration.
    api/index
    guides/index
    spec/actus_overview
+   ARCHITECTURE
+   PAM
+   derivatives
 
 Features
 --------
@@ -33,8 +36,8 @@ Quick Links
 * :ref:`quickstart`
 * :ref:`api-reference`
 * :ref:`user-guides`
-* `GitHub Repository <https://github.com/pedronahum/jactus>`_
-* `Issue Tracker <https://github.com/pedronahum/jactus/issues>`_
+* `GitHub Repository <https://github.com/pedronahum/JACTUS>`_
+* `Issue Tracker <https://github.com/pedronahum/JACTUS/issues>`_
 
 Examples
 --------

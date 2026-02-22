@@ -4,6 +4,21 @@ This directory contains interactive Jupyter notebooks demonstrating various ACTU
 
 ## Notebooks
 
+### 00 - Getting Started with PAM (`00_getting_started_pam.ipynb`)
+**Contract Type:** PAM (Principal at Maturity)
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/pedronahum/JACTUS/blob/main/examples/notebooks/00_getting_started_pam.ipynb)
+
+The quickest way to get started with JACTUS:
+- Install JACTUS from PyPI
+- Create a simple PAM loan ($100,000 at 5% for 1 year)
+- Simulate and inspect all cash flow events
+- Understand the ACTUS event lifecycle
+
+**Key Learning:** How ACTUS models financial contracts as event-driven simulations with state transitions.
+
+---
+
 ### 01 - Annuity Mortgage (`01_annuity_mortgage.ipynb`)
 **Contract Type:** ANN (Annuity)
 
@@ -103,9 +118,9 @@ These notebooks demonstrate contract types from the **ACTUS Financial Research F
 
 ## Learn More
 
-- [JACTUS Documentation](https://docs.jactus.dev)
+- [JACTUS Documentation](https://pedronahum.github.io/JACTUS/)
 - [ACTUS Standard](https://www.actusfrf.org/)
-- [GitHub Repository](https://github.com/pedronahum/jactus)
+- [GitHub Repository](https://github.com/pedronahum/JACTUS)
 
 ## License
 

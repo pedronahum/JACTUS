@@ -19,8 +19,8 @@ By participating in this project, you agree to abide by our code of conduct:
 1. **Fork and clone the repository**
 
 ```bash
-git clone https://github.com/pedronahum/jactus.git
-cd jactus
+git clone https://github.com/pedronahum/JACTUS.git
+cd JACTUS
 ```
 
 2. **Set up the development environment**

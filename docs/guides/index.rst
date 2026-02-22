@@ -5,16 +5,6 @@ User Guides
 
 Comprehensive guides for using JACTUS to model financial contracts.
 
-.. toctree::
-   :maxdepth: 2
-
-   getting_started
-   principal_contracts
-   derivative_contracts
-   contract_composition
-   schedule_generation
-   advanced_topics
-
 Getting Started
 ---------------
 
@@ -514,7 +504,7 @@ See Also
 * :doc:`../derivatives` - Derivative contracts guide
 * :doc:`../ARCHITECTURE` - System architecture
 * :doc:`../PAM` - Deep dive into PAM implementation
-* `Examples Directory <https://github.com/pedronahum/jactus/tree/main/examples>`_
+* `Examples Directory <https://github.com/pedronahum/JACTUS/tree/main/examples>`_
 
 Additional Resources
 --------------------
@@ -537,4 +527,4 @@ Additional Resources
 
 * `ACTUS Standard <https://www.actusfrf.org/>`_
 * `JAX Documentation <https://jax.readthedocs.io/>`_
-* `GitHub Repository <https://github.com/pedronahum/jactus>`_
+* `GitHub Repository <https://github.com/pedronahum/JACTUS>`_

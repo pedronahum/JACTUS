@@ -49,27 +49,20 @@ The JACTUS MCP server provides these capabilities to AI assistants:
 
 ## Installation
 
-### Prerequisites
+### From GitHub (one command)
 
-1. **Install JACTUS** (from parent directory):
 ```bash
-cd /path/to/JACTUS
-pip install .
+pip install git+https://github.com/pedronahum/JACTUS.git#subdirectory=tools/mcp-server
 ```
 
-2. **Install MCP server**:
+This automatically installs `jactus` from PyPI as a dependency.
+
+### From a local clone
+
 ```bash
-cd tools/mcp-server
+git clone https://github.com/pedronahum/JACTUS.git
+cd JACTUS/tools/mcp-server
 pip install .
-```
-
-### With uv (recommended)
-
-```bash
-cd /path/to/JACTUS
-uv pip install .
-cd tools/mcp-server
-uv pip install .
 ```
 
 ### For Development
@@ -97,8 +90,7 @@ Add to your Claude Desktop configuration file:
   "mcpServers": {
     "jactus": {
       "command": "python",
-      "args": ["-m", "jactus_mcp"],
-      "cwd": "/path/to/JACTUS"
+      "args": ["-m", "jactus_mcp"]
     }
   }
 }
@@ -365,13 +357,8 @@ jactus-mcp/
 ### Import Errors
 
 ```bash
-# Ensure JACTUS is installed first
-cd /path/to/JACTUS
-pip install .
-
-# Then install MCP server
-cd tools/mcp-server
-pip install .
+# Reinstall MCP server (pulls jactus from PyPI automatically)
+pip install git+https://github.com/pedronahum/JACTUS.git#subdirectory=tools/mcp-server
 ```
 
 ## Contributing

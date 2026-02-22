@@ -2,8 +2,11 @@
 
 > High-performance implementation of the ACTUS financial contract standard using JAX
 
+[![PyPI](https://img.shields.io/pypi/v/jactus)](https://pypi.org/project/jactus/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://pedronahum.github.io/JACTUS/)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/pedronahum/JACTUS/blob/main/examples/notebooks/00_getting_started_pam.ipynb)
 
 <p align="center">
   <img src="docs/jactus-demo.gif" alt="JACTUS Demo">
@@ -19,7 +22,7 @@ JACTUS is a Python library that implements the **ACTUS (Algorithmic Contract Typ
 - **Automatic Differentiation**: Built-in support for gradient-based risk analytics
 - **Type Safety**: Full type annotations with mypy support
 - **Comprehensive**: Implements the complete ACTUS standard
-- **Well Tested**: 109/109 official ACTUS cross-validation test cases passing
+- **Well Tested**: 276 official ACTUS cross-validation test cases passing across all 18 contract types
 - **Production Ready**: Robust error handling, logging, and documentation
 
 ## What is ACTUS?
@@ -28,32 +31,19 @@ ACTUS (Algorithmic Contract Types Unified Standards) is a standardized framework
 
 ## Installation
 
-### From GitHub
-
 ```bash
-# Install directly from GitHub
-pip install git+https://github.com/pedronahum/JACTUS.git
-
-# Or clone and install locally
-git clone https://github.com/pedronahum/JACTUS.git
-cd JACTUS
-pip install .
+pip install jactus
 ```
 
-### Development Installation
+**Requirements:** Python 3.10+, JAX >= 0.4.20
+
+For development:
 
 ```bash
 git clone https://github.com/pedronahum/JACTUS.git
 cd JACTUS
 pip install -e ".[dev,docs,viz]"
 ```
-
-### Requirements
-
-- Python 3.10 or higher
-- JAX >= 0.4.20
-- Flax >= 0.8.0
-- NumPy >= 1.24.0
 
 ## Quick Start
 
@@ -127,9 +117,11 @@ JACTUS implements **18 ACTUS contract types** covering the complete ACTUS specif
 - **CEG** - Credit Enhancement Guarantee (credit protection)
 - **CEC** - Credit Enhancement Collateral (collateral management)
 
-**Test Coverage:** 1,200+ unit/integration tests plus 109/109 official ACTUS cross-validation cases passing
+**Test Coverage:** 1,200+ unit/integration tests plus 276 official ACTUS cross-validation cases passing across all 18 contract types
 
 ## Documentation
+
+Full documentation is available at **[pedronahum.github.io/JACTUS](https://pedronahum.github.io/JACTUS/)**, including API reference, user guides, and the ACTUS specification overview.
 
 ### Core Documentation
 
@@ -137,13 +129,16 @@ JACTUS implements **18 ACTUS contract types** covering the complete ACTUS specif
 - **[PAM Contract Walkthrough](docs/PAM.md)** - Deep dive into JACTUS internals using the Principal at Maturity contract
 - **[Derivative Contracts Guide](docs/derivatives.md)** - Complete guide to all 8 derivative contract types
 
-### API Documentation
+### Try It Now
 
-Full API documentation is available at: [jactus.readthedocs.io](https://jactus.readthedocs.io) (coming soon)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/pedronahum/JACTUS/blob/main/examples/notebooks/00_getting_started_pam.ipynb)
+
+Get started immediately with the **Getting Started** notebook — no local installation required.
 
 ### Building Documentation Locally
 
 ```bash
+pip install -e ".[docs]"
 cd docs
 make html
 # Open docs/_build/html/index.html in your browser
@@ -162,9 +157,8 @@ For Claude Code and LLM-assisted development, JACTUS includes an **MCP (Model Co
 ### Quick Setup
 
 ```bash
-# Install MCP server
-cd tools/mcp-server
-pip install .
+# Install MCP server (automatically installs jactus from PyPI)
+pip install git+https://github.com/pedronahum/JACTUS.git#subdirectory=tools/mcp-server
 ```
 
 Configure in Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
@@ -174,12 +168,13 @@ Configure in Claude Desktop (`~/Library/Application Support/Claude/claude_deskto
   "mcpServers": {
     "jactus": {
       "command": "python",
-      "args": ["-m", "jactus_mcp.server"],
-      "cwd": "/path/to/JACTUS"
+      "args": ["-m", "jactus_mcp"]
     }
   }
 }
 ```
+
+For Claude Code, the `.mcp.json` in the project root provides auto-discovery when you open the JACTUS workspace.
 
 See **[MCP Server Documentation](tools/mcp-server/README.md)** for full setup and usage.
 
@@ -234,6 +229,7 @@ make quality
 
 Hands-on tutorials with visualizations in `examples/notebooks/`:
 
+- **[00 - Getting Started (PAM)](examples/notebooks/00_getting_started_pam.ipynb)** - Quick start with a PAM contract [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/pedronahum/JACTUS/blob/main/examples/notebooks/00_getting_started_pam.ipynb)
 - **[01 - Annuity Mortgage](examples/notebooks/01_annuity_mortgage.ipynb)** - 30-year mortgage with amortization charts
 - **[02 - Options Contracts](examples/notebooks/02_options_contracts.ipynb)** - Call/Put options with payoff diagrams
 - **[03 - Interest Rate Cap](examples/notebooks/03_interest_rate_cap.ipynb)** - Interest rate protection scenarios
@@ -349,7 +345,7 @@ jactus/
 ├── tests/                  # Test suite (1,200+ tests, 95%+ coverage)
 │   ├── unit/               # Unit tests for each module
 │   ├── integration/        # Integration and end-to-end tests
-│   ├── cross_validation/   # 109/109 official ACTUS test cases
+│   ├── cross_validation/   # 276 official ACTUS cross-validation cases
 │   ├── property/           # Property-based tests (Hypothesis)
 │   └── performance/        # Performance benchmarks
 ├── docs/                   # Documentation
@@ -393,7 +389,7 @@ If you use JACTUS in your research, please cite:
   title = {JACTUS: High-performance ACTUS implementation using JAX},
   author = {Rodriguez, Pedro N.},
   year = {2025},
-  url = {https://github.com/pedronahum/jactus}
+  url = {https://github.com/pedronahum/JACTUS}
 }
 ```
 
@@ -419,21 +415,23 @@ If you use JACTUS in your research, please cite:
 **Release**: v0.1.0 - Complete implementation of ACTUS v1.1 specification ✅
 
 - ✅ 18 contract types implemented
-- ✅ 109/109 official ACTUS cross-validation test cases passing (PAM, LAM, NAM, ANN)
+- ✅ 276 official ACTUS cross-validation test cases passing across all 18 contract types
 - ✅ 1,200+ unit/integration/property tests
 - ✅ Full JAX integration with automatic differentiation
 - ✅ Production-ready with comprehensive documentation
+- ✅ Available on [PyPI](https://pypi.org/project/jactus/)
 - ✅ Apache License 2.0
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/pedronahum/jactus/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/pedronahum/jactus/discussions)
+- **Issues**: [GitHub Issues](https://github.com/pedronahum/JACTUS/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/pedronahum/JACTUS/discussions)
 - **Email**: pnrodriguezh@gmail.com
 
 ## Links
 
+- [Project Documentation](https://pedronahum.github.io/JACTUS/)
+- [PyPI Package](https://pypi.org/project/jactus/)
 - [ACTUS Standard](https://www.actusfrf.org/)
 - [JAX Documentation](https://jax.readthedocs.io/)
 - [Flax Documentation](https://flax.readthedocs.io/)
-- [Project Documentation](https://jactus.readthedocs.io)

@@ -133,7 +133,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Project Information
 - **License**: Apache License 2.0
 - **Author**: Pedro N. Rodriguez (pnrodriguezh@gmail.com)
-- **Repository**: https://github.com/pedronahum/jactus
+- **Repository**: https://github.com/pedronahum/JACTUS
 
 ### Implemented Features
 
@@ -284,5 +284,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/pedronahum/jactus/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/pedronahum/jactus/releases/tag/v0.1.0
+[Unreleased]: https://github.com/pedronahum/JACTUS/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/pedronahum/JACTUS/releases/tag/v0.1.0

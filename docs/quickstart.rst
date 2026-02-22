@@ -14,8 +14,8 @@ Install JACTUS using pip::
 
 Or for development::
 
-    git clone https://github.com/pedronahum/jactus.git
-    cd jactus
+    git clone https://github.com/pedronahum/JACTUS.git
+    cd JACTUS
     pip install -e ".[dev]"
 
 Your First Contract

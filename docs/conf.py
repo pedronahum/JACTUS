@@ -62,6 +62,7 @@ html_title = f"{project} {version} documentation"
 html_short_title = project
 html_logo = None
 html_favicon = None
+html_baseurl = "https://pedronahum.github.io/JACTUS/"
 
 # Autodoc options
 autodoc_default_options = {

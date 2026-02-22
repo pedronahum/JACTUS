@@ -10,7 +10,7 @@ Basic usage:
     0.1.0
 
 For more information, see the documentation at:
-https://jactus.readthedocs.io
+https://pedronahum.github.io/JACTUS/
 """
 
 __version__ = "0.1.0"

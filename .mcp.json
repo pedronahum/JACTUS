@@ -1,3 +1,8 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "jactus": {
+      "command": "python",
+      "args": ["-m", "jactus_mcp"]
+    }
+  }
 }

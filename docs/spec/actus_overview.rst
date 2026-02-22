@@ -448,7 +448,7 @@ See Also
 
 * :doc:`../quickstart` - Get started in 5 minutes
 * :doc:`../installation` - Installation guide
-* `GitHub Repository <https://github.com/pedronahum/jactus>`_
+* `GitHub Repository <https://github.com/pedronahum/JACTUS>`_
 
 **Working Examples:**
 
