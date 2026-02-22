@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "JAX implementation of the ACTUS financial contract standard"
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
 authors = [
     {name = "Pedro N. Rodriguez", email = "pnrodriguezh@gmail.com"},
 ]
@@ -17,7 +17,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Financial and Insurance Industry",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
