@@ -36,7 +36,12 @@ class SimulationHistory:
     Attributes:
         events: List of all events (scheduled + observed)
         states: List of states (one per event, plus initial)
-        initial_state: Contract state before first event
+        initial_state: Contract state before first event. When
+            ``IED >= SD`` (contract hasn't started yet), this is the
+            pre-IED state with ``nt=0``. When ``IED < SD`` (contract
+            already existed at status date), this reflects the post-IED
+            state reconstructed from contract attributes (``nt=notional``,
+            ``ipnr=rate``, etc.).
         final_state: Contract state after last event
 
     Example:

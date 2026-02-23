@@ -200,8 +200,24 @@ class NAMPayoffFunction(BasePayoffFunction):
         time: ActusDateTime,
         rf_obs: RiskFactorObserver,
     ) -> jnp.ndarray:
-        """POF_PP: Prepayment - observed prepayment amount."""
-        return jnp.array(0.0, dtype=jnp.float32)
+        """POF_PP_NAM: Principal Prepayment.
+
+        Formula:
+            POF_PP_NAM = X^CURS_CUR(t) × f(O_ev(CID, PP, t))
+
+        The prepayment amount is observed from the risk factor observer.
+        """
+        try:
+            pp_amount = rf_obs.observe_event(
+                attrs.contract_id or "",
+                EventType.PP,
+                time,
+                state,
+                attrs,
+            )
+            return jnp.array(float(pp_amount), dtype=jnp.float32)
+        except (KeyError, NotImplementedError, TypeError):
+            return jnp.array(0.0, dtype=jnp.float32)
 
     def _pof_py(
         self,
@@ -505,8 +521,49 @@ class NAMStateTransitionFunction(BaseStateTransitionFunction):
         risk_factor_observer: RiskFactorObserver,
         child_contract_observer: Any | None = None,
     ) -> ContractState:
-        """STF_PP: Prepayment - reduce notional, update IPCB if needed."""
-        return state.replace(sd=time)
+        """STF_PP_NAM: Prepayment - accrue interest, reduce notional, update IPCB.
+
+        Updates:
+            ipac_t = Ipac_t⁻ + Y(Sd_t⁻, t) × Ipnr_t⁻ × Ipcb_t⁻
+            nt_t = Nt_t⁻ - PP_amount
+            ipcb_t = Nt_t (if IPCB='NT')
+            sd_t = t
+        """
+        dcc = attrs.day_count_convention or DayCountConvention.A360
+        yf = year_fraction(state.sd, time, dcc)
+
+        ipcb = state.ipcb if state.ipcb is not None else state.nt
+        new_ipac = state.ipac + yf * state.ipnr * ipcb
+
+        # Get prepayment amount from risk factor observer
+        try:
+            pp_amount = float(
+                risk_factor_observer.observe_event(
+                    attrs.contract_id or "",
+                    EventType.PP,
+                    time,
+                    state,
+                    attrs,
+                )
+            )
+        except (KeyError, NotImplementedError, TypeError):
+            pp_amount = 0.0
+
+        new_nt = state.nt - jnp.array(pp_amount, dtype=jnp.float32)
+
+        # Update IPCB based on mode
+        ipcb_mode = attrs.interest_calculation_base or "NT"
+        if ipcb_mode in ("NT", "NTIED"):
+            new_ipcb = new_nt
+        else:  # NTL - only updated at IPCB events
+            new_ipcb = state.ipcb or jnp.array(0.0, dtype=jnp.float32)
+
+        return state.replace(
+            sd=time,
+            nt=new_nt,
+            ipac=new_ipac,
+            ipcb=new_ipcb,
+        )
 
     def _stf_py(
         self,

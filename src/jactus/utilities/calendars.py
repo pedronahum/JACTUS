@@ -10,7 +10,7 @@ References:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import timedelta
+from datetime import date, timedelta
 
 from jactus.core.time import ActusDateTime
 
@@ -282,6 +282,164 @@ class CustomCalendar(HolidayCalendar):
         return True
 
 
+def _easter(year: int) -> date:
+    """Compute Easter Sunday for a given year (Anonymous Gregorian algorithm).
+
+    Args:
+        year: Year to compute Easter for
+
+    Returns:
+        datetime.date of Easter Sunday
+    """
+    a = year % 19
+    b, c = divmod(year, 100)
+    d, e = divmod(b, 4)
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = divmod(c, 4)
+    el = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * el) // 451
+    month, day = divmod(h + el - 7 * m + 114, 31)
+    return date(year, month, day + 1)
+
+
+def _nth_weekday(year: int, month: int, weekday: int, n: int) -> date:
+    """Get the nth occurrence of a weekday in a given month.
+
+    Args:
+        year: Year
+        month: Month (1-12)
+        weekday: Day of week (0=Monday, 6=Sunday)
+        n: Occurrence (1=first, -1=last)
+
+    Returns:
+        datetime.date of the nth weekday
+    """
+    if n > 0:
+        # First day of month
+        first = date(year, month, 1)
+        # Days until target weekday
+        days_ahead = (weekday - first.weekday()) % 7
+        result = first + timedelta(days=days_ahead + 7 * (n - 1))
+    else:
+        # Last day of month
+        if month == 12:
+            last = date(year, 12, 31)
+        else:
+            last = date(year, month + 1, 1) - timedelta(days=1)
+        # Days back to target weekday
+        days_back = (last.weekday() - weekday) % 7
+        result = last - timedelta(days=days_back + 7 * (abs(n) - 1))
+    return result
+
+
+class TARGETCalendar(HolidayCalendar):
+    """ECB TARGET2 calendar.
+
+    TARGET (Trans-European Automated Real-time Gross Settlement Express
+    Transfer) holidays: New Year's Day, Good Friday, Easter Monday,
+    Labour Day (May 1), Christmas Day, Boxing Day.
+
+    Holiday dates are pre-computed for years 2000-2100.
+    """
+
+    def __init__(self) -> None:
+        self._holidays: set[date] = set()
+        for year in range(2000, 2101):
+            easter_sun = _easter(year)
+            self._holidays.update(
+                [
+                    date(year, 1, 1),  # New Year's Day
+                    easter_sun - timedelta(days=2),  # Good Friday
+                    easter_sun + timedelta(days=1),  # Easter Monday
+                    date(year, 5, 1),  # Labour Day
+                    date(year, 12, 25),  # Christmas Day
+                    date(year, 12, 26),  # Boxing Day
+                ]
+            )
+
+    def is_business_day(self, dt: ActusDateTime) -> bool:
+        """Check if date is a TARGET business day."""
+        py_dt = dt.to_datetime()
+        if py_dt.weekday() >= 5:
+            return False
+        return date(py_dt.year, py_dt.month, py_dt.day) not in self._holidays
+
+
+class NYSECalendar(HolidayCalendar):
+    """New York Stock Exchange calendar.
+
+    NYSE holidays: New Year's Day, MLK Day (3rd Mon Jan),
+    Presidents' Day (3rd Mon Feb), Good Friday, Memorial Day (last Mon May),
+    Juneteenth (Jun 19), Independence Day (Jul 4), Labor Day (1st Mon Sep),
+    Thanksgiving (4th Thu Nov), Christmas Day.
+
+    Holiday dates are pre-computed for years 2000-2100.
+    """
+
+    def __init__(self) -> None:
+        self._holidays: set[date] = set()
+        for year in range(2000, 2101):
+            easter_sun = _easter(year)
+            self._holidays.update(
+                [
+                    date(year, 1, 1),  # New Year's Day
+                    _nth_weekday(year, 1, 0, 3),  # MLK Day (3rd Mon Jan)
+                    _nth_weekday(year, 2, 0, 3),  # Presidents' Day (3rd Mon Feb)
+                    easter_sun - timedelta(days=2),  # Good Friday
+                    _nth_weekday(year, 5, 0, -1),  # Memorial Day (last Mon May)
+                    date(year, 6, 19),  # Juneteenth
+                    date(year, 7, 4),  # Independence Day
+                    _nth_weekday(year, 9, 0, 1),  # Labor Day (1st Mon Sep)
+                    _nth_weekday(year, 11, 3, 4),  # Thanksgiving (4th Thu Nov)
+                    date(year, 12, 25),  # Christmas Day
+                ]
+            )
+
+    def is_business_day(self, dt: ActusDateTime) -> bool:
+        """Check if date is an NYSE business day."""
+        py_dt = dt.to_datetime()
+        if py_dt.weekday() >= 5:
+            return False
+        return date(py_dt.year, py_dt.month, py_dt.day) not in self._holidays
+
+
+class UKSettlementCalendar(HolidayCalendar):
+    """UK Settlement (bank holidays) calendar.
+
+    UK bank holidays: New Year's Day, Good Friday, Easter Monday,
+    Early May Bank Holiday (1st Mon May), Spring Bank Holiday (last Mon May),
+    Summer Bank Holiday (last Mon Aug), Christmas Day, Boxing Day.
+
+    Holiday dates are pre-computed for years 2000-2100.
+    """
+
+    def __init__(self) -> None:
+        self._holidays: set[date] = set()
+        for year in range(2000, 2101):
+            easter_sun = _easter(year)
+            self._holidays.update(
+                [
+                    date(year, 1, 1),  # New Year's Day
+                    easter_sun - timedelta(days=2),  # Good Friday
+                    easter_sun + timedelta(days=1),  # Easter Monday
+                    _nth_weekday(year, 5, 0, 1),  # Early May Bank Holiday
+                    _nth_weekday(year, 5, 0, -1),  # Spring Bank Holiday
+                    _nth_weekday(year, 8, 0, -1),  # Summer Bank Holiday
+                    date(year, 12, 25),  # Christmas Day
+                    date(year, 12, 26),  # Boxing Day
+                ]
+            )
+
+    def is_business_day(self, dt: ActusDateTime) -> bool:
+        """Check if date is a UK Settlement business day."""
+        py_dt = dt.to_datetime()
+        if py_dt.weekday() >= 5:
+            return False
+        return date(py_dt.year, py_dt.month, py_dt.day) not in self._holidays
+
+
 def get_calendar(calendar_name: str) -> HolidayCalendar:
     """Factory function to get a calendar by name.
 
@@ -305,7 +463,16 @@ def get_calendar(calendar_name: str) -> HolidayCalendar:
         return NoHolidayCalendar()
     if calendar_name_upper in ("MONDAY_TO_FRIDAY", "MTF"):
         return MondayToFridayCalendar()
-    raise ValueError(f"Unknown calendar: {calendar_name}. Supported: NO_CALENDAR, MONDAY_TO_FRIDAY")
+    if calendar_name_upper in ("TARGET", "TARGET2"):
+        return TARGETCalendar()
+    if calendar_name_upper in ("NYSE",):
+        return NYSECalendar()
+    if calendar_name_upper in ("UK_SETTLEMENT", "UK"):
+        return UKSettlementCalendar()
+    raise ValueError(
+        f"Unknown calendar: {calendar_name}. "
+        "Supported: NO_CALENDAR, MONDAY_TO_FRIDAY, TARGET, NYSE, UK_SETTLEMENT"
+    )
 
 
 def is_weekend(date: ActusDateTime) -> bool:

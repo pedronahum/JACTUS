@@ -14,6 +14,7 @@ import calendar
 
 from jactus.core.time import ActusDateTime
 from jactus.core.types import DayCountConvention
+from jactus.utilities.calendars import HolidayCalendar, MondayToFridayCalendar
 
 
 def year_fraction(
@@ -21,6 +22,7 @@ def year_fraction(
     end: ActusDateTime,
     convention: DayCountConvention,
     maturity: ActusDateTime | None = None,
+    calendar: HolidayCalendar | None = None,
 ) -> float:
     """Calculate year fraction between two dates using specified convention.
 
@@ -29,6 +31,8 @@ def year_fraction(
         end: End date
         convention: Day count convention to use
         maturity: Maturity date (required for some conventions)
+        calendar: Holiday calendar for BUS/252 convention. If None, defaults
+            to MondayToFridayCalendar (Mon-Fri only, no public holidays).
 
     Returns:
         Year fraction as a float
@@ -57,7 +61,7 @@ def year_fraction(
     if convention == DayCountConvention.B30360:
         return _year_fraction_30360(start, end)
     if convention == DayCountConvention.BUS252:
-        return _year_fraction_bus252(start, end)
+        return _year_fraction_bus252(start, end, calendar)
     raise ValueError(f"Unsupported day count convention: {convention}")
 
 
@@ -210,34 +214,30 @@ def _year_fraction_30360(start: ActusDateTime, end: ActusDateTime) -> float:
     return days / 360.0
 
 
-def _year_fraction_bus252(start: ActusDateTime, end: ActusDateTime) -> float:
+def _year_fraction_bus252(
+    start: ActusDateTime,
+    end: ActusDateTime,
+    calendar: HolidayCalendar | None = None,
+) -> float:
     """BUS/252 (Brazilian business days) day count convention.
 
     Year fraction = business days / 252
 
-    Note: This is a simplified implementation that doesn't account for
-    Brazilian holidays. A production implementation would need a proper
-    holiday calendar.
+    Uses the provided holiday calendar to determine business days. If no
+    calendar is provided, defaults to MondayToFridayCalendar (Mon-Fri only,
+    no public holidays).
+
+    Args:
+        start: Start date
+        end: End date
+        calendar: Holiday calendar for business day determination.
 
     References:
         ACTUS BUS/252
     """
-    # Count business days (Mon-Fri only, no holiday handling)
-    business_days = 0
-    current = start
-
-    while current < end:
-        py_dt = current.to_datetime()
-        if py_dt.weekday() < 5:  # Monday=0, Friday=4
-            business_days += 1
-
-        # Move to next day
-        next_dt = py_dt.replace() + __import__("datetime").timedelta(days=1)
-        current = ActusDateTime(
-            next_dt.year, next_dt.month, next_dt.day, current.hour, current.minute, current.second
-        )
-
-    return business_days / 252.0
+    if calendar is None:
+        calendar = MondayToFridayCalendar()
+    return calendar.business_days_between(start, end) / 252.0
 
 
 def days_between_30_360_methods(

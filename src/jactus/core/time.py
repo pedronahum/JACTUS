@@ -487,16 +487,26 @@ def is_business_day(
     if calendar == Calendar.NO_CALENDAR:
         return True
 
-    # Check if weekend
+    # Check if weekend (applies to all standard calendars)
     if py_dt.weekday() >= 5:  # Saturday=5, Sunday=6
         return False
 
-    # For now, we only implement NO_CALENDAR and MONDAY_TO_FRIDAY
-    # Other calendars (TARGET, NYSE, etc.) would need holiday data
-    if calendar in (Calendar.MONDAY_TO_FRIDAY,):
+    if calendar == Calendar.MONDAY_TO_FRIDAY:
         return True
 
-    # For calendars we don't support yet, be conservative
+    # Dispatch to full calendar objects for holiday-aware calendars
+    if calendar in (Calendar.TARGET, Calendar.US_NYSE, Calendar.UK_SETTLEMENT):
+        from jactus.utilities.calendars import get_calendar
+
+        _calendar_name_map = {
+            Calendar.TARGET: "TARGET",
+            Calendar.US_NYSE: "NYSE",
+            Calendar.UK_SETTLEMENT: "UK_SETTLEMENT",
+        }
+        cal = get_calendar(_calendar_name_map[calendar])
+        return cal.is_business_day(dt)
+
+    # Unknown calendar - be conservative (treat as business day)
     return True
 
 
@@ -507,13 +517,27 @@ def adjust_to_business_day(
 ) -> ActusDateTime:
     """Adjust a date to a business day according to the given convention.
 
+    ACTUS business day conventions have two components:
+    - **S (Shift)**: Move the payment/settlement date to a business day.
+    - **C (Calculate)**: Use the original (unadjusted) date for accrual
+      calculations, even if the payment date was shifted.
+
+    Convention naming: ``[S|CS][F|MF|P|MP]``
+    - ``S`` prefix = Shift only (both payment and calculation use shifted date)
+    - ``CS`` prefix = Calculate-Shift (payment is shifted, calculation uses
+      original date)
+
+    Currently, all conventions implement the Shift (S) semantics for date
+    adjustment. The CS distinction is documented for callers that need to
+    track the original calculation date separately (see ``get_calculation_date``).
+
     Args:
         dt: Date to adjust
         convention: Business day convention to use
         calendar: Business day calendar
 
     Returns:
-        Adjusted date (may be same as input if already a business day)
+        Adjusted (shifted) date (may be same as input if already a business day)
 
     Example:
         >>> dt = ActusDateTime(2024, 1, 13, 0, 0, 0)  # Saturday
@@ -567,3 +591,58 @@ def adjust_to_business_day(
                 )
 
     return dt
+
+
+def is_shift_calculate(convention: BusinessDayConvention) -> bool:
+    """Check if convention is Shift-Calculate (S prefix).
+
+    In SC conventions, both the payment date and the calculation date are
+    shifted to a business day together.
+
+    Args:
+        convention: Business day convention
+
+    Returns:
+        True if this is a Shift-only convention (SCF, SCMF, SCP, SCMP)
+    """
+    return convention.value.startswith("SC")
+
+
+def is_calculate_shift(convention: BusinessDayConvention) -> bool:
+    """Check if convention is Calculate-Shift (CS prefix).
+
+    In CS conventions, the payment date is shifted to a business day, but
+    the calculation date remains the original (unadjusted) date. This means
+    interest accrual uses the scheduled date, not the actual payment date.
+
+    Args:
+        convention: Business day convention
+
+    Returns:
+        True if this is a Calculate-Shift convention (CSF, CSMF, CSP, CSMP)
+    """
+    return convention.value.startswith("CS")
+
+
+def get_calculation_date(
+    original_dt: ActusDateTime,
+    shifted_dt: ActusDateTime,
+    convention: BusinessDayConvention,
+) -> ActusDateTime:
+    """Get the date to use for accrual calculations.
+
+    For SC (Shift-Calculate) conventions, returns the shifted date.
+    For CS (Calculate-Shift) conventions, returns the original date.
+    For NULL convention, returns the original date.
+
+    Args:
+        original_dt: The original scheduled date (before adjustment)
+        shifted_dt: The business-day-adjusted date
+        convention: Business day convention
+
+    Returns:
+        Date to use for interest accrual calculations
+    """
+    if is_calculate_shift(convention):
+        return original_dt
+    return shifted_dt

@@ -196,11 +196,24 @@ class LAMPayoffFunction(BasePayoffFunction):
         time: ActusDateTime,
         rf_obs: RiskFactorObserver,
     ) -> jnp.ndarray:
-        """POF_PP: Prepayment - observed prepayment amount.
+        """POF_PP_LAM: Principal Prepayment.
 
-        Note: Amount from risk factor observer, not yet implemented.
+        Formula:
+            POF_PP_LAM = X^CURS_CUR(t) × f(O_ev(CID, PP, t))
+
+        The prepayment amount is observed from the risk factor observer.
         """
-        return jnp.array(0.0, dtype=jnp.float32)
+        try:
+            pp_amount = rf_obs.observe_event(
+                attrs.contract_id or "",
+                EventType.PP,
+                time,
+                state,
+                attrs,
+            )
+            return jnp.array(float(pp_amount), dtype=jnp.float32)
+        except (KeyError, NotImplementedError, TypeError):
+            return jnp.array(0.0, dtype=jnp.float32)
 
     def _pof_py(
         self,
@@ -481,11 +494,49 @@ class LAMStateTransitionFunction(BaseStateTransitionFunction):
         time: ActusDateTime,
         risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
-        """STF_PP: Prepayment - reduce notional, update IPCB if needed.
+        """STF_PP_LAM: Prepayment - accrue interest, reduce notional, update IPCB.
 
-        Note: Not yet fully implemented.
+        Updates:
+            ipac_t = Ipac_t⁻ + Y(Sd_t⁻, t) × Ipnr_t⁻ × Ipcb_t⁻
+            nt_t = Nt_t⁻ - PP_amount
+            ipcb_t = Nt_t (if IPCB='NT')
+            sd_t = t
         """
-        return state.replace(sd=time)
+        dcc = attrs.day_count_convention or DayCountConvention.A360
+        yf = year_fraction(state.sd, time, dcc)
+
+        ipcb = state.ipcb if state.ipcb is not None else state.nt
+        new_ipac = state.ipac + yf * state.ipnr * ipcb
+
+        # Get prepayment amount from risk factor observer
+        try:
+            pp_amount = float(
+                risk_factor_observer.observe_event(
+                    attrs.contract_id or "",
+                    EventType.PP,
+                    time,
+                    state,
+                    attrs,
+                )
+            )
+        except (KeyError, NotImplementedError, TypeError):
+            pp_amount = 0.0
+
+        new_nt = state.nt - jnp.array(pp_amount, dtype=jnp.float32)
+
+        # Update IPCB based on mode
+        ipcb_mode = attrs.interest_calculation_base or "NT"
+        if ipcb_mode in ("NT", "NTIED"):
+            new_ipcb = new_nt
+        else:  # NTL - only updated at IPCB events
+            new_ipcb = state.ipcb or jnp.array(0.0, dtype=jnp.float32)
+
+        return state.replace(
+            sd=time,
+            nt=new_nt,
+            ipac=new_ipac,
+            ipcb=new_ipcb,
+        )
 
     def _stf_py(
         self,
@@ -1102,14 +1153,12 @@ class LinearAmortizerContract(BaseContract):
             )
 
         # When IED < SD, advance state to SD (accrual before SD is not reported)
+        # Note: ipac is reset to 0 (or user-specified accrued_interest) because
+        # POF_PRD will compute accrual from SD to PRD. Setting ipac to the accrual
+        # from last event to SD would double-count interest.
         if ied < sd and sd < prd:
-            dcc = attrs.day_count_convention or DayCountConvention.A360
-            yf = year_fraction(state.sd, sd, dcc)
-            ipcb = state.ipcb if state.ipcb is not None else state.nt
-            new_ipac = yf * state.ipnr * ipcb  # Reset ipac to accrual from last event to SD
-            if attrs.accrued_interest is not None:
-                new_ipac = jnp.array(attrs.accrued_interest, dtype=jnp.float32)
-            state = state.replace(sd=sd, ipac=new_ipac)
+            ipac = jnp.array(attrs.accrued_interest or 0.0, dtype=jnp.float32)
+            state = state.replace(sd=sd, ipac=ipac)
 
         return state
 

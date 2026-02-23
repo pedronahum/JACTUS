@@ -656,19 +656,34 @@ class PAMStateTransitionFunction(BaseStateTransitionFunction):
 
         Updates:
             ipac_t = Ipac_t⁻ + Y(Sd_t⁻, t) × Ipnr_t⁻ × Nt_t⁻
-            nt_t = Nt_t⁻ - prepayment_amount
+            nt_t = Nt_t⁻ - PP_amount
             sd_t = t
         """
-        # For now, just accrue interest and update sd
         dcc = attributes.day_count_convention or DayCountConvention.A360
         yf = year_fraction(state_pre.sd, time, dcc)
 
         ipac = float(state_pre.ipac) + yf * float(state_pre.ipnr) * float(state_pre.nt)
 
+        # Get prepayment amount from risk factor observer
+        try:
+            pp_amount = float(
+                risk_factor_observer.observe_event(
+                    attributes.contract_id or "",
+                    EventType.PP,
+                    time,
+                    state_pre,
+                    attributes,
+                )
+            )
+        except (KeyError, NotImplementedError, TypeError):
+            pp_amount = 0.0
+
+        new_nt = float(state_pre.nt) - pp_amount
+
         return ContractState(
             sd=time,
             tmd=state_pre.tmd,
-            nt=state_pre.nt,  # TODO: reduce by prepayment amount
+            nt=jnp.array(new_nt, dtype=jnp.float32),
             ipnr=state_pre.ipnr,
             ipac=jnp.array(ipac, dtype=jnp.float32),
             feac=state_pre.feac,
