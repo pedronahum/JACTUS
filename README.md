@@ -412,7 +412,7 @@ If you use JACTUS in your research, please cite:
 
 ## Project Status
 
-**Release**: v0.1.1 - Complete implementation of ACTUS v1.1 specification ✅
+**Release**: v0.1.2 - Complete implementation of ACTUS v1.1 specification ✅
 
 - ✅ 18 contract types implemented
 - ✅ 276 official ACTUS cross-validation test cases passing across all 18 contract types

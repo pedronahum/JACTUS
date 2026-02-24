@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-02-24
+
+### Added
+- **Risk Factor Observers**: Four new observer types for realistic market data modeling:
+  - `TimeSeriesRiskFactorObserver`: Time-varying market data with step/linear
+    interpolation and flat/raise extrapolation
+  - `CurveRiskFactorObserver`: Yield/rate curves keyed by tenor with linear/log-linear
+    interpolation
+  - `CallbackRiskFactorObserver`: Delegates to user-provided callables for custom logic
+  - `CompositeRiskFactorObserver`: Chains multiple observers with priority-based fallback
+  - 44 new tests covering interpolation, extrapolation, fallback chains, and integration
+- **MCP Composite Contract Simulation**: All 18 ACTUS contract types now simulatable
+  via MCP. Added `child_contracts` parameter to `jactus_simulate_contract` for
+  composite types (SWAPS, CAPFL, CEG, CEC) — child contracts are simulated first and
+  results fed into the parent via `SimulatedChildContractObserver`.
+- **MCP Time-Series Simulation**: Added `time_series`, `interpolation`, and
+  `extrapolation` parameters to `jactus_simulate_contract` for market-data-dependent
+  contracts.
+- **MCP Pagination**: Added `event_limit` and `event_offset` parameters with
+  auto-truncation for large outputs (prevents token limit issues with `include_states`).
+- **MCP Observer Discovery**: New `jactus_list_risk_factor_observers` tool for
+  discovering available observer types and their MCP parameters.
+- **MCP Server Instructions**: Added workflow guidance and expanded all tool docstrings
+  with context, examples, and next-step hints.
+- **AI Agent Instructions**: Added GROK.md; updated CLAUDE.md, AGENTS.md, GEMINI.md
+  with MCP-first workflow guidance.
+
+### Fixed
+- Corrected field names in docs and examples: `interest_payment_anchor` (was
+  `cycle_anchor_date_of_interest_payment`), `next_principal_redemption_amount` (was
+  `next_principal_redemption_payment`), `principal_redemption_cycle` (was
+  `principal_redemption_cycle_anchor`).
+- MCP schema accuracy: moved `contract_id` to required fields, added
+  `nominal_interest_rate_2` to SWPPV required fields.
+- Granular MCP error handling with `error_type` field for better diagnostics.
+
+## [0.1.1] - 2026-02-23
+
 ### Fixed
 - **109/109 ACTUS Cross-Validation Compliance**: All PAM, LAM, NAM, and ANN official
   test cases now pass, up from partial compliance.
@@ -17,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shifted position.
 - **Schedule Generation**: Fixed `generate_schedule` (`schedules.py`) to compute
   dates from the anchor using cumulative offsets, avoiding day-capping drift.
-  E.g., Jan 30 → Feb 28 → Mar 28 was incorrect; now computes Jan 30 + 2M = Mar 30
+  E.g., Jan 30 -> Feb 28 -> Mar 28 was incorrect; now computes Jan 30 + 2M = Mar 30
   directly. Also restricted EOM convention to month-based periods (M/Q/H/Y) only.
 - **PAM/LAM/NAM/ANN Role Sign**: Removed spurious `R(CNTRL)` from payoff functions
   (IP, PR, MD, FP, PY, PRD, TD) where state variables (`Nt`, `Ipac`, `Feac`,
@@ -30,7 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prevent `Nt` from going negative after the final redemption period.
 - **NAM Open-Ended Contracts**: Handle NAM contracts without explicit maturity date
   by deriving MD from the test horizon.
-- **Attributes IED < SD**: Relaxed `initial_exchange_date ≥ status_date` validation
+- **Attributes IED < SD**: Relaxed `initial_exchange_date >= status_date` validation
   — per ACTUS spec, IED before SD is allowed (contract existed before the observation
   date). When IED < SD, the IED event is skipped but state initializes as if IED
   occurred.
@@ -55,11 +93,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `py_dt.year` for the year component.
 - **PAM**: Implemented IPAC/IPANX initialization in STF_IED (`pam.py:538`). At
   initial exchange, accrued interest is now set from the IPAC attribute if provided,
-  or calculated as `Y(IPANX, IED) × IPNR × |NT|` when the interest payment anchor
+  or calculated as `Y(IPANX, IED) x IPNR x |NT|` when the interest payment anchor
   (IPANX) precedes the initial exchange date. Previously always initialized to 0.0.
 - **CAPFL**: Implemented proper cap/floor payoff mechanism (`capfl.py`). CAPFL now
-  computes cap payoffs as `max(0, rate - cap_rate) × NT × YF` and floor payoffs as
-  `max(0, floor_rate - rate) × NT × YF`. Added STF_RR to observe market rates and
+  computes cap payoffs as `max(0, rate - cap_rate) x NT x YF` and floor payoffs as
+  `max(0, floor_rate - rate) x NT x YF`. Added STF_RR to observe market rates and
   track the floating rate. Supports embedded underlier terms with automatic schedule
   generation from the underlier's IP/RR cycles. IP events correctly run before RR
   events at the same timestamp so payoffs use the previous period's rate. Validated
@@ -72,13 +110,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **PP** (Principal Prepayment): Observes prepayment amount from risk factor observer
     via `_get_event_data(CID, PP, t)`. Returns 0.0 when no observer data available.
   - **PY** (Penalty Payment): Supports all three ACTUS penalty types — 'A' (absolute
-    fixed amount), 'N' (notional percentage `Y × Nt × PYRT`), 'I' (interest rate
+    fixed amount), 'N' (notional percentage `Y x Nt x PYRT`), 'I' (interest rate
     differential, falls back to type N).
   - **FP** (Fee Payment): Supports FEB='A' (absolute `FER`) and FEB='N' (notional
-    percentage `Y × Nt × FER + Feac`). Default returns accrued fees.
-  - **PRD** (Purchase): `R(CNTRL) × (-1) × (PPRD + Ipac + Y × Ipnr × Nt)` — buyer
+    percentage `Y x Nt x FER + Feac`). Default returns accrued fees.
+  - **PRD** (Purchase): `R(CNTRL) x (-1) x (PPRD + Ipac + Y x Ipnr x Nt)` — buyer
     pays purchase price plus accrued interest.
-  - **TD** (Termination): `R(CNTRL) × (PTD + Ipac + Y × Ipnr × Nt)` — seller receives
+  - **TD** (Termination): `R(CNTRL) x (PTD + Ipac + Y x Ipnr x Nt)` — seller receives
     termination price plus accrued interest.
   Previously all five returned 0.0.
 
@@ -88,15 +126,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   generate schedule dates without BDC, then shift `event_time` for display while
   preserving the original date in `calculation_time` for accrual calculations.
 - **Event Priority**: Added `EVENT_SCHEDULE_PRIORITY` mapping in `types.py` defining
-  ACTUS-compliant processing order for same-date events (AD → IED → PR → IP → IPCI
-  → RR → IPCB → SC → FP → PRD → TD → MD).
+  ACTUS-compliant processing order for same-date events (AD -> IED -> PR -> IP -> IPCI
+  -> RR -> IPCB -> SC -> FP -> PRD -> TD -> MD).
 - **Scaling (SC)**: Implemented STF_SC state transition with market data observation
   via `SCMO` risk factor. SC events are now scheduled and processed with correct
   priority (after PR/IP/RR/IPCB).
 - **Event Dispatch**: Refactored POF/STF event dispatch in PAM, LAM, NAM, and ANN
   contracts from if/elif chains to dictionary-based dispatch tables with O(1) lookup.
   Each POF/STF class now has a `_build_dispatch_table()` method returning an
-  `EventType → handler` dict. ANN composes its table by extending NAM's dispatch
+  `EventType -> handler` dict. ANN composes its table by extending NAM's dispatch
   and overriding RR/RRF entries. Added `EventType.index` property with stable integer
   mapping in `types.py` to support future `jax.lax.switch` migration for full JIT
   compilation of the simulation loop.
@@ -118,7 +156,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `runner.py`: Generic comparison engine that aligns events by (date, type) pairs
     for robust comparison even when schedule generation differs
   - Tests for PAM (25 cases), LAM, NAM, ANN contract types — all 109 cases passing
-
 - MCP (Model Context Protocol) server for AI-assisted development
   - 10 tools for contract discovery, validation, examples, documentation, and system diagnostics
   - 4 MCP resources providing direct access to JACTUS documentation
@@ -284,5 +321,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/pedronahum/JACTUS/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/pedronahum/JACTUS/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/pedronahum/JACTUS/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/pedronahum/JACTUS/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/pedronahum/JACTUS/releases/tag/v0.1.0

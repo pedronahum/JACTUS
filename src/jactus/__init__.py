@@ -7,13 +7,13 @@ differentiation and GPU acceleration.
 Basic usage:
     >>> import jactus
     >>> print(jactus.__version__)
-    0.1.0
+    0.1.2
 
 For more information, see the documentation at:
 https://pedronahum.github.io/JACTUS/
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.2"
 __author__ = "Pedro N. Rodriguez"
 __license__ = "Apache-2.0"
 

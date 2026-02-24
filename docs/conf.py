@@ -11,8 +11,8 @@ sys.path.insert(0, os.path.abspath("../src"))
 project = "jactus"
 author = "Pedro N. Rodriguez"
 copyright = f"{datetime.now().year}, {author}"
-version = "0.1.0"
-release = "0.1.0"
+version = "0.1.2"
+release = "0.1.2"
 
 # General configuration
 extensions = [

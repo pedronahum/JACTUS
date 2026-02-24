@@ -85,7 +85,7 @@ Verify your installation:
 
     import jactus
     print(jactus.__version__)
-    # Output: 0.1.0
+    # Output: 0.1.2
 
 Test JAX is working:
 
