@@ -115,6 +115,7 @@ def get_contract_schema(contract_type: str) -> dict[str, Any]:
     # Base required fields (always needed)
     base_required = {
         "contract_type": "ContractType enum",
+        "contract_id": "str - Unique contract identifier",
         "status_date": "ActusDateTime - Contract status date",
         "contract_role": "ContractRole enum - RPA (lender) or RPL (borrower)",
     }
@@ -214,6 +215,7 @@ def get_contract_schema(contract_type: str) -> dict[str, Any]:
             "maturity_date": "ActusDateTime",
             "notional_principal": "float",
             "nominal_interest_rate": "float - Fixed leg rate",
+            "nominal_interest_rate_2": "float - Initial floating leg rate (IPNR2)",
             "interest_payment_cycle": "str - Payment frequency (e.g., '3M', '6M')",
             "rate_reset_cycle": "str - Floating leg reset frequency",
         },
@@ -254,7 +256,6 @@ def get_contract_schema(contract_type: str) -> dict[str, Any]:
 
     # Common optional fields
     optional = {
-        "contract_id": "str - Unique identifier",
         "currency": "str - ISO currency code (default: USD)",
         "contract_deal_date": "ActusDateTime (CDD)",
         # Schedule cycles and anchors
@@ -296,6 +297,8 @@ def get_contract_schema(contract_type: str) -> dict[str, Any]:
         "amortization_date": "ActusDateTime (AMD)",
         "penalty_type": "str (PYTP)",
         "penalty_rate": "float (PYRT)",
+        "nominal_interest_rate_2": "float - Second nominal interest rate for swaps (IPNR2)",
+        "delivery_settlement": "str - Settlement type: 'D' (delivery/net) or 'S' (settlement/gross)",
     }
 
     return {
@@ -317,6 +320,89 @@ rf_observer = ConstantRiskFactorObserver(constant_value=0.0)
 contract = create_contract(attrs, rf_observer)
 result = contract.simulate()
 """,
+    }
+
+
+def list_risk_factor_observers() -> dict[str, Any]:
+    """List all available risk factor observer types with usage guidance.
+
+    Returns:
+        Dictionary with observer types, descriptions, and usage guidance.
+    """
+    return {
+        "observers": {
+            "ConstantRiskFactorObserver": {
+                "description": "Returns the same constant value for all risk factors",
+                "use_case": "Fixed-rate contracts, testing, simple scenarios",
+                "mcp_param": "constant_value",
+                "example": {"constant_value": 0.05},
+            },
+            "DictRiskFactorObserver": {
+                "description": "Maps risk factor identifiers to fixed values",
+                "use_case": "Contracts needing different fixed values per risk factor identifier",
+                "mcp_param": "risk_factors",
+                "example": {"risk_factors": {"LIBOR-3M": 0.05, "USD/EUR": 1.18}},
+            },
+            "TimeSeriesRiskFactorObserver": {
+                "description": "Maps identifiers to time series with step or linear interpolation",
+                "use_case": "Floating-rate contracts with rate resets that need time-varying data",
+                "mcp_param": "time_series",
+                "interpolation_note": (
+                    "Step vs linear only differ when a query date falls BETWEEN data points. "
+                    "If rate reset dates align exactly with data points, both modes give identical "
+                    "results. To see the difference, place data points at different dates than "
+                    "the reset dates (e.g., quarterly data with monthly resets)."
+                ),
+                "example": {
+                    "time_series": {
+                        "LIBOR-3M": [
+                            ["2024-01-01", 0.04],
+                            ["2024-07-01", 0.045],
+                            ["2025-01-01", 0.05],
+                        ]
+                    },
+                    "interpolation": "step",
+                },
+            },
+            "CurveRiskFactorObserver": {
+                "description": "Yield/rate curves keyed by tenor for term structure modeling",
+                "use_case": "Term structure modeling, yield curve-dependent pricing",
+                "python_only": True,
+            },
+            "CompositeRiskFactorObserver": {
+                "description": "Chains multiple observers with fallback behavior",
+                "use_case": "Complex scenarios needing different data sources per risk factor",
+                "python_only": True,
+            },
+            "CallbackRiskFactorObserver": {
+                "description": "Delegates to user-provided Python callables",
+                "use_case": "Custom pricing models, external data integration",
+                "python_only": True,
+            },
+            "JaxRiskFactorObserver": {
+                "description": "Integer-indexed, fully JAX-compatible for jit/grad/vmap",
+                "use_case": "Automatic differentiation, sensitivity analysis, batch scenarios",
+                "python_only": True,
+            },
+        },
+        "guidance": {
+            "simple_fixed_rate": (
+                "Use constant_value=0.0 (default) for contracts with fixed rates "
+                "and no market-dependent features"
+            ),
+            "multiple_market_factors": (
+                "Use risk_factors dict when the contract references specific market "
+                "objects (e.g., rate_reset_market_object)"
+            ),
+            "time_varying_rates": (
+                "Use time_series for floating-rate contracts with rate resets "
+                "that need temporal market data"
+            ),
+            "advanced": (
+                "For yield curves, composites, callbacks, or JAX gradients, "
+                "use the Python API directly"
+            ),
+        },
     }
 
 

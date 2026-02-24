@@ -155,6 +155,11 @@ def validate_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
                     "valid": False,
                     "errors": ["SWPPV requires rate_reset_cycle"],
                 }
+            if attrs.nominal_interest_rate_2 is None:
+                return {
+                    "valid": False,
+                    "errors": ["SWPPV requires nominal_interest_rate_2 (initial floating leg rate)"],
+                }
 
         if contract_type == "FXOUT":
             if not attrs.delivery_settlement:

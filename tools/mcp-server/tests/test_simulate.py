@@ -156,3 +156,185 @@ def test_prepare_attributes_converts_dates():
 
     assert isinstance(attrs["status_date"], ActusDateTime)
     assert isinstance(attrs["initial_exchange_date"], ActusDateTime)
+
+
+def test_simulate_with_time_series(pam_attributes):
+    """Test simulation with TimeSeriesRiskFactorObserver."""
+    result = simulate.simulate_contract(
+        pam_attributes,
+        time_series={
+            "RATE": [
+                ["2024-01-01", 0.04],
+                ["2024-07-01", 0.045],
+                ["2025-01-01", 0.05],
+            ]
+        },
+    )
+
+    assert result["success"] is True
+    assert result["num_events"] > 0
+
+
+def test_simulate_time_series_linear_interpolation(pam_attributes):
+    """Test simulation with linear interpolation time series."""
+    result = simulate.simulate_contract(
+        pam_attributes,
+        time_series={"RATE": [["2024-01-01", 0.04], ["2025-01-01", 0.05]]},
+        interpolation="linear",
+    )
+    assert result["success"] is True
+
+
+def test_simulate_time_series_takes_priority_over_risk_factors(pam_attributes):
+    """Test that time_series takes priority when both are provided."""
+    result = simulate.simulate_contract(
+        pam_attributes,
+        risk_factors={"RATE": 999.0},
+        time_series={"RATE": [["2024-01-01", 0.04]]},
+    )
+    assert result["success"] is True
+
+
+def test_simulate_time_series_invalid_format():
+    """Test error handling for invalid time series format."""
+    attrs = {
+        "contract_type": "PAM",
+        "contract_id": "TEST",
+        "contract_role": "RPA",
+        "status_date": "2024-01-01",
+        "initial_exchange_date": "2024-01-15",
+        "maturity_date": "2025-01-15",
+        "notional_principal": 100000.0,
+        "nominal_interest_rate": 0.05,
+    }
+    result = simulate.simulate_contract(
+        attrs,
+        time_series={"RATE": [["2024-01-01"]]},  # Missing value
+    )
+    assert result["success"] is False
+    assert "error" in result
+
+
+def test_simulate_granular_error_invalid_enum():
+    """Test that invalid enum values return error_type field."""
+    result = simulate.simulate_contract({
+        "contract_type": "INVALID",
+        "contract_role": "RPA",
+        "status_date": "2024-01-01",
+    })
+    assert result["success"] is False
+    assert result["error_type"] == "invalid_attribute"
+
+
+def test_simulate_granular_error_missing_fields():
+    """Test that missing required fields return appropriate error."""
+    result = simulate.simulate_contract({
+        "contract_type": "PAM",
+        "contract_role": "RPA",
+        # Missing status_date
+    })
+    assert result["success"] is False
+    assert "error_type" in result
+
+
+# ---- Pagination tests ----
+
+
+@pytest.fixture
+def lam_attributes():
+    """LAM contract with monthly payments over 4+ years (many events)."""
+    return {
+        "contract_type": "LAM",
+        "contract_id": "TEST-LAM-001",
+        "contract_role": "RPA",
+        "status_date": "2024-01-01",
+        "initial_exchange_date": "2024-01-01",
+        "maturity_date": "2028-01-01",
+        "notional_principal": 500000.0,
+        "nominal_interest_rate": 0.05,
+        "interest_payment_cycle": "1M",
+        "principal_redemption_cycle": "1M",
+        "next_principal_redemption_amount": 10000.0,
+        "day_count_convention": "A365",
+    }
+
+
+def test_simulate_event_limit(lam_attributes):
+    """Test that event_limit restricts the number of returned events."""
+    result = simulate.simulate_contract(lam_attributes, event_limit=3)
+
+    assert result["success"] is True
+    assert len(result["events"]) == 3
+    assert result["num_events"] > 3  # total is larger
+    assert "pagination" in result
+    assert result["pagination"]["limit"] == 3
+    assert result["pagination"]["returned"] == 3
+    assert result["pagination"]["total_events"] == result["num_events"]
+
+
+def test_simulate_event_offset(lam_attributes):
+    """Test that event_offset skips events from the beginning."""
+    full = simulate.simulate_contract(lam_attributes)
+    offset_result = simulate.simulate_contract(lam_attributes, event_offset=2)
+
+    assert offset_result["success"] is True
+    assert "pagination" in offset_result
+    assert offset_result["pagination"]["offset"] == 2
+    # First event of offset result should be the third event of the full result
+    assert offset_result["events"][0] == full["events"][2]
+
+
+def test_simulate_event_limit_and_offset(lam_attributes):
+    """Test combined limit and offset for pagination."""
+    full = simulate.simulate_contract(lam_attributes)
+    page = simulate.simulate_contract(lam_attributes, event_limit=2, event_offset=1)
+
+    assert page["success"] is True
+    assert len(page["events"]) == 2
+    assert page["events"][0] == full["events"][1]
+    assert page["events"][1] == full["events"][2]
+    assert page["pagination"]["total_events"] == full["num_events"]
+
+
+def test_simulate_summary_covers_all_events(lam_attributes):
+    """Test that summary is computed from all events, not just the page."""
+    full = simulate.simulate_contract(lam_attributes)
+    page = simulate.simulate_contract(lam_attributes, event_limit=2)
+
+    # Summaries should be identical regardless of pagination
+    assert page["summary"] == full["summary"]
+
+
+def test_simulate_auto_truncation_with_states(lam_attributes):
+    """Test that include_states auto-truncates when output is too large."""
+    result = simulate.simulate_contract(lam_attributes, include_states=True)
+
+    assert result["success"] is True
+    # With 4 years of monthly events + states, output should be auto-truncated
+    if result["num_events"] > 10:
+        assert "pagination" in result
+        assert result["pagination"].get("truncated") is True
+        assert len(result["events"]) <= 10
+        assert result["pagination"]["total_events"] == result["num_events"]
+
+
+def test_simulate_no_truncation_without_states(lam_attributes):
+    """Test that without include_states, output is not auto-truncated."""
+    result = simulate.simulate_contract(lam_attributes, include_states=False)
+
+    assert result["success"] is True
+    assert len(result["events"]) == result["num_events"]
+    assert "pagination" not in result
+
+
+def test_simulate_explicit_limit_skips_auto_truncation(lam_attributes):
+    """Test that explicit event_limit prevents auto-truncation."""
+    result = simulate.simulate_contract(
+        lam_attributes, include_states=True, event_limit=5
+    )
+
+    assert result["success"] is True
+    assert len(result["events"]) == 5
+    assert result["pagination"]["limit"] == 5
+    # Should not have truncated flag since explicit limit was used
+    assert result["pagination"].get("truncated") is not True
