@@ -852,8 +852,7 @@ class CompositeRiskFactorObserver(BaseRiskFactorObserver):
             except KeyError:
                 continue
         raise KeyError(
-            f"Risk factor '{identifier}' not found in any observer "
-            f"in composite '{self.name}'"
+            f"Risk factor '{identifier}' not found in any observer in composite '{self.name}'"
         )
 
     def _get_event_data(
@@ -885,8 +884,7 @@ class CompositeRiskFactorObserver(BaseRiskFactorObserver):
             except KeyError:
                 continue
         raise KeyError(
-            f"Event data '{identifier}' not found in any observer "
-            f"in composite '{self.name}'"
+            f"Event data '{identifier}' not found in any observer in composite '{self.name}'"
         )
 
 

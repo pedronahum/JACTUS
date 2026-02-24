@@ -778,12 +778,16 @@ class TestTimeSeriesRiskFactorObserver:
     def test_init_invalid_interpolation_raises(self):
         """Invalid interpolation method raises ValueError."""
         with pytest.raises(ValueError, match="interpolation"):
-            TimeSeriesRiskFactorObserver({"R": [(ActusDateTime(2024, 1, 1), 0.0)]}, interpolation="cubic")
+            TimeSeriesRiskFactorObserver(
+                {"R": [(ActusDateTime(2024, 1, 1), 0.0)]}, interpolation="cubic"
+            )
 
     def test_init_invalid_extrapolation_raises(self):
         """Invalid extrapolation method raises ValueError."""
         with pytest.raises(ValueError, match="extrapolation"):
-            TimeSeriesRiskFactorObserver({"R": [(ActusDateTime(2024, 1, 1), 0.0)]}, extrapolation="none")
+            TimeSeriesRiskFactorObserver(
+                {"R": [(ActusDateTime(2024, 1, 1), 0.0)]}, extrapolation="none"
+            )
 
     def test_step_interpolation_at_exact_point(self):
         """Step interpolation returns exact value at data point."""
@@ -962,9 +966,7 @@ class TestCurveRiskFactorObserver:
     def test_init_invalid_interpolation_raises(self):
         """Invalid interpolation raises ValueError."""
         with pytest.raises(ValueError, match="interpolation"):
-            CurveRiskFactorObserver(
-                curves={"Y": [(1.0, 0.04)]}, interpolation="cubic"
-            )
+            CurveRiskFactorObserver(curves={"Y": [(1.0, 0.04)]}, interpolation="cubic")
 
     def test_linear_interpolation_at_exact_tenor(self):
         """Linear interpolation returns exact rate at tenor point."""
@@ -1041,9 +1043,7 @@ class TestCurveRiskFactorObserver:
             contract_role=ContractRole.RPA,
             status_date=ActusDateTime(2024, 1, 1),
         )
-        result = observer.observe_risk_factor(
-            "YIELD", ActusDateTime(2025, 1, 1), attributes=attrs
-        )
+        result = observer.observe_risk_factor("YIELD", ActusDateTime(2025, 1, 1), attributes=attrs)
         assert jnp.allclose(result, jnp.array(0.04, dtype=jnp.float32), atol=1e-3)
 
     def test_no_reference_date_no_attributes_raises(self):
@@ -1216,12 +1216,14 @@ class TestCompositeRiskFactorObserver:
 
     def test_timeseries_with_constant_fallback(self):
         """TimeSeriesRiskFactorObserver with ConstantRiskFactorObserver fallback."""
-        ts = TimeSeriesRiskFactorObserver({
-            "LIBOR-3M": [
-                (ActusDateTime(2024, 1, 1), 0.04),
-                (ActusDateTime(2025, 1, 1), 0.05),
-            ]
-        })
+        ts = TimeSeriesRiskFactorObserver(
+            {
+                "LIBOR-3M": [
+                    (ActusDateTime(2024, 1, 1), 0.04),
+                    (ActusDateTime(2025, 1, 1), 0.05),
+                ]
+            }
+        )
         fallback = ConstantRiskFactorObserver(0.0)
         composite = CompositeRiskFactorObserver([ts, fallback])
 
