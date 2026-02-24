@@ -116,7 +116,7 @@ Principal at Maturity contracts are interest-only loans where principal is repai
         nominal_interest_rate=0.06,  # 6% annual
         day_count_convention=DayCountConvention.A360,
         interest_payment_cycle="1M",  # Monthly payments
-        cycle_anchor_date_of_interest_payment=ActusDateTime(2024, 2, 1, 0, 0, 0),
+        interest_payment_anchor=ActusDateTime(2024, 2, 1, 0, 0, 0),
         end_of_month_convention=EndOfMonthConvention.EOM,
         currency="USD",
     )
@@ -167,10 +167,10 @@ Linear amortizer contracts have fixed principal payments plus decreasing interes
         notional_principal=30_000.0,  # $30k car loan
         nominal_interest_rate=0.048,  # 4.8% APR
         interest_payment_cycle="1M",  # Monthly payments
-        cycle_anchor_date_of_interest_payment=ActusDateTime(2024, 2, 1, 0, 0, 0),
-        cycle_of_principal_redemption="1M",  # Monthly principal payments
-        cycle_anchor_date_of_principal_redemption=ActusDateTime(2024, 2, 1, 0, 0, 0),
-        next_principal_redemption_payment=500.0,  # $500/month principal
+        interest_payment_anchor=ActusDateTime(2024, 2, 1, 0, 0, 0),
+        principal_redemption_cycle="1M",  # Monthly principal payments
+        principal_redemption_anchor=ActusDateTime(2024, 2, 1, 0, 0, 0),
+        next_principal_redemption_amount=500.0,  # $500/month principal
         currency="USD",
     )
 
@@ -209,7 +209,7 @@ Plain vanilla interest rate swaps exchange fixed and floating rate payments.
         nominal_interest_rate=0.05,  # 5% fixed rate
         nominal_interest_rate_2=0.03,  # 3% initial floating rate
         interest_payment_cycle="3M",  # Quarterly payments
-        cycle_anchor_date_of_interest_payment=ActusDateTime(2024, 1, 1, 0, 0, 0),
+        interest_payment_anchor=ActusDateTime(2024, 1, 1, 0, 0, 0),
         rate_reset_cycle="3M",  # Quarterly rate resets
         rate_reset_anchor=ActusDateTime(2024, 1, 1, 0, 0, 0),
         delivery_settlement="D",  # Net settlement

@@ -51,7 +51,7 @@ Complete Example
         nominal_interest_rate=0.05,  # 5% annual interest
         day_count_convention=DayCountConvention.A360,  # Actual/360
         interest_payment_cycle="3M",  # Quarterly payments
-        cycle_anchor_date_of_interest_payment=ActusDateTime(2024, 4, 1, 0, 0, 0),
+        interest_payment_anchor=ActusDateTime(2024, 4, 1, 0, 0, 0),
         end_of_month_convention=EndOfMonthConvention.SD,  # Same day
         currency="USD",
     )
@@ -200,8 +200,8 @@ Try Different Contract Types
     attrs = ContractAttributes(
         contract_type=ContractType.LAM,
         # ... same basic parameters ...
-        cycle_of_principal_redemption="3M",
-        next_principal_redemption_payment=5_000.0,  # $5k per quarter
+        principal_redemption_cycle="3M",
+        next_principal_redemption_amount=5_000.0,  # $5k per quarter
     )
 
 **Interest Rate Swap (SWPPV)**::

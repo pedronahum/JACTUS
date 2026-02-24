@@ -118,7 +118,7 @@ def main():
         nominal_interest_rate=euribor_3m,
         nominal_interest_rate_2=euribor_3m,
         interest_payment_cycle="3M",
-        cycle_anchor_date_of_interest_payment=status_date,
+        interest_payment_anchor=status_date,
         rate_reset_cycle="3M",
         rate_reset_anchor=status_date,
         delivery_settlement="D",  # Net
@@ -138,7 +138,7 @@ def main():
         nominal_interest_rate=sofr_3m + basis_spread,
         nominal_interest_rate_2=sofr_3m + basis_spread,
         interest_payment_cycle="3M",
-        cycle_anchor_date_of_interest_payment=status_date,
+        interest_payment_anchor=status_date,
         rate_reset_cycle="3M",
         rate_reset_anchor=status_date,
         delivery_settlement="D",  # Net

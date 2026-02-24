@@ -83,7 +83,7 @@ def main():
         nominal_interest_rate_2=floating_rate_initial,
         # Payment cycles
         interest_payment_cycle="3M",  # Quarterly interest payments (every 3 months)
-        cycle_anchor_date_of_interest_payment=status_date,
+        interest_payment_anchor=status_date,
         # Rate reset cycle for floating leg (O/N = daily resets)
         # Using weekly resets for demonstration (daily would create 1825 events!)
         rate_reset_cycle="1W",  # Weekly resets for overnight rate

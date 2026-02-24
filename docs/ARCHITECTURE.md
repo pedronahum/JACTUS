@@ -611,7 +611,7 @@ class LAMPayoffFunction(PayoffFunction):
         """Interest payment + principal reduction."""
         role_sign = contract_role_sign(self.contract_role)
         interest = state.isc * state.ipac
-        principal = state.nsc * attrs.next_principal_redemption_payment
+        principal = state.nsc * attrs.next_principal_redemption_amount
         return role_sign * (interest + principal)
 ```
 
@@ -625,7 +625,7 @@ class LAMStateTransitionFunction(StateTransitionFunction):
 
     def _stf_ippr(self, state, attrs, time):
         """Reduce notional by redemption amount."""
-        new_nt = state.nt - attrs.next_principal_redemption_payment
+        new_nt = state.nt - attrs.next_principal_redemption_amount
         return ContractState(
             sd=time,
             tmd=state.tmd,
@@ -680,7 +680,7 @@ def test_lam_principal_amortizes():
     attrs = ContractAttributes(
         contract_type=ContractType.LAM,
         notional_principal=120000,
-        next_principal_redemption_payment=10000,
+        next_principal_redemption_amount=10000,
         ...
     )
     contract = create_contract(attrs, rf_obs)
