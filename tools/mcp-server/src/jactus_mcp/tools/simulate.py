@@ -7,71 +7,12 @@ from typing import Any
 from pydantic import ValidationError
 
 from jactus.contracts import create_contract
-from jactus.core import ContractAttributes, ContractType, ContractRole, ActusDateTime
-from jactus.core.types import DayCountConvention
+from jactus.core import ContractAttributes, ActusDateTime
 from jactus.observers import ConstantRiskFactorObserver, DictRiskFactorObserver
-from jactus_mcp.tools._utils import DATE_FIELDS, ARRAY_DATE_FIELDS
+from jactus_mcp.tools._utils import prepare_attributes, parse_datetime
 from jactus_mcp.tools.validation import _detect_unknown_fields
 
 logger = logging.getLogger(__name__)
-
-
-def _parse_datetime(value: str) -> ActusDateTime:
-    """Parse an ISO date string to ActusDateTime.
-
-    Supports: YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS
-    """
-    if "T" in value:
-        return ActusDateTime.from_iso(value)
-    parts = value.split("-")
-    return ActusDateTime(int(parts[0]), int(parts[1]), int(parts[2]))
-
-
-def _prepare_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
-    """Convert string values to proper JACTUS types.
-
-    Handles contract_type, contract_role, day_count_convention, and date fields.
-    """
-    attrs = dict(attributes)
-
-    # Convert contract_type string to enum
-    if "contract_type" in attrs and isinstance(attrs["contract_type"], str):
-        attrs["contract_type"] = ContractType[attrs["contract_type"]]
-
-    # Convert contract_role string to enum
-    if "contract_role" in attrs and isinstance(attrs["contract_role"], str):
-        attrs["contract_role"] = ContractRole[attrs["contract_role"]]
-
-    # Convert day_count_convention string to enum
-    if "day_count_convention" in attrs and isinstance(attrs["day_count_convention"], str):
-        dcc_map = {
-            "AA": DayCountConvention.AA,
-            "A360": DayCountConvention.A360,
-            "A365": DayCountConvention.A365,
-            "E30360ISDA": DayCountConvention.E30360ISDA,
-            "E30360": DayCountConvention.E30360,
-            "30E360": DayCountConvention.E30360,  # Common alias
-            "B30360": DayCountConvention.B30360,
-            "BUS252": DayCountConvention.BUS252,
-        }
-        dcc_value = attrs["day_count_convention"]
-        if dcc_value in dcc_map:
-            attrs["day_count_convention"] = dcc_map[dcc_value]
-
-    # Convert single date strings to ActusDateTime
-    for field in DATE_FIELDS:
-        if field in attrs and isinstance(attrs[field], str):
-            attrs[field] = _parse_datetime(attrs[field])
-
-    # Convert array date fields (list of date strings → list of ActusDateTime)
-    for field in ARRAY_DATE_FIELDS:
-        if field in attrs and isinstance(attrs[field], list):
-            attrs[field] = [
-                _parse_datetime(v) if isinstance(v, str) else v
-                for v in attrs[field]
-            ]
-
-    return attrs
 
 
 # Maximum output size in characters before auto-truncation kicks in
@@ -88,6 +29,7 @@ def simulate_contract(
     include_states: bool = False,
     event_limit: int | None = None,
     event_offset: int = 0,
+    child_contracts: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Simulate an ACTUS contract and return structured event results.
 
@@ -107,17 +49,39 @@ def simulate_contract(
             events (subject to auto-truncation if output is too large).
         event_offset: Number of events to skip from the beginning (default 0).
             Use with event_limit for pagination.
+        child_contracts: Optional dict mapping child identifiers to attribute dicts.
+            Required for composite contracts (SWAPS, CAPFL, CEG, CEC). Each child
+            is simulated first and its results are fed into the parent contract.
 
     Returns:
         Dictionary with contract_type, num_events, events list, and summary.
         The summary always covers ALL events regardless of pagination.
     """
+    # Contracts that require child contracts
+    _CHILD_CONTRACT_REQUIRED = {"CAPFL", "SWAPS", "CEG", "CEC"}
+
+    ct_str = attributes.get("contract_type", "")
+    if isinstance(ct_str, str) and ct_str in _CHILD_CONTRACT_REQUIRED and not child_contracts:
+        return {
+            "success": False,
+            "error_type": "missing_child_contracts",
+            "error": (
+                f"{ct_str} requires child contracts. Provide a child_contracts dict "
+                f"mapping identifiers to contract attribute dicts. Each child is "
+                f"simulated first, then its results are fed into the {ct_str} parent."
+            ),
+            "hint": (
+                f"Call jactus_get_contract_schema('{ct_str}') to see the required "
+                f"format and an example with child_contracts."
+            ),
+        }
+
     try:
         # Detect unknown fields before preparation
         unknown_field_warnings = _detect_unknown_fields(attributes)
 
         # Prepare attributes (convert strings to enums/dates)
-        prepared = _prepare_attributes(attributes)
+        prepared = prepare_attributes(attributes)
 
         # Strip unknown keys so Pydantic doesn't silently ignore them
         valid_fields = set(ContractAttributes.model_fields.keys())
@@ -138,7 +102,7 @@ def simulate_contract(
                             f"Each time series entry must be [date_string, value], "
                             f"got {entry!r} for '{identifier}'"
                         )
-                    dt = _parse_datetime(str(entry[0]))
+                    dt = parse_datetime(str(entry[0]))
                     val = float(entry[1])
                     parsed_series.append((dt, val))
                 parsed_ts[identifier] = parsed_series
@@ -154,8 +118,54 @@ def simulate_contract(
                 constant_value=constant_value if constant_value is not None else 0.0
             )
 
+        # Create child contract observer if child_contracts provided
+        child_observer = None
+        child_results = {}
+        if child_contracts:
+            from jactus.observers.child_contract import SimulatedChildContractObserver
+
+            child_observer = SimulatedChildContractObserver()
+
+            for child_id, child_attrs_raw in child_contracts.items():
+                try:
+                    child_prepared = prepare_attributes(child_attrs_raw)
+                    child_prepared = {
+                        k: v for k, v in child_prepared.items() if k in valid_fields
+                    }
+                    child_contract_attrs = ContractAttributes(**child_prepared)
+                    child_contract = create_contract(child_contract_attrs, rf_observer)
+                    child_result = child_contract.simulate()
+
+                    child_observer.register_simulation(
+                        child_id,
+                        child_result.events,
+                        child_contract_attrs,
+                        child_result.initial_state,
+                    )
+
+                    # Summarize child results
+                    child_payoffs = [float(e.payoff) for e in child_result.events]
+                    child_non_zero = [p for p in child_payoffs if abs(p) > 1e-10]
+                    child_results[child_id] = {
+                        "contract_type": child_contract_attrs.contract_type.name,
+                        "num_events": len(child_result.events),
+                        "net_cashflow": sum(child_non_zero),
+                    }
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "error_type": "child_simulation_error",
+                        "error": (
+                            f"Child contract '{child_id}' failed: {e!s}"
+                        ),
+                        "hint": (
+                            "Check the child contract attributes. Each child must be "
+                            "a valid, self-contained contract (e.g., PAM, LAM, ANN)."
+                        ),
+                    }
+
         # Create and simulate
-        contract = create_contract(contract_attrs, rf_observer)
+        contract = create_contract(contract_attrs, rf_observer, child_observer)
         result = contract.simulate()
 
         # Serialize events using ContractEvent.to_dict()
@@ -233,6 +243,8 @@ def simulate_contract(
         }
         if pagination:
             response["pagination"] = pagination
+        if child_results:
+            response["child_results"] = child_results
         if unknown_field_warnings:
             response["warnings"] = unknown_field_warnings
         return response

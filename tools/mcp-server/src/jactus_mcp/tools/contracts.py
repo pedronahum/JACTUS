@@ -73,6 +73,9 @@ def get_contract_info(contract_type: str) -> dict[str, Any]:
         "CEG": "derivative", "CEC": "derivative",
     }
 
+    # Composite contracts that require child_contracts parameter
+    _requires_child_contracts = {"CAPFL", "SWAPS", "CEG", "CEC"}
+
     try:
         ct = ContractType[contract_type]
 
@@ -84,20 +87,317 @@ def get_contract_info(contract_type: str) -> dict[str, Any]:
 
         contract_class = CONTRACT_REGISTRY[ct]
 
-        return {
+        result = {
             "contract_type": contract_type,
             "description": descriptions.get(contract_type, "No description available"),
             "category": categories.get(contract_type, "unknown"),
             "implemented": True,
+            "mcp_simulatable": True,
             "class_name": contract_class.__name__,
             "module": contract_class.__module__,
         }
+
+        if contract_type in _requires_child_contracts:
+            result["requires_child_contracts"] = True
+            result["mcp_note"] = (
+                f"{contract_type} is a composite contract — pass a child_contracts "
+                f"dict to jactus_simulate_contract. Each child is simulated first, "
+                f"then its results feed into the {contract_type} parent. "
+                f"Use jactus_get_contract_schema('{contract_type}') for the format."
+            )
+
+        return result
 
     except KeyError:
         return {
             "error": f"Unknown contract type: {contract_type}",
             "available": list_contracts()["all_contracts"],
         }
+
+
+def _child_observer_example(contract_type: str) -> str:
+    """Return a concrete Python example for a child-observer contract type."""
+    examples = {
+        "SWAPS": '''
+from jactus.contracts import create_contract
+from jactus.core import ContractAttributes, ContractType, ContractRole, ActusDateTime
+from jactus.observers import ConstantRiskFactorObserver
+from jactus.observers.child_contract import SimulatedChildContractObserver
+
+rf_observer = ConstantRiskFactorObserver(constant_value=0.05)
+
+# Step 1: Create and simulate the two swap legs as separate contracts
+leg1_attrs = ContractAttributes(
+    contract_id="LEG1", contract_type=ContractType.PAM,
+    contract_role=ContractRole.RPA,
+    status_date=ActusDateTime(2024, 1, 1),
+    initial_exchange_date=ActusDateTime(2024, 1, 1),
+    maturity_date=ActusDateTime(2029, 1, 1),
+    notional_principal=1_000_000.0,
+    nominal_interest_rate=0.04,
+    interest_payment_cycle="6M",
+)
+leg2_attrs = ContractAttributes(
+    contract_id="LEG2", contract_type=ContractType.PAM,
+    contract_role=ContractRole.RPL,
+    status_date=ActusDateTime(2024, 1, 1),
+    initial_exchange_date=ActusDateTime(2024, 1, 1),
+    maturity_date=ActusDateTime(2029, 1, 1),
+    notional_principal=1_000_000.0,
+    nominal_interest_rate=0.035,
+    interest_payment_cycle="6M",
+)
+leg1_result = create_contract(leg1_attrs, rf_observer).simulate()
+leg2_result = create_contract(leg2_attrs, rf_observer).simulate()
+
+# Step 2: Register child simulation results in a ChildContractObserver
+child_obs = SimulatedChildContractObserver()
+child_obs.register_simulation("LEG1", leg1_result.events, leg1_attrs, leg1_result.initial_state)
+child_obs.register_simulation("LEG2", leg2_result.events, leg2_attrs, leg2_result.initial_state)
+
+# Step 3: Create the SWAPS parent contract referencing both legs
+swap_attrs = ContractAttributes(
+    contract_id="SWAP-001", contract_type=ContractType.SWAPS,
+    contract_role=ContractRole.RFL,
+    status_date=ActusDateTime(2024, 1, 1),
+    maturity_date=ActusDateTime(2029, 1, 1),
+    contract_structure=\'{"FirstLeg": "LEG1", "SecondLeg": "LEG2"}\',
+)
+
+# Step 4: Simulate — pass BOTH the risk factor observer AND the child observer
+swap = create_contract(swap_attrs, rf_observer, child_obs)
+result = swap.simulate()
+for event in result.events:
+    print(f"{event.event_type.name:6s}  {event.event_time}  payoff={float(event.payoff):>12.2f}")
+''',
+        "CAPFL": '''
+from jactus.contracts import create_contract
+from jactus.core import ContractAttributes, ContractType, ContractRole, ActusDateTime
+from jactus.observers import ConstantRiskFactorObserver
+from jactus.observers.child_contract import SimulatedChildContractObserver
+
+rf_observer = ConstantRiskFactorObserver(constant_value=0.06)
+
+# Step 1: Create and simulate the underlier loan
+loan_attrs = ContractAttributes(
+    contract_id="LOAN-001", contract_type=ContractType.PAM,
+    contract_role=ContractRole.RPA,
+    status_date=ActusDateTime(2024, 1, 1),
+    initial_exchange_date=ActusDateTime(2024, 1, 1),
+    maturity_date=ActusDateTime(2029, 1, 1),
+    notional_principal=1_000_000.0,
+    nominal_interest_rate=0.05,
+    rate_reset_cycle="3M",
+    rate_reset_market_object="LIBOR-3M",
+)
+loan_result = create_contract(loan_attrs, rf_observer).simulate()
+
+# Step 2: Register child simulation results
+child_obs = SimulatedChildContractObserver()
+child_obs.register_simulation("LOAN-001", loan_result.events, loan_attrs, loan_result.initial_state)
+
+# Step 3: Create the CAPFL (cap) contract referencing the underlier
+cap_attrs = ContractAttributes(
+    contract_id="CAP-001", contract_type=ContractType.CAPFL,
+    contract_role=ContractRole.BUY,
+    status_date=ActusDateTime(2024, 1, 1),
+    initial_exchange_date=ActusDateTime(2024, 1, 1),
+    maturity_date=ActusDateTime(2029, 1, 1),
+    notional_principal=1_000_000.0,
+    rate_reset_cycle="3M",
+    rate_reset_cap=0.055,  # Cap rate at 5.5%
+)
+
+# Step 4: Simulate with both observers
+cap = create_contract(cap_attrs, rf_observer, child_obs)
+result = cap.simulate()
+for event in result.events:
+    print(f"{event.event_type.name:6s}  {event.event_time}  payoff={float(event.payoff):>12.2f}")
+''',
+        "CEG": '''
+from jactus.contracts import create_contract
+from jactus.core import ContractAttributes, ContractType, ContractRole, ActusDateTime
+from jactus.observers import ConstantRiskFactorObserver
+from jactus.observers.child_contract import SimulatedChildContractObserver
+
+rf_observer = ConstantRiskFactorObserver(constant_value=0.0)
+
+# Step 1: Create and simulate the covered (guaranteed) loan
+loan_attrs = ContractAttributes(
+    contract_id="LOAN-001", contract_type=ContractType.PAM,
+    contract_role=ContractRole.RPA,
+    status_date=ActusDateTime(2024, 1, 1),
+    initial_exchange_date=ActusDateTime(2024, 1, 1),
+    maturity_date=ActusDateTime(2029, 1, 1),
+    notional_principal=500_000.0,
+    nominal_interest_rate=0.04,
+)
+loan_result = create_contract(loan_attrs, rf_observer).simulate()
+
+# Step 2: Register child simulation results
+child_obs = SimulatedChildContractObserver()
+child_obs.register_simulation("LOAN-001", loan_result.events, loan_attrs, loan_result.initial_state)
+
+# Step 3: Create the CEG (guarantee) contract
+ceg_attrs = ContractAttributes(
+    contract_id="CEG-001", contract_type=ContractType.CEG,
+    contract_role=ContractRole.BUY,
+    status_date=ActusDateTime(2024, 1, 1),
+    initial_exchange_date=ActusDateTime(2024, 1, 1),
+    maturity_date=ActusDateTime(2029, 1, 1),
+    notional_principal=500_000.0,
+    coverage=1.0,  # 100% coverage
+    contract_structure=\'{"CoveredContract": "LOAN-001"}\',
+)
+
+# Step 4: Simulate with both observers
+ceg = create_contract(ceg_attrs, rf_observer, child_obs)
+result = ceg.simulate()
+for event in result.events:
+    print(f"{event.event_type.name:6s}  {event.event_time}  payoff={float(event.payoff):>12.2f}")
+''',
+        "CEC": '''
+from jactus.contracts import create_contract
+from jactus.core import ContractAttributes, ContractType, ContractRole, ActusDateTime
+from jactus.observers import ConstantRiskFactorObserver
+from jactus.observers.child_contract import SimulatedChildContractObserver
+
+rf_observer = ConstantRiskFactorObserver(constant_value=0.0)
+
+# Step 1: Create and simulate the covered loan (the contract being collateralized)
+loan_attrs = ContractAttributes(
+    contract_id="LOAN-001", contract_type=ContractType.PAM,
+    contract_role=ContractRole.RPA,
+    status_date=ActusDateTime(2024, 1, 1),
+    initial_exchange_date=ActusDateTime(2024, 1, 1),
+    maturity_date=ActusDateTime(2029, 1, 1),
+    notional_principal=500_000.0,
+    nominal_interest_rate=0.04,
+)
+loan_result = create_contract(loan_attrs, rf_observer).simulate()
+
+# Step 2: Register child simulation results
+child_obs = SimulatedChildContractObserver()
+child_obs.register_simulation("LOAN-001", loan_result.events, loan_attrs, loan_result.initial_state)
+
+# Step 3: Create the CEC (collateral) contract
+cec_attrs = ContractAttributes(
+    contract_id="CEC-001", contract_type=ContractType.CEC,
+    contract_role=ContractRole.BUY,
+    status_date=ActusDateTime(2024, 1, 1),
+    initial_exchange_date=ActusDateTime(2024, 1, 1),
+    maturity_date=ActusDateTime(2029, 1, 1),
+    notional_principal=500_000.0,
+    coverage=1.0,  # 100% collateral coverage
+    contract_structure=\'{"CoveredContract": "LOAN-001"}\',
+)
+
+# Step 4: Simulate with both observers
+cec = create_contract(cec_attrs, rf_observer, child_obs)
+result = cec.simulate()
+for event in result.events:
+    print(f"{event.event_type.name:6s}  {event.event_time}  payoff={float(event.payoff):>12.2f}")
+''',
+    }
+    return examples.get(contract_type, "")
+
+
+def _child_contract_mcp_example(contract_type: str) -> dict[str, Any]:
+    """Return an MCP-friendly JSON example for a composite contract type."""
+    examples = {
+        "SWAPS": {
+            "attributes": {
+                "contract_type": "SWAPS",
+                "contract_id": "SWAP-001",
+                "contract_role": "RFL",
+                "status_date": "2024-01-01",
+                "maturity_date": "2029-01-01",
+                "contract_structure": '{"FirstLeg": "LEG1", "SecondLeg": "LEG2"}',
+            },
+            "child_contracts": {
+                "LEG1": {
+                    "contract_type": "PAM", "contract_id": "LEG1",
+                    "contract_role": "RPA", "status_date": "2024-01-01",
+                    "initial_exchange_date": "2024-01-01", "maturity_date": "2029-01-01",
+                    "notional_principal": 1000000.0, "nominal_interest_rate": 0.04,
+                    "interest_payment_cycle": "6M",
+                },
+                "LEG2": {
+                    "contract_type": "PAM", "contract_id": "LEG2",
+                    "contract_role": "RPL", "status_date": "2024-01-01",
+                    "initial_exchange_date": "2024-01-01", "maturity_date": "2029-01-01",
+                    "notional_principal": 1000000.0, "nominal_interest_rate": 0.035,
+                    "interest_payment_cycle": "6M",
+                },
+            },
+        },
+        "CAPFL": {
+            "attributes": {
+                "contract_type": "CAPFL",
+                "contract_id": "CAP-001",
+                "contract_role": "BUY",
+                "status_date": "2024-01-01",
+                "initial_exchange_date": "2024-01-01",
+                "maturity_date": "2029-01-01",
+                "notional_principal": 1000000.0,
+                "rate_reset_cycle": "3M",
+                "rate_reset_cap": 0.055,
+            },
+            "child_contracts": {
+                "LOAN-001": {
+                    "contract_type": "PAM", "contract_id": "LOAN-001",
+                    "contract_role": "RPA", "status_date": "2024-01-01",
+                    "initial_exchange_date": "2024-01-01", "maturity_date": "2029-01-01",
+                    "notional_principal": 1000000.0, "nominal_interest_rate": 0.05,
+                    "rate_reset_cycle": "3M",
+                },
+            },
+            "constant_value": 0.06,
+        },
+        "CEG": {
+            "attributes": {
+                "contract_type": "CEG",
+                "contract_id": "CEG-001",
+                "contract_role": "BUY",
+                "status_date": "2024-01-01",
+                "initial_exchange_date": "2024-01-01",
+                "maturity_date": "2029-01-01",
+                "notional_principal": 500000.0,
+                "coverage": 1.0,
+                "contract_structure": '{"CoveredContract": "LOAN-001"}',
+            },
+            "child_contracts": {
+                "LOAN-001": {
+                    "contract_type": "PAM", "contract_id": "LOAN-001",
+                    "contract_role": "RPA", "status_date": "2024-01-01",
+                    "initial_exchange_date": "2024-01-01", "maturity_date": "2029-01-01",
+                    "notional_principal": 500000.0, "nominal_interest_rate": 0.04,
+                },
+            },
+        },
+        "CEC": {
+            "attributes": {
+                "contract_type": "CEC",
+                "contract_id": "CEC-001",
+                "contract_role": "BUY",
+                "status_date": "2024-01-01",
+                "initial_exchange_date": "2024-01-01",
+                "maturity_date": "2029-01-01",
+                "notional_principal": 500000.0,
+                "coverage": 1.0,
+                "contract_structure": '{"CoveredContract": "LOAN-001"}',
+            },
+            "child_contracts": {
+                "LOAN-001": {
+                    "contract_type": "PAM", "contract_id": "LOAN-001",
+                    "contract_role": "RPA", "status_date": "2024-01-01",
+                    "initial_exchange_date": "2024-01-01", "maturity_date": "2029-01-01",
+                    "notional_principal": 500000.0, "nominal_interest_rate": 0.04,
+                },
+            },
+        },
+    }
+    return examples.get(contract_type, {})
 
 
 def get_contract_schema(contract_type: str) -> dict[str, Any]:
@@ -112,79 +412,88 @@ def get_contract_schema(contract_type: str) -> dict[str, Any]:
     # Get Pydantic schema
     schema = ContractAttributes.model_json_schema()
 
-    # Base required fields (always needed)
+    # Base required fields (always needed by Pydantic)
     base_required = {
-        "contract_type": "ContractType enum",
+        "contract_type": "ContractType enum (e.g., 'PAM', 'LAM', 'SWPPV')",
         "contract_id": "str - Unique contract identifier",
-        "status_date": "ActusDateTime - Contract status date",
-        "contract_role": "ContractRole enum - RPA (lender) or RPL (borrower)",
+        "status_date": "ActusDateTime - Analysis/valuation date (ISO string: 'YYYY-MM-DD')",
+        "contract_role": (
+            "ContractRole enum - RPA (Real Position Asset/lender), "
+            "RPL (Real Position Liability/borrower), RFL (Receive First Leg), "
+            "PFL (Pay First Leg), BUY (Protection Buyer), SEL (Protection Seller), "
+            "LG (Long), ST (Short)"
+        ),
     }
 
-    # Contract-specific required fields (all 18 types)
+    # Contract-specific typical fields.
+    # Fields marked "(recommended)" have sensible defaults but are usually
+    # needed for meaningful simulations. Fields without the marker are strictly
+    # required by the contract logic.
     specific_required = {
         # Principal contracts
         "PAM": {
             "initial_exchange_date": "ActusDateTime",
             "maturity_date": "ActusDateTime",
             "notional_principal": "float",
-            "nominal_interest_rate": "float",
-            "day_count_convention": "DayCountConvention enum",
+            "nominal_interest_rate": "float (recommended, defaults to 0)",
+            "day_count_convention": "DayCountConvention enum (recommended, defaults to A360)",
         },
         "LAM": {
             "initial_exchange_date": "ActusDateTime",
-            "maturity_date": "ActusDateTime",
-            "notional_principal": "float",
-            "nominal_interest_rate": "float",
-            "next_principal_redemption_amount": "float - Fixed principal payment amount",
-            "principal_redemption_cycle": "str (e.g., '1M', '3M')",
+            "notional_principal": "float (recommended)",
+            "nominal_interest_rate": "float (recommended, defaults to 0)",
+            "maturity_date": "ActusDateTime - Required if principal_redemption_cycle not set",
+            "principal_redemption_cycle": "str (e.g., '1M', '3M') - Required if maturity_date not set",
+            "next_principal_redemption_amount": "float (recommended, auto-calculated if omitted)",
         },
         "LAX": {
-            "initial_exchange_date": "ActusDateTime",
-            "maturity_date": "ActusDateTime",
-            "notional_principal": "float",
-            "nominal_interest_rate": "float",
+            "initial_exchange_date": "ActusDateTime (recommended)",
+            "maturity_date": "ActusDateTime (recommended)",
+            "notional_principal": "float (recommended)",
+            "nominal_interest_rate": "float (recommended, defaults to 0)",
             "array_pr_cycle": "list[str] - Array of PR cycles for exotic amortization",
             "array_pr_next": "list[float] - Array of next PR amounts",
+            "array_pr_anchor": "list[ActusDateTime] - Array of PR anchor dates",
+            "array_increase_decrease": "list[str] - 'INC' or 'DEC' per segment",
         },
         "NAM": {
             "initial_exchange_date": "ActusDateTime",
-            "maturity_date": "ActusDateTime",
-            "notional_principal": "float",
-            "nominal_interest_rate": "float",
-            "next_principal_redemption_amount": "float",
-            "principal_redemption_cycle": "str (e.g., '1M', '3M')",
+            "notional_principal": "float (recommended)",
+            "nominal_interest_rate": "float (recommended, defaults to 0)",
+            "maturity_date": "ActusDateTime - Required if principal_redemption_cycle not set",
+            "principal_redemption_cycle": "str (e.g., '1M', '3M') - Required if maturity_date not set",
+            "next_principal_redemption_amount": "float (recommended, auto-calculated if omitted)",
         },
         "ANN": {
             "initial_exchange_date": "ActusDateTime",
-            "maturity_date": "ActusDateTime",
-            "notional_principal": "float",
-            "nominal_interest_rate": "float",
-            "interest_payment_cycle": "str",
-            "principal_redemption_cycle": "str",
+            "principal_redemption_cycle": "str - Payment frequency (e.g., '1M', '3M')",
+            "notional_principal": "float (recommended)",
+            "nominal_interest_rate": "float (recommended, defaults to 0)",
+            "maturity_date": "ActusDateTime (recommended, or use amortization_date)",
         },
         "CLM": {
-            "initial_exchange_date": "ActusDateTime",
-            "notional_principal": "float",
-            "nominal_interest_rate": "float",
-            "interest_payment_cycle": "str",
+            "initial_exchange_date": "ActusDateTime (recommended)",
+            "notional_principal": "float (recommended)",
+            "nominal_interest_rate": "float (recommended)",
+            "interest_payment_cycle": "str (recommended)",
         },
         # Non-principal contracts
         "UMP": {
-            "initial_exchange_date": "ActusDateTime",
-            "notional_principal": "float",
-            "nominal_interest_rate": "float",
+            "initial_exchange_date": "ActusDateTime (recommended)",
+            "notional_principal": "float (recommended)",
+            "nominal_interest_rate": "float (recommended)",
         },
         "CSH": {
             "notional_principal": "float",
         },
         "STK": {
-            "initial_exchange_date": "ActusDateTime",
+            "initial_exchange_date": "ActusDateTime (recommended)",
             "notional_principal": "float - Number of shares or position value",
         },
         # Exotic contracts
         "COM": {
-            "initial_exchange_date": "ActusDateTime",
-            "notional_principal": "float - Commodity value",
+            "initial_exchange_date": "ActusDateTime (recommended)",
+            "notional_principal": "float - Commodity value (recommended)",
         },
         # Derivative contracts
         "FXOUT": {
@@ -199,10 +508,10 @@ def get_contract_schema(contract_type: str) -> dict[str, Any]:
             "initial_exchange_date": "ActusDateTime",
             "maturity_date": "ActusDateTime",
             "notional_principal": "float",
-            "option_type": "str ('C' for call, 'P' for put)",
+            "contract_structure": "str (JSON) - Reference to underlier contract",
+            "option_type": "str ('C' for call, 'P' for put, 'CP' for collar)",
             "option_strike_1": "float",
             "option_exercise_type": "str ('E' European, 'A' American, 'B' Bermudan)",
-            "contract_structure": "str (JSON) - Reference to underlier contract",
         },
         "FUTUR": {
             "initial_exchange_date": "ActusDateTime",
@@ -229,24 +538,24 @@ def get_contract_schema(contract_type: str) -> dict[str, Any]:
             "initial_exchange_date": "ActusDateTime",
             "maturity_date": "ActusDateTime",
             "notional_principal": "float",
-            "nominal_interest_rate": "float",
-            "rate_reset_cap": "float - Interest rate cap level",
-            "rate_reset_floor": "float - Interest rate floor level",
             "rate_reset_cycle": "str - Reset frequency",
+            "nominal_interest_rate": "float (recommended)",
+            "rate_reset_cap": "float - Interest rate cap level (recommended)",
+            "rate_reset_floor": "float - Interest rate floor level (recommended)",
         },
         "CEG": {
             "initial_exchange_date": "ActusDateTime",
             "maturity_date": "ActusDateTime",
             "notional_principal": "float",
-            "coverage": "float - Coverage ratio",
             "contract_structure": "str (JSON) - Reference to guaranteed contract",
+            "coverage": "float - Coverage ratio (recommended)",
         },
         "CEC": {
             "initial_exchange_date": "ActusDateTime",
             "maturity_date": "ActusDateTime",
             "notional_principal": "float",
-            "coverage": "float - Coverage ratio",
             "contract_structure": "str (JSON) - Reference to collateral contract",
+            "coverage": "float - Coverage ratio (recommended)",
         },
     }
 
@@ -254,10 +563,28 @@ def get_contract_schema(contract_type: str) -> dict[str, Any]:
     if contract_type in specific_required:
         required.update(specific_required[contract_type])
 
-    # Common optional fields
+    # Optional fields — comprehensive list of all ContractAttributes fields
+    # not already in base_required. Fields that appear in specific_required
+    # for the current contract_type are excluded dynamically below.
     optional = {
+        # Currency
         "currency": "str - ISO currency code (default: USD)",
+        "currency_2": "str - Second currency for FX/swap contracts (CUR2)",
+        # Dates
         "contract_deal_date": "ActusDateTime (CDD)",
+        "initial_exchange_date": "ActusDateTime - Contract inception (IED)",
+        "maturity_date": "ActusDateTime - Contract maturity (MD)",
+        "purchase_date": "ActusDateTime - Secondary market purchase (PRD)",
+        "termination_date": "ActusDateTime - Early termination (TD)",
+        "settlement_date": "ActusDateTime - Derivative settlement (STD)",
+        "amortization_date": "ActusDateTime - ANN amortization end date (AMD)",
+        "analysis_dates": "list[ActusDateTime] - Array of analysis dates (AD)",
+        # Notional and rates
+        "notional_principal": "float - Principal amount (NT)",
+        "nominal_interest_rate": "float - Nominal interest rate as decimal (IPNR)",
+        "nominal_interest_rate_2": "float - Second rate for swaps (IPNR2)",
+        "notional_principal_2": "float - Second notional for FX/swaps (NT2)",
+        "next_principal_redemption_amount": "float - Next PR payment amount (PRNXT)",
         # Schedule cycles and anchors
         "interest_payment_cycle": "str - Interest payment cycle (IPCL), e.g. '6M', '1Y'",
         "interest_payment_anchor": "ActusDateTime - Interest payment anchor (IPANX)",
@@ -270,11 +597,24 @@ def get_contract_schema(contract_type: str) -> dict[str, Any]:
         "rate_reset_anchor": "ActusDateTime (RRANX)",
         "scaling_index_cycle": "str - Scaling index cycle (SCCL)",
         "scaling_index_anchor": "ActusDateTime (SCANX)",
+        "interest_calculation_base_cycle": "str - Interest calc base reset cycle (IPCBCL)",
+        "interest_calculation_base_anchor": "ActusDateTime (IPCBANX)",
+        # Array schedule attributes (for LAX and exotic schedules)
+        "array_pr_anchor": "list[ActusDateTime] - Array of PR anchors (ARPRANX)",
+        "array_pr_cycle": "list[str] - Array of PR cycles (ARPRCL)",
+        "array_pr_next": "list[float] - Array of next PR amounts (ARPRNXT)",
+        "array_increase_decrease": "list[str] - 'INC' or 'DEC' per segment (ARINCDEC)",
+        "array_ip_anchor": "list[ActusDateTime] - Array of IP anchors (ARIPANX)",
+        "array_ip_cycle": "list[str] - Array of IP cycles (ARIPCL)",
+        "array_rr_anchor": "list[ActusDateTime] - Array of RR anchors (ARRRANX)",
+        "array_rr_cycle": "list[str] - Array of RR cycles (ARRRCL)",
+        "array_rate": "list[float] - Array of interest rates (ARRATE)",
+        "array_fixed_variable": "list[str] - 'F' or 'V' per segment (ARFIXVAR)",
         # Conventions
-        "day_count_convention": "DayCountConvention enum (DCC)",
-        "business_day_convention": "BusinessDayConvention enum (BDC)",
-        "end_of_month_convention": "EndOfMonthConvention enum (EOMC)",
-        "calendar": "Calendar enum (CLDR)",
+        "day_count_convention": "DayCountConvention enum: AA, A360, A365, E30360ISDA, E30360, B30360, BUS252 (DCC)",
+        "business_day_convention": "BusinessDayConvention enum: NULL, SCF, SCMF, CSF, CSMF, SCP, SCMP, CSP, CSMP (BDC)",
+        "end_of_month_convention": "EndOfMonthConvention enum: EOM, SD (EOMC)",
+        "calendar": "Calendar enum: NO_CALENDAR, MONDAY_TO_FRIDAY, TARGET, US_NYSE, UK_SETTLEMENT (CLDR)",
         # Rate reset
         "rate_reset_market_object": "str - Market reference for rate reset (RRMO)",
         "rate_reset_multiplier": "float (RRMLT)",
@@ -284,28 +624,69 @@ def get_contract_schema(contract_type: str) -> dict[str, Any]:
         "rate_reset_next": "float (RRNXT)",
         # Fees
         "fee_rate": "float (FER)",
-        "fee_basis": "FeeBasis enum (FEB)",
+        "fee_basis": "FeeBasis enum: A (absolute), N (notional percentage) (FEB)",
         "fee_accrued": "float (FEAC)",
+        # Interest calculation base
+        "interest_calculation_base": "InterestCalculationBase enum: NT, NTIED, NTL (IPCB)",
+        "interest_calculation_base_amount": "float (IPCBA)",
+        # Prepayment
+        "prepayment_effect": "PrepaymentEffect enum: N, A, M (PPEF, default: N)",
+        "penalty_type": "str (PYTP)",
+        "penalty_rate": "float (PYRT)",
+        # Scaling
+        "scaling_effect": "ScalingEffect enum: 000, I00, 0N0, IN0, 00M, I0M, 0NM, INM (SCEF, default: 000)",
+        "scaling_index_at_status_date": "float (SCIXSD)",
+        "scaling_index_at_contract_deal_date": "float (SCIXCDD)",
+        "scaling_market_object": "str (SCMO)",
+        # Options and derivatives
+        "option_type": "str: 'C' (call), 'P' (put), 'CP' (collar) (OPTP)",
+        "option_strike_1": "float - Primary strike price (OPS1)",
+        "option_strike_2": "float - Secondary strike for collars (OPS2)",
+        "option_exercise_type": "str: 'E' (European), 'A' (American), 'B' (Bermudan) (OPXT)",
+        "option_exercise_end_date": "ActusDateTime (OPXED)",
+        "exercise_date": "ActusDateTime - Option/derivative exercise date (XD)",
+        "exercise_amount": "float - Amount determined at exercise (XA)",
+        "settlement_period": "str - Period between exercise and settlement (STPD)",
+        "delivery_type": "str: 'P' (physical), 'C' (cash) (DVTP)",
+        "delivery_settlement": "str: 'D' (delivery/net), 'S' (settlement/gross) (DS)",
+        "contract_structure": "str (JSON) - Reference to underlier/child contracts (CTST)",
+        "future_price": "float - Agreed futures price (PFUT)",
+        "settlement_currency": "str - Settlement currency (CURS)",
+        "fixing_period": "str - Period between rate observation and reset (RRFIX)",
+        "x_day_notice": "str - Notice period for call/put (XDN)",
+        # Commodity and equity
+        "quantity": "float - Quantity of commodity/stock (QT)",
+        "unit": "str - Unit of measurement (UNIT)",
+        "market_object_code": "str - Market object code for price observation (MOC)",
+        "market_object_code_of_dividends": "str - Dividend observation code (DVMO)",
+        "dividend_cycle": "str - Dividend payment cycle (DVCL)",
+        "dividend_anchor": "ActusDateTime - Dividend payment anchor (DVANX)",
+        # Credit enhancement
+        "coverage": "float - Coverage ratio (CECV)",
+        "credit_event_type": "ContractPerformance enum: PF, DL, DQ, DF (CET)",
+        "credit_enhancement_guarantee_extent": "str: NO, NI, or MV (CEGE)",
         # Other
         "premium_discount_at_ied": "float (PDIED)",
         "accrued_interest": "float (IPAC)",
-        "purchase_date": "ActusDateTime (PRD)",
         "price_at_purchase_date": "float (PPRD)",
-        "termination_date": "ActusDateTime (TD)",
         "price_at_termination_date": "float (PTD)",
-        "settlement_date": "ActusDateTime (STD)",
-        "amortization_date": "ActusDateTime (AMD)",
-        "penalty_type": "str (PYTP)",
-        "penalty_rate": "float (PYRT)",
-        "nominal_interest_rate_2": "float - Second nominal interest rate for swaps (IPNR2)",
-        "delivery_settlement": "str - Settlement type: 'D' (delivery/net) or 'S' (settlement/gross)",
+        "contract_performance": "ContractPerformance enum: PF, DL, DQ, DF (PRF, default: PF)",
     }
 
-    return {
-        "contract_type": contract_type,
-        "required_fields": required,
-        "optional_fields": optional,
-        "example_usage": f"""
+    # Remove fields that are already in specific_required for this contract type
+    specific = specific_required.get(contract_type, {})
+    filtered_optional = {k: v for k, v in optional.items() if k not in specific and k not in base_required}
+
+    # Composite contracts that require child_contracts parameter
+    _requires_child_contracts = {"CAPFL", "SWAPS", "CEG", "CEC"}
+
+    # Build example code — MCP JSON for composite, Python for standard
+    if contract_type in _requires_child_contracts:
+        mcp_example = _child_contract_mcp_example(contract_type)
+        python_example = _child_observer_example(contract_type)
+    else:
+        mcp_example = None
+        python_example = f"""
 from jactus.contracts import create_contract
 from jactus.core import ContractAttributes, ContractType, ContractRole, ActusDateTime
 from jactus.observers import ConstantRiskFactorObserver
@@ -319,8 +700,25 @@ attrs = ContractAttributes(
 rf_observer = ConstantRiskFactorObserver(constant_value=0.0)
 contract = create_contract(attrs, rf_observer)
 result = contract.simulate()
-""",
+"""
+
+    result = {
+        "contract_type": contract_type,
+        "required_fields": required,
+        "optional_fields": filtered_optional,
+        "example_usage": python_example,
     }
+
+    if contract_type in _requires_child_contracts:
+        result["requires_child_contracts"] = True
+        result["mcp_example"] = mcp_example
+        result["mcp_note"] = (
+            f"{contract_type} is a composite contract. Pass a child_contracts dict "
+            f"to jactus_simulate_contract — each child is simulated automatically, "
+            f"then its results feed into the parent. See the mcp_example field."
+        )
+
+    return result
 
 
 def list_risk_factor_observers() -> dict[str, Any]:

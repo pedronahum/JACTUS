@@ -250,21 +250,24 @@ Use `jactus_get_event_types` to see all event types.
 
 ContractAttributes defines all contract terms:
 
-**Required Fields:**
+**Required Fields (Pydantic-enforced):**
+- contract_id: str - Unique identifier
 - contract_type: ContractType enum
 - status_date: ActusDateTime
-- contract_role: ContractRole (RPA or RPL)
+- contract_role: ContractRole (RPA, RPL, RFL, PFL, BUY, SEL, LG, ST, etc.)
 
 **Common Fields:**
 - initial_exchange_date: Contract inception
 - maturity_date: Contract maturity
 - notional_principal: Principal amount
 - nominal_interest_rate: Interest rate
-- currency: ISO currency code
+- currency: ISO currency code (default: USD)
 
 **Conventions:**
-- day_count_convention: A360, A365, 30E360, AA, BUS252
-- business_day_convention: SCF, SCMF, CSF, CSMF
+- day_count_convention: AA, A360, A365, E30360ISDA, E30360, B30360, BUS252
+- business_day_convention: NULL, SCF, SCMF, CSF, CSMF, SCP, SCMP, CSP, CSMP
+- end_of_month_convention: EOM, SD
+- calendar: NO_CALENDAR, MONDAY_TO_FRIDAY, TARGET, US_NYSE, UK_SETTLEMENT
 
 Use `jactus_get_contract_schema(contract_type)` for specific requirements.
 """,

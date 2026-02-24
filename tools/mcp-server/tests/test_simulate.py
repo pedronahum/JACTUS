@@ -133,10 +133,11 @@ def test_simulate_missing_required_fields():
 
 
 def test_prepare_attributes_converts_enums():
-    """Test that _prepare_attributes correctly converts string enums."""
+    """Test that prepare_attributes correctly converts string enums."""
     from jactus.core import ContractType, ContractRole
+    from jactus_mcp.tools._utils import prepare_attributes
 
-    attrs = simulate._prepare_attributes({
+    attrs = prepare_attributes({
         "contract_type": "PAM",
         "contract_role": "RPA",
     })
@@ -146,10 +147,11 @@ def test_prepare_attributes_converts_enums():
 
 
 def test_prepare_attributes_converts_dates():
-    """Test that _prepare_attributes correctly converts date strings."""
+    """Test that prepare_attributes correctly converts date strings."""
     from jactus.core import ActusDateTime
+    from jactus_mcp.tools._utils import prepare_attributes
 
-    attrs = simulate._prepare_attributes({
+    attrs = prepare_attributes({
         "status_date": "2024-01-15",
         "initial_exchange_date": "2024-06-01T00:00:00",
     })
@@ -216,14 +218,14 @@ def test_simulate_time_series_invalid_format():
 
 
 def test_simulate_granular_error_invalid_enum():
-    """Test that invalid enum values return error_type field."""
+    """Test that invalid enum values return an error with error_type field."""
     result = simulate.simulate_contract({
         "contract_type": "INVALID",
         "contract_role": "RPA",
         "status_date": "2024-01-01",
     })
     assert result["success"] is False
-    assert result["error_type"] == "invalid_attribute"
+    assert result["error_type"] in ("invalid_attribute", "validation_error")
 
 
 def test_simulate_granular_error_missing_fields():
@@ -235,6 +237,146 @@ def test_simulate_granular_error_missing_fields():
     })
     assert result["success"] is False
     assert "error_type" in result
+
+
+def test_simulate_composite_contract_without_child_contracts():
+    """Test that composite contracts without child_contracts return helpful error."""
+    for ct in ("CAPFL", "SWAPS", "CEG", "CEC"):
+        result = simulate.simulate_contract({
+            "contract_type": ct,
+            "contract_id": f"TEST-{ct}",
+            "contract_role": "RPA",
+            "status_date": "2024-01-01",
+        })
+        assert result["success"] is False
+        assert result["error_type"] == "missing_child_contracts"
+        assert "child_contracts" in result["error"]
+        assert "jactus_get_contract_schema" in result["hint"]
+
+
+# ---- Child contract simulation tests ----
+
+
+def test_simulate_swaps_with_child_contracts():
+    """Test simulating a SWAPS contract with two PAM legs via child_contracts."""
+    parent_attrs = {
+        "contract_type": "SWAPS",
+        "contract_id": "SWAP-001",
+        "contract_role": "RFL",
+        "status_date": "2024-01-01",
+        "maturity_date": "2029-01-01",
+        "contract_structure": '{"FirstLeg": "LEG1", "SecondLeg": "LEG2"}',
+    }
+    child_contracts = {
+        "LEG1": {
+            "contract_type": "PAM", "contract_id": "LEG1",
+            "contract_role": "RPA", "status_date": "2024-01-01",
+            "initial_exchange_date": "2024-01-01", "maturity_date": "2029-01-01",
+            "notional_principal": 1000000.0, "nominal_interest_rate": 0.04,
+            "interest_payment_cycle": "6M",
+        },
+        "LEG2": {
+            "contract_type": "PAM", "contract_id": "LEG2",
+            "contract_role": "RPL", "status_date": "2024-01-01",
+            "initial_exchange_date": "2024-01-01", "maturity_date": "2029-01-01",
+            "notional_principal": 1000000.0, "nominal_interest_rate": 0.035,
+            "interest_payment_cycle": "6M",
+        },
+    }
+    result = simulate.simulate_contract(parent_attrs, child_contracts=child_contracts)
+    assert result["success"] is True
+    assert result["contract_type"] == "SWAPS"
+    assert result["num_events"] > 0
+    assert "child_results" in result
+    assert "LEG1" in result["child_results"]
+    assert "LEG2" in result["child_results"]
+
+
+def test_simulate_ceg_with_child_contracts():
+    """Test simulating a CEG contract with an underlier loan via child_contracts."""
+    parent_attrs = {
+        "contract_type": "CEG",
+        "contract_id": "CEG-001",
+        "contract_role": "BUY",
+        "status_date": "2024-01-01",
+        "initial_exchange_date": "2024-01-01",
+        "maturity_date": "2029-01-01",
+        "notional_principal": 500000.0,
+        "coverage": 1.0,
+        "contract_structure": '{"CoveredContract": "LOAN-001"}',
+    }
+    child_contracts = {
+        "LOAN-001": {
+            "contract_type": "PAM", "contract_id": "LOAN-001",
+            "contract_role": "RPA", "status_date": "2024-01-01",
+            "initial_exchange_date": "2024-01-01", "maturity_date": "2029-01-01",
+            "notional_principal": 500000.0, "nominal_interest_rate": 0.04,
+        },
+    }
+    result = simulate.simulate_contract(parent_attrs, child_contracts=child_contracts)
+    assert result["success"] is True
+    assert result["contract_type"] == "CEG"
+    assert "child_results" in result
+    assert "LOAN-001" in result["child_results"]
+
+
+def test_simulate_child_contract_invalid_child():
+    """Test that an invalid child contract returns a clear error."""
+    parent_attrs = {
+        "contract_type": "SWAPS",
+        "contract_id": "SWAP-001",
+        "contract_role": "RFL",
+        "status_date": "2024-01-01",
+        "maturity_date": "2029-01-01",
+        "contract_structure": '{"FirstLeg": "LEG1", "SecondLeg": "LEG2"}',
+    }
+    child_contracts = {
+        "LEG1": {
+            "contract_type": "PAM", "contract_id": "LEG1",
+            "contract_role": "RPA", "status_date": "2024-01-01",
+            "initial_exchange_date": "2024-01-01", "maturity_date": "2029-01-01",
+            "notional_principal": 1000000.0,
+        },
+        "LEG2": {
+            # Missing contract_role — should fail
+            "contract_type": "INVALID_TYPE", "contract_id": "LEG2",
+        },
+    }
+    result = simulate.simulate_contract(parent_attrs, child_contracts=child_contracts)
+    assert result["success"] is False
+    assert result["error_type"] == "child_simulation_error"
+    assert "LEG2" in result["error"]
+
+
+def test_simulate_child_results_summary():
+    """Test that child_results includes summary for each child."""
+    parent_attrs = {
+        "contract_type": "CEG",
+        "contract_id": "CEG-001",
+        "contract_role": "BUY",
+        "status_date": "2024-01-01",
+        "initial_exchange_date": "2024-01-01",
+        "maturity_date": "2029-01-01",
+        "notional_principal": 500000.0,
+        "coverage": 1.0,
+        "contract_structure": '{"CoveredContract": "LOAN-001"}',
+    }
+    child_contracts = {
+        "LOAN-001": {
+            "contract_type": "PAM", "contract_id": "LOAN-001",
+            "contract_role": "RPA", "status_date": "2024-01-01",
+            "initial_exchange_date": "2024-01-01", "maturity_date": "2029-01-01",
+            "notional_principal": 500000.0, "nominal_interest_rate": 0.04,
+        },
+    }
+    result = simulate.simulate_contract(parent_attrs, child_contracts=child_contracts)
+    assert result["success"] is True
+    child = result["child_results"]["LOAN-001"]
+    assert "contract_type" in child
+    assert child["contract_type"] == "PAM"
+    assert "num_events" in child
+    assert child["num_events"] > 0
+    assert "net_cashflow" in child
 
 
 # ---- Pagination tests ----

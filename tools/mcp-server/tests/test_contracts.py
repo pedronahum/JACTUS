@@ -112,3 +112,50 @@ def test_list_risk_factor_observers_python_only_flagged():
     assert result["observers"]["CompositeRiskFactorObserver"].get("python_only") is True
     assert result["observers"]["CallbackRiskFactorObserver"].get("python_only") is True
     assert result["observers"]["JaxRiskFactorObserver"].get("python_only") is True
+
+
+def test_get_contract_info_composite_contracts():
+    """Test that composite contracts are flagged as requiring child_contracts."""
+    for ct in ("CAPFL", "SWAPS", "CEG", "CEC"):
+        result = contracts.get_contract_info(ct)
+        assert result["requires_child_contracts"] is True
+        assert result["mcp_simulatable"] is True
+        assert "child_contracts" in result["mcp_note"]
+
+
+def test_get_contract_info_mcp_simulatable():
+    """Test that all contracts are marked as MCP-simulatable."""
+    for ct in ("PAM", "LAM", "ANN", "SWPPV", "FXOUT", "CAPFL", "SWAPS"):
+        result = contracts.get_contract_info(ct)
+        assert result["mcp_simulatable"] is True
+
+
+def test_get_contract_schema_composite_requires_child_contracts():
+    """Test that schema shows child_contracts requirement for composite contracts."""
+    for ct in ("CAPFL", "SWAPS", "CEG", "CEC"):
+        result = contracts.get_contract_schema(ct)
+        assert result["requires_child_contracts"] is True
+        assert "mcp_example" in result
+        assert "mcp_note" in result
+        # MCP example should be a dict with attributes and child_contracts
+        assert "attributes" in result["mcp_example"]
+        assert "child_contracts" in result["mcp_example"]
+
+    # Standard contracts should not have these
+    result = contracts.get_contract_schema("PAM")
+    assert "requires_child_contracts" not in result
+    assert "mcp_example" not in result
+
+
+def test_get_contract_schema_child_observer_python_example():
+    """Test that composite contracts get a Python example with SimulatedChildContractObserver."""
+    for ct in ("CAPFL", "SWAPS", "CEG", "CEC"):
+        result = contracts.get_contract_schema(ct)
+        example = result["example_usage"]
+        assert "SimulatedChildContractObserver" in example
+        assert "register_simulation" in example
+        assert "create_contract" in example
+
+    # Standard contracts should use the generic example
+    result = contracts.get_contract_schema("PAM")
+    assert "SimulatedChildContractObserver" not in result["example_usage"]

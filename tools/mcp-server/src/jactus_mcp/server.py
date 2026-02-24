@@ -25,22 +25,32 @@ mcp = FastMCP(
     "jactus-mcp",
     instructions="""JACTUS MCP Server - Financial contract simulation powered by JAX.
 
-This server provides tools for discovering, validating, and simulating ACTUS
-(Algorithmic Contract Types Unified Standards) financial contracts. JACTUS
-supports 18 contract types across 4 categories: principal instruments (PAM,
-LAM, LAX, NAM, ANN, CLM), non-principal instruments (UMP, CSH, STK), exotic
-instruments (COM), and derivatives (FXOUT, OPTNS, FUTUR, SWPPV, SWAPS, CAPFL,
-CEG, CEC).
+IMPORTANT: These MCP tools provide ALL the information you need to discover,
+validate, and simulate ACTUS contracts. Do NOT read JACTUS source code or
+explore the codebase to learn about contract types, parameters, or usage.
+Use the tools below — they are authoritative and always up-to-date.
 
-Typical workflow:
-1. Use jactus_list_contracts to discover available contract types
-2. Use jactus_get_contract_schema to understand required/optional parameters
-3. Use jactus_validate_attributes to verify your parameters before simulation
-4. Use jactus_simulate_contract to run the simulation and get cash flows
-5. Use jactus_search_docs or jactus_get_topic_guide for deeper understanding
+This server covers 18 ACTUS contract types across 4 categories:
+- Principal instruments: PAM, LAM, LAX, NAM, ANN, CLM
+- Non-principal instruments: UMP, CSH, STK
+- Exotic instruments: COM
+- Derivatives: FXOUT, OPTNS, FUTUR, SWPPV, SWAPS, CAPFL, CEG, CEC
+
+Required workflow — always follow these steps in order:
+1. jactus_list_contracts → discover available contract types and categories
+2. jactus_get_contract_schema → get required/optional fields for your contract type
+3. jactus_validate_attributes → verify your attributes before simulation
+4. jactus_simulate_contract → run the simulation and get cash flows
+5. jactus_search_docs or jactus_get_topic_guide → only if you need deeper understanding
+
+The schema tool returns everything you need to build valid attributes: field names,
+types, descriptions, and example code. All 18 contract types can be simulated via MCP.
+Composite contracts (SWAPS, CAPFL, CEG, CEC) require a child_contracts parameter —
+check jactus_get_contract_schema for the required format and examples.
 
 Key concepts:
-- contract_role: RPA = receive principal (lender/asset), RPL = receive payoff (borrower/liability)
+- contract_role: RPA = Real Position Asset (lender), RPL = Real Position Liability (borrower).
+  Other roles: RFL/PFL (swap legs), BUY/SEL (protection), LG/ST (long/short)
 - Dates use ISO format: "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM:SS"
 - Cycles use notation like "1M" (monthly), "3M" (quarterly), "6M" (semi-annual), "1Y" (annual)
 - Risk factors: use constant_value for fixed-rate contracts, risk_factors dict for static
@@ -105,8 +115,9 @@ def jactus_list_contracts() -> dict[str, Any]:
 def jactus_get_contract_info(contract_type: str) -> dict[str, Any]:
     """Get detailed information about a specific ACTUS contract type.
 
-    Returns the contract description, category, implementation class, and module path.
-    Use this to understand what a contract type represents before building one.
+    Returns the contract description, category, implementation class, MCP simulatability
+    status, and whether a ChildContractObserver is required. Use this to understand
+    what a contract type represents and whether it can be simulated via MCP.
 
     Args:
         contract_type: ACTUS contract type code. Examples: PAM (bonds/loans),
@@ -121,9 +132,12 @@ def jactus_get_contract_info(contract_type: str) -> dict[str, Any]:
 def jactus_get_contract_schema(contract_type: str) -> dict[str, Any]:
     """Get required and optional parameters for a contract type.
 
-    Returns field names, types, and descriptions for both required and optional
-    parameters, plus example Python code for creating the contract. Use this
-    before calling jactus_simulate_contract to know which fields to provide.
+    Returns field names, types, descriptions, and example Python code — everything
+    needed to build valid attributes for jactus_simulate_contract. This is the
+    authoritative source for contract parameters; there is no need to read source code.
+
+    Also indicates whether the contract can be simulated via MCP or requires
+    the Python API (e.g., contracts needing a ChildContractObserver).
 
     Args:
         contract_type: ACTUS contract type code (e.g., PAM, LAM, SWPPV).
@@ -175,12 +189,14 @@ def jactus_simulate_contract(
     include_states: bool = False,
     event_limit: int | None = None,
     event_offset: int = 0,
+    child_contracts: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Simulate an ACTUS contract and return structured cash flow events.
 
     Creates a contract from the provided attributes, runs the ACTUS simulation
     engine, and returns all generated events with payoffs, timing, and optional
-    contract state snapshots.
+    contract state snapshots. Supports ALL 18 contract types including composite
+    contracts (SWAPS, CAPFL, CEG, CEC) via the child_contracts parameter.
 
     Common workflow:
     1. Use jactus_get_contract_schema to get required fields for your contract type
@@ -220,12 +236,18 @@ def jactus_simulate_contract(
         event_limit: Maximum number of events to return. Use with event_offset for
             pagination. The summary always covers all events regardless.
         event_offset: Number of events to skip from the beginning (default 0).
+        child_contracts: Dict mapping child identifiers to their attribute dicts.
+            Required for composite contracts (SWAPS, CAPFL, CEG, CEC). Each child
+            is simulated first, then its results are fed into the parent contract.
+            The identifiers must match those referenced in the parent's contract_structure.
+            Example for SWAPS: {"LEG1": {PAM attrs...}, "LEG2": {PAM attrs...}}
+            Example for CAPFL/CEG/CEC: {"LOAN-001": {PAM attrs...}}
 
     Returns:
         Dict with: success, contract_type, num_events, events (list of event dicts),
         summary (total_inflows, total_outflows, net_cashflow, first/last_event),
-        initial_state, final_state. If paginated: includes pagination dict with
-        total_events, offset, limit, returned. On error: success=False, error,
+        initial_state, final_state, child_results (if child_contracts provided).
+        If paginated: includes pagination dict. On error: success=False, error,
         error_type, hint.
     """
     from .tools import simulate
@@ -240,6 +262,7 @@ def jactus_simulate_contract(
         include_states=include_states,
         event_limit=event_limit,
         event_offset=event_offset,
+        child_contracts=child_contracts,
     )
 
 

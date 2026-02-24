@@ -10,21 +10,25 @@ JACTUS is a JAX-based implementation of the ACTUS (Algorithmic Contract Types Un
 - `examples/` — Python scripts and Jupyter notebooks
 - `docs/` — Architecture guides and contract documentation
 
-## MCP Server
+## MCP Server — USE TOOLS FIRST
 
-The MCP server (`tools/mcp-server/`) provides AI assistants with:
-- **Contract discovery** — list types, get schemas, view event types
-- **Contract simulation** — create and simulate contracts, get structured cash flows
-- **Documentation search** — search across all JACTUS docs
-- **Example retrieval** — get and run example code
-- **Validation** — validate contract attributes before simulation
+When the JACTUS MCP server is available, **always use the `jactus_*` MCP tools** to discover contract types, get schemas, validate attributes, and simulate contracts. Do NOT read JACTUS source code to learn about contracts or parameters — the MCP tools are authoritative and return everything you need, including complete working Python examples.
+
+Required workflow:
+1. `jactus_list_contracts` — discover available contract types
+2. `jactus_get_contract_schema` — get required/optional fields and example code
+3. `jactus_validate_attributes` — verify attributes before simulation
+4. `jactus_simulate_contract` — run the simulation
+5. `jactus_search_docs` / `jactus_get_topic_guide` — only if deeper understanding is needed
+
+Only read source code if you need to modify or debug JACTUS itself. For using JACTUS (simulating contracts, generating code, understanding parameters), the MCP tools are sufficient.
 
 Run: `python -m jactus_mcp` (stdio) or `python -m jactus_mcp --transport streamable-http`
 
 ## Key Concepts
 
 - **Contract Types**: PAM, LAM, LAX, NAM, ANN, CLM, UMP, CSH, STK, COM, FXOUT, OPTNS, FUTUR, SWPPV, SWAPS, CAPFL, CEG, CEC (18 total)
-- **Risk Factor Observers**: `ConstantRiskFactorObserver`, `DictRiskFactorObserver`, `JaxRiskFactorObserver`
+- **Risk Factor Observers**: `ConstantRiskFactorObserver`, `DictRiskFactorObserver`, `TimeSeriesRiskFactorObserver`, `CurveRiskFactorObserver`, `CompositeRiskFactorObserver`, `CallbackRiskFactorObserver`, `JaxRiskFactorObserver`
 - **Events**: IED, IP, PR, MD, RR, etc. — represent cash flows and state transitions
 - **ContractAttributes**: Pydantic model defining all contract parameters (`src/jactus/core/attributes.py`)
 

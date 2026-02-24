@@ -7,7 +7,7 @@ from typing import Any
 from pydantic import ValidationError
 from jactus.core import ContractAttributes, ContractType, ContractRole, ActusDateTime
 from jactus.core.attributes import ATTRIBUTE_MAP
-from jactus_mcp.tools._utils import DATE_FIELDS, ARRAY_DATE_FIELDS
+from jactus_mcp.tools._utils import prepare_attributes
 
 
 def _detect_unknown_fields(attributes: dict[str, Any]) -> list[str]:
@@ -50,6 +50,9 @@ def _detect_unknown_fields(attributes: dict[str, Any]) -> list[str]:
 def validate_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
     """Validate contract attributes for correctness.
 
+    Uses the same enum/date conversion as simulate_contract to ensure
+    consistent behavior between validation and simulation.
+
     Args:
         attributes: Dictionary of contract attributes
 
@@ -57,77 +60,22 @@ def validate_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
         Validation result with success status and any errors.
     """
     try:
-        # Convert string contract_type to enum if needed
-        if "contract_type" in attributes and isinstance(attributes["contract_type"], str):
-            try:
-                attributes["contract_type"] = ContractType[attributes["contract_type"]]
-            except KeyError:
-                return {
-                    "valid": False,
-                    "errors": [
-                        f"Invalid contract_type: {attributes['contract_type']}. "
-                        f"Must be one of: {[ct.name for ct in ContractType]}"
-                    ],
-                }
-
-        # Convert string contract_role to enum if needed
-        if "contract_role" in attributes and isinstance(attributes["contract_role"], str):
-            try:
-                attributes["contract_role"] = ContractRole[attributes["contract_role"]]
-            except KeyError:
-                return {
-                    "valid": False,
-                    "errors": [
-                        f"Invalid contract_role: {attributes['contract_role']}. "
-                        f"Must be one of: {[cr.name for cr in ContractRole]}"
-                    ],
-                }
-
-        # Convert single date strings to ActusDateTime
-        for field in DATE_FIELDS:
-            if field in attributes and isinstance(attributes[field], str):
-                try:
-                    value = attributes[field]
-                    if "T" in value:
-                        attributes[field] = ActusDateTime.from_iso(value)
-                    else:
-                        parts = value.split("-")
-                        if len(parts) == 3:
-                            year, month, day = map(int, parts)
-                            attributes[field] = ActusDateTime(year, month, day)
-                except Exception as e:
-                    return {
-                        "valid": False,
-                        "errors": [f"Invalid date format for {field}: {str(e)}"],
-                    }
-
-        # Convert array date fields (list of date strings → list of ActusDateTime)
-        for field in ARRAY_DATE_FIELDS:
-            if field in attributes and isinstance(attributes[field], list):
-                try:
-                    converted = []
-                    for v in attributes[field]:
-                        if isinstance(v, str):
-                            if "T" in v:
-                                converted.append(ActusDateTime.from_iso(v))
-                            else:
-                                parts = v.split("-")
-                                converted.append(ActusDateTime(int(parts[0]), int(parts[1]), int(parts[2])))
-                        else:
-                            converted.append(v)
-                    attributes[field] = converted
-                except Exception as e:
-                    return {
-                        "valid": False,
-                        "errors": [f"Invalid date format in {field}: {str(e)}"],
-                    }
-
-        # Detect unknown fields before Pydantic validation
+        # Detect unknown fields before conversion
         unknown_field_warnings = _detect_unknown_fields(attributes)
+
+        # Use shared prepare_attributes for consistent enum/date conversion
+        try:
+            prepared = prepare_attributes(attributes)
+        except Exception as e:
+            return {
+                "valid": False,
+                "errors": [f"Attribute conversion error: {e!s}"],
+                "hint": "Check date formats (YYYY-MM-DD) and enum values.",
+            }
 
         # Strip unknown keys so Pydantic doesn't silently ignore them
         valid_fields = set(ContractAttributes.model_fields.keys())
-        cleaned = {k: v for k, v in attributes.items() if k in valid_fields}
+        cleaned = {k: v for k, v in prepared.items() if k in valid_fields}
 
         # Validate with Pydantic
         attrs = ContractAttributes(**cleaned)
@@ -136,13 +84,86 @@ def validate_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
         warnings = list(unknown_field_warnings)
         contract_type = attrs.contract_type.name if hasattr(attrs.contract_type, 'name') else str(attrs.contract_type)
 
-        # Check for common required fields by contract type
-        if contract_type in ["PAM", "LAM", "ANN", "SWPPV"]:
-            if attrs.notional_principal is None or attrs.notional_principal == 0:
-                warnings.append("notional_principal should typically be non-zero")
+        # ---- Contract-specific required field checks ----
 
+        # Principal contracts
+        if contract_type in ("PAM", "LAM", "LAX", "NAM", "ANN", "CLM", "UMP"):
+            if attrs.initial_exchange_date is None:
+                warnings.append(f"{contract_type} typically requires initial_exchange_date")
+            if attrs.notional_principal is None:
+                warnings.append(f"{contract_type} typically requires notional_principal")
+
+        if contract_type in ("PAM", "LAM", "NAM", "ANN"):
             if attrs.nominal_interest_rate is None:
-                warnings.append("nominal_interest_rate is typically required")
+                warnings.append(f"{contract_type} typically requires nominal_interest_rate")
+
+        if contract_type == "PAM":
+            if attrs.maturity_date is None:
+                warnings.append("PAM requires maturity_date")
+
+        if contract_type in ("LAM", "NAM"):
+            if attrs.maturity_date is None and attrs.principal_redemption_cycle is None:
+                return {
+                    "valid": False,
+                    "errors": [f"{contract_type} requires either maturity_date or principal_redemption_cycle"],
+                }
+
+        if contract_type == "ANN":
+            if attrs.principal_redemption_cycle is None:
+                return {
+                    "valid": False,
+                    "errors": ["ANN requires principal_redemption_cycle"],
+                }
+            if attrs.maturity_date is None and attrs.amortization_date is None:
+                warnings.append("ANN typically requires maturity_date or amortization_date")
+
+        if contract_type == "CLM":
+            if attrs.interest_payment_cycle is None:
+                warnings.append("CLM typically requires interest_payment_cycle")
+
+        # Non-principal contracts
+        if contract_type == "CSH":
+            if attrs.notional_principal is None:
+                return {
+                    "valid": False,
+                    "errors": ["CSH requires notional_principal"],
+                }
+
+        if contract_type in ("STK", "COM"):
+            if attrs.initial_exchange_date is None:
+                warnings.append(f"{contract_type} typically requires initial_exchange_date")
+            if attrs.notional_principal is None:
+                warnings.append(f"{contract_type} typically requires notional_principal")
+
+        # Derivative contracts
+        if contract_type == "FXOUT":
+            if not attrs.delivery_settlement:
+                return {
+                    "valid": False,
+                    "errors": ["FXOUT requires delivery_settlement ('D' or 'S')"],
+                }
+            if not attrs.currency_2:
+                warnings.append("FXOUT typically requires currency_2")
+            if attrs.notional_principal_2 is None:
+                warnings.append("FXOUT typically requires notional_principal_2")
+
+        if contract_type == "OPTNS":
+            if not attrs.contract_structure:
+                return {
+                    "valid": False,
+                    "errors": ["OPTNS requires contract_structure (JSON string)"],
+                }
+            if not attrs.option_type:
+                warnings.append("OPTNS typically requires option_type ('C' or 'P')")
+            if attrs.option_strike_1 is None:
+                warnings.append("OPTNS typically requires option_strike_1")
+
+        if contract_type == "FUTUR":
+            if not attrs.contract_structure:
+                return {
+                    "valid": False,
+                    "errors": ["FUTUR requires contract_structure (JSON string)"],
+                }
 
         if contract_type == "SWPPV":
             if not attrs.interest_payment_cycle:
@@ -161,21 +182,34 @@ def validate_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
                     "errors": ["SWPPV requires nominal_interest_rate_2 (initial floating leg rate)"],
                 }
 
-        if contract_type == "FXOUT":
-            if not attrs.delivery_settlement:
-                return {
-                    "valid": False,
-                    "errors": ["FXOUT requires delivery_settlement ('D' or 'S')"],
-                }
-
-        if contract_type == "OPTNS":
+        if contract_type == "SWAPS":
             if not attrs.contract_structure:
                 return {
                     "valid": False,
-                    "errors": ["OPTNS requires contract_structure (JSON string)"],
+                    "errors": ["SWAPS requires contract_structure (JSON string)"],
                 }
-            if not attrs.option_type:
-                warnings.append("option_type should be 'C' (call) or 'P' (put)")
+
+        if contract_type == "CAPFL":
+            if not attrs.rate_reset_cycle:
+                return {
+                    "valid": False,
+                    "errors": ["CAPFL requires rate_reset_cycle"],
+                }
+            if attrs.rate_reset_cap is None and attrs.rate_reset_floor is None:
+                warnings.append("CAPFL typically requires rate_reset_cap and/or rate_reset_floor")
+
+        if contract_type in ("CEG", "CEC"):
+            if not attrs.contract_structure:
+                return {
+                    "valid": False,
+                    "errors": [f"{contract_type} requires contract_structure (JSON string)"],
+                }
+            if attrs.coverage is None:
+                warnings.append(f"{contract_type} typically requires coverage")
+
+        if contract_type == "LAX":
+            if not attrs.array_pr_cycle and not attrs.array_pr_next:
+                warnings.append("LAX typically requires array_pr_cycle and array_pr_next")
 
         return {
             "valid": True,
@@ -232,7 +266,7 @@ valid_attrs = {
     "maturity_date": "2025-01-15",
     "notional_principal": 100000.0,
     "nominal_interest_rate": 0.05,
-    "day_count_convention": "30E360",
+    "day_count_convention": "E30360",
 }
 
 result = validation.validate_attributes(valid_attrs)
