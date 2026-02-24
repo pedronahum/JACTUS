@@ -7,7 +7,6 @@ using the mcp.client module with pytest-asyncio.
 import json
 
 import pytest
-import pytest_asyncio
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 

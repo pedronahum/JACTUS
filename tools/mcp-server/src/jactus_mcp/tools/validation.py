@@ -1,12 +1,12 @@
 """Contract validation tools."""
 
 import difflib
-import json
 from typing import Any
 
-from pydantic import ValidationError
-from jactus.core import ContractAttributes, ContractType, ContractRole, ActusDateTime
+from jactus.core import ContractAttributes
 from jactus.core.attributes import ATTRIBUTE_MAP
+from pydantic import ValidationError
+
 from jactus_mcp.tools._utils import prepare_attributes
 
 

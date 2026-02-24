@@ -134,7 +134,8 @@ def test_simulate_missing_required_fields():
 
 def test_prepare_attributes_converts_enums():
     """Test that prepare_attributes correctly converts string enums."""
-    from jactus.core import ContractType, ContractRole
+    from jactus.core import ContractRole, ContractType
+
     from jactus_mcp.tools._utils import prepare_attributes
 
     attrs = prepare_attributes({
@@ -149,6 +150,7 @@ def test_prepare_attributes_converts_enums():
 def test_prepare_attributes_converts_dates():
     """Test that prepare_attributes correctly converts date strings."""
     from jactus.core import ActusDateTime
+
     from jactus_mcp.tools._utils import prepare_attributes
 
     attrs = prepare_attributes({

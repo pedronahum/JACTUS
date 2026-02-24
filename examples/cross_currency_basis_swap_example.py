@@ -50,7 +50,7 @@ def main():
     print(
         f"Maturity Date:       {maturity_date.year}-{maturity_date.month:02d}-{maturity_date.day:02d}"
     )
-    print(f"Tenor:               5 years")
+    print("Tenor:               5 years")
     print()
 
     # Swap terms
@@ -228,7 +228,7 @@ def main():
 
     print("Initializing contract state...")
     initial_state = xccy_swap.initialize_state()
-    print(f"✓ Initial state created")
+    print("✓ Initial state created")
     print(
         f"  Status Date (SD):    {initial_state.sd.year}-{initial_state.sd.month:02d}-{initial_state.sd.day:02d}"
     )
@@ -251,7 +251,7 @@ def main():
     print(f"{'Event Type':<15} {'Date':<12} {'Description':<50}")
     print("-" * 80)
 
-    for i, event in enumerate(schedule.events[:15]):
+    for _i, event in enumerate(schedule.events[:15]):
         event_date = (
             f"{event.event_time.year}-{event.event_time.month:02d}-{event.event_time.day:02d}"
         )
@@ -276,8 +276,8 @@ def main():
     # ==================== Simulation ====================
 
     print("Running simulation...")
-    result = xccy_swap.simulate(rf_observer, child_observer)
-    print(f"✓ Simulation complete")
+    xccy_swap.simulate(rf_observer, child_observer)
+    print("✓ Simulation complete")
     print()
 
     # ==================== Cashflow Analysis ====================

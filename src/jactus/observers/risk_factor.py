@@ -67,7 +67,7 @@ class RiskFactorObserver(Protocol):
     def observe_event(
         self,
         identifier: str,
-        event_type: EventType,  # type: ignore # noqa: F821
+        event_type: EventType,
         time: ActusDateTime,
         state: ContractState | None = None,
         attributes: ContractAttributes | None = None,
@@ -141,7 +141,7 @@ class BaseRiskFactorObserver(ABC):
     def _get_event_data(
         self,
         identifier: str,
-        event_type: EventType,  # type: ignore # noqa: F821
+        event_type: EventType,
         time: ActusDateTime,
         state: ContractState | None,
         attributes: ContractAttributes | None,
@@ -195,7 +195,7 @@ class BaseRiskFactorObserver(ABC):
     def observe_event(
         self,
         identifier: str,
-        event_type: EventType,  # type: ignore # noqa: F821
+        event_type: EventType,
         time: ActusDateTime,
         state: ContractState | None = None,
         attributes: ContractAttributes | None = None,
@@ -261,7 +261,7 @@ class ConstantRiskFactorObserver(BaseRiskFactorObserver):
     def _get_event_data(
         self,
         identifier: str,  # noqa: ARG002
-        event_type: EventType,  # type: ignore # noqa: F821, ARG002
+        event_type: EventType,
         time: ActusDateTime,  # noqa: ARG002
         state: ContractState | None,  # noqa: ARG002
         attributes: ContractAttributes | None,  # noqa: ARG002
@@ -343,7 +343,7 @@ class DictRiskFactorObserver(BaseRiskFactorObserver):
     def _get_event_data(
         self,
         identifier: str,  # noqa: ARG002
-        event_type: EventType,  # type: ignore # noqa: F821, ARG002
+        event_type: EventType,
         time: ActusDateTime,  # noqa: ARG002
         state: ContractState | None,  # noqa: ARG002
         attributes: ContractAttributes | None,  # noqa: ARG002
@@ -519,7 +519,7 @@ class TimeSeriesRiskFactorObserver(BaseRiskFactorObserver):
     def _get_event_data(
         self,
         identifier: str,
-        event_type: EventType,  # type: ignore # noqa: F821, ARG002
+        event_type: EventType,
         time: ActusDateTime,
         state: ContractState | None,  # noqa: ARG002
         attributes: ContractAttributes | None,  # noqa: ARG002
@@ -691,7 +691,7 @@ class CurveRiskFactorObserver(BaseRiskFactorObserver):
     def _get_event_data(
         self,
         identifier: str,
-        event_type: EventType,  # type: ignore # noqa: F821, ARG002
+        event_type: EventType,
         time: ActusDateTime,  # noqa: ARG002
         state: ContractState | None,  # noqa: ARG002
         attributes: ContractAttributes | None,  # noqa: ARG002
@@ -764,7 +764,7 @@ class CallbackRiskFactorObserver(BaseRiskFactorObserver):
     def _get_event_data(
         self,
         identifier: str,
-        event_type: EventType,  # type: ignore # noqa: F821
+        event_type: EventType,
         time: ActusDateTime,
         state: ContractState | None,  # noqa: ARG002
         attributes: ContractAttributes | None,  # noqa: ARG002
@@ -859,7 +859,7 @@ class CompositeRiskFactorObserver(BaseRiskFactorObserver):
     def _get_event_data(
         self,
         identifier: str,
-        event_type: EventType,  # type: ignore # noqa: F821
+        event_type: EventType,
         time: ActusDateTime,
         state: ContractState | None,
         attributes: ContractAttributes | None,

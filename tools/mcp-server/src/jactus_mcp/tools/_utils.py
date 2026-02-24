@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any
 
-from jactus.core import ContractType, ContractRole, ActusDateTime
+from jactus.core import ActusDateTime, ContractRole, ContractType
 from jactus.core.types import (
     BusinessDayConvention,
     Calendar,

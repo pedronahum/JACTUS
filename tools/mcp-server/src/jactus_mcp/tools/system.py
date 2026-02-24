@@ -1,6 +1,5 @@
 """System information and health check tools."""
 
-from pathlib import Path
 from typing import Any
 
 from ._utils import get_jactus_root
@@ -72,7 +71,7 @@ def health_check() -> dict[str, Any]:
 
     # Check JACTUS installation
     try:
-        import jactus
+        import jactus  # noqa: F401
         checks["jactus_installed"] = True
         checks["jactus_importable"] = True
 

@@ -4,12 +4,12 @@ import json
 import logging
 from typing import Any
 
+from jactus.contracts import create_contract
+from jactus.core import ActusDateTime, ContractAttributes
+from jactus.observers import ConstantRiskFactorObserver, DictRiskFactorObserver
 from pydantic import ValidationError
 
-from jactus.contracts import create_contract
-from jactus.core import ContractAttributes, ActusDateTime
-from jactus.observers import ConstantRiskFactorObserver, DictRiskFactorObserver
-from jactus_mcp.tools._utils import prepare_attributes, parse_datetime
+from jactus_mcp.tools._utils import parse_datetime, prepare_attributes
 from jactus_mcp.tools.validation import _detect_unknown_fields
 
 logger = logging.getLogger(__name__)
@@ -58,10 +58,10 @@ def simulate_contract(
         The summary always covers ALL events regardless of pagination.
     """
     # Contracts that require child contracts
-    _CHILD_CONTRACT_REQUIRED = {"CAPFL", "SWAPS", "CEG", "CEC"}
+    child_contract_required = {"CAPFL", "SWAPS", "CEG", "CEC"}
 
     ct_str = attributes.get("contract_type", "")
-    if isinstance(ct_str, str) and ct_str in _CHILD_CONTRACT_REQUIRED and not child_contracts:
+    if isinstance(ct_str, str) and ct_str in child_contract_required and not child_contracts:
         return {
             "success": False,
             "error_type": "missing_child_contracts",
@@ -209,7 +209,6 @@ def simulate_contract(
             }
 
         # Auto-truncation: if output is still too large, reduce events
-        truncated = False
         if not pagination:
             estimated_size = len(json.dumps(events[:1])) * len(events) if events else 0
             if estimated_size > _MAX_OUTPUT_CHARS:
@@ -219,7 +218,6 @@ def simulate_contract(
                 tail = events[-(keep - keep // 2):]
                 omitted = total_events - len(head) - len(tail)
                 events = head + tail
-                truncated = True
                 pagination = {
                     "total_events": total_events,
                     "returned": len(events),

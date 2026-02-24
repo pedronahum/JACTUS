@@ -1,6 +1,5 @@
 """Tests for validation tools."""
 
-import pytest
 from jactus_mcp.tools import validation
 
 

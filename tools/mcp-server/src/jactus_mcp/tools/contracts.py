@@ -1,10 +1,9 @@
 """Contract discovery and introspection tools."""
 
-import json
 from typing import Any
 
 from jactus.contracts import CONTRACT_REGISTRY
-from jactus.core import ContractType, EventType, ContractAttributes
+from jactus.core import ContractType, EventType
 
 
 def list_contracts() -> dict[str, Any]:
@@ -409,9 +408,6 @@ def get_contract_schema(contract_type: str) -> dict[str, Any]:
     Returns:
         Dictionary with required fields, optional fields, and their types.
     """
-    # Get Pydantic schema
-    schema = ContractAttributes.model_json_schema()
-
     # Base required fields (always needed by Pydantic)
     base_required = {
         "contract_type": "ContractType enum (e.g., 'PAM', 'LAM', 'SWPPV')",

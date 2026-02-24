@@ -45,7 +45,7 @@ def main():
     print(
         f"Maturity Date:       {maturity_date.year}-{maturity_date.month:02d}-{maturity_date.day:02d}"
     )
-    print(f"Tenor:               5 years")
+    print("Tenor:               5 years")
     print()
 
     # Swap terms
@@ -56,8 +56,8 @@ def main():
     print(f"Notional:            ${notional:,.0f}")
     print(f"Fixed Rate:          {fixed_rate * 100:.2f}% p.a.")
     print(f"Floating Rate:       O/N rate (initial {floating_rate_initial * 100:.2f}%)")
-    print(f"Payment Frequency:   Quarterly")
-    print(f"Day Count:           Actual/360")
+    print("Payment Frequency:   Quarterly")
+    print("Day Count:           Actual/360")
     print()
 
     # ==================== Contract Creation ====================
@@ -108,7 +108,7 @@ def main():
 
     print("Initializing contract state...")
     initial_state = swap_contract.initialize_state()
-    print(f"✓ Initial state created")
+    print("✓ Initial state created")
     print(
         f"  Status Date (SD):    {initial_state.sd.year}-{initial_state.sd.month:02d}-{initial_state.sd.day:02d}"
     )
@@ -158,8 +158,8 @@ def main():
     # ==================== Simulation ====================
 
     print("Running simulation...")
-    result = swap_contract.simulate(rf_observer)
-    print(f"✓ Simulation complete")
+    swap_contract.simulate(rf_observer)
+    print("✓ Simulation complete")
     print()
 
     # ==================== Results Analysis ====================
@@ -168,8 +168,6 @@ def main():
     print("-" * 80)
 
     # Calculate net payments
-    total_fixed_payments = 0.0
-    total_floating_payments = 0.0
     total_net_payments = 0.0
 
     # In SWPPV with net settlement, we get net cashflows
@@ -196,11 +194,11 @@ def main():
     print(f"  - {(maturity_date.year - status_date.year) * 4} total payments over 5 years")
     print()
     print("Floating Leg Cashflows:")
-    print(f"  - Quarterly payments based on O/N rate resets")
+    print("  - Quarterly payments based on O/N rate resets")
     print(f"  - Current quarterly payment ~${(notional * floating_rate_initial / 4):,.2f}")
     print()
     print("Net Settlement:")
-    print(f"  - Only the difference between fixed and floating is exchanged")
+    print("  - Only the difference between fixed and floating is exchanged")
     print(f"  - If O/N rate < {fixed_rate * 100:.2f}%, fixed payer receives")
     print(f"  - If O/N rate > {fixed_rate * 100:.2f}%, fixed payer pays")
     print()

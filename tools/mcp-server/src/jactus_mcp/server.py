@@ -13,7 +13,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from .tools import contracts, examples, validation, documentation, system
+from .tools import contracts, documentation, examples, system, validation
 from .tools._utils import get_jactus_root
 
 # Configure logging

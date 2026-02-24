@@ -1,6 +1,5 @@
 """Tests for documentation search tools."""
 
-import pytest
 from jactus_mcp.tools import documentation
 
 

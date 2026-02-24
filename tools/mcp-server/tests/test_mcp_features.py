@@ -1,8 +1,6 @@
 """Tests for MCP-specific features (resources and prompts)."""
 
-import pytest
 from pathlib import Path
-
 
 # Note: These tests verify the structure of resources and prompts
 # Actual MCP protocol testing would require async test framework

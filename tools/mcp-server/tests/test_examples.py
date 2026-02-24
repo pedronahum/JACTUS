@@ -1,6 +1,5 @@
 """Tests for example retrieval tools."""
 
-import pytest
 from jactus_mcp.tools import examples
 
 

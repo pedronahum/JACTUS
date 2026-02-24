@@ -1,7 +1,5 @@
 """Documentation search tools."""
 
-import re
-from pathlib import Path
 from typing import Any
 
 from ._utils import get_jactus_root
@@ -61,7 +59,7 @@ def search_docs(query: str) -> dict[str, Any]:
                     "total_matches": len(matches),
                 })
 
-        except Exception as e:
+        except Exception:
             continue
 
     if not results:

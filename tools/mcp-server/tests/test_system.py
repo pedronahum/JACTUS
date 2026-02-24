@@ -1,6 +1,5 @@
 """Tests for system tools."""
 
-import pytest
 from jactus_mcp.tools import system
 
 
