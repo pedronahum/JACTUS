@@ -18,10 +18,14 @@ from jactus.core import ActusDateTime, ContractAttributes, ContractState
 from jactus.core.types import ContractRole, ContractType, EventType
 from jactus.observers import (
     BaseRiskFactorObserver,
+    CallbackRiskFactorObserver,
+    CompositeRiskFactorObserver,
     ConstantRiskFactorObserver,
+    CurveRiskFactorObserver,
     DictRiskFactorObserver,
     JaxRiskFactorObserver,
     RiskFactorObserver,
+    TimeSeriesRiskFactorObserver,
 )
 
 
@@ -751,3 +755,485 @@ class TestJaxRiskFactorObserverVmap:
             ]
         )
         assert jnp.allclose(sensitivities, expected)
+
+
+class TestTimeSeriesRiskFactorObserver:
+    """Test TimeSeriesRiskFactorObserver."""
+
+    def test_init_sorts_series_by_time(self):
+        """Series are sorted by time at construction."""
+        # Provide unsorted input
+        ts = {
+            "RATE": [
+                (ActusDateTime(2025, 1, 1), 0.05),
+                (ActusDateTime(2024, 1, 1), 0.04),
+                (ActusDateTime(2024, 7, 1), 0.045),
+            ]
+        }
+        observer = TimeSeriesRiskFactorObserver(ts)
+        # Step interpolation at a time between first two should return first
+        result = observer.observe_risk_factor("RATE", ActusDateTime(2024, 4, 1))
+        assert jnp.allclose(result, jnp.array(0.04, dtype=jnp.float32))
+
+    def test_init_invalid_interpolation_raises(self):
+        """Invalid interpolation method raises ValueError."""
+        with pytest.raises(ValueError, match="interpolation"):
+            TimeSeriesRiskFactorObserver({"R": [(ActusDateTime(2024, 1, 1), 0.0)]}, interpolation="cubic")
+
+    def test_init_invalid_extrapolation_raises(self):
+        """Invalid extrapolation method raises ValueError."""
+        with pytest.raises(ValueError, match="extrapolation"):
+            TimeSeriesRiskFactorObserver({"R": [(ActusDateTime(2024, 1, 1), 0.0)]}, extrapolation="none")
+
+    def test_step_interpolation_at_exact_point(self):
+        """Step interpolation returns exact value at data point."""
+        ts = {
+            "RATE": [
+                (ActusDateTime(2024, 1, 1), 0.04),
+                (ActusDateTime(2024, 7, 1), 0.045),
+            ]
+        }
+        observer = TimeSeriesRiskFactorObserver(ts, interpolation="step")
+        result = observer.observe_risk_factor("RATE", ActusDateTime(2024, 1, 1))
+        assert jnp.allclose(result, jnp.array(0.04, dtype=jnp.float32))
+
+    def test_step_interpolation_between_points(self):
+        """Step interpolation returns left value between points."""
+        ts = {
+            "RATE": [
+                (ActusDateTime(2024, 1, 1), 0.04),
+                (ActusDateTime(2024, 7, 1), 0.05),
+            ]
+        }
+        observer = TimeSeriesRiskFactorObserver(ts, interpolation="step")
+        result = observer.observe_risk_factor("RATE", ActusDateTime(2024, 4, 1))
+        assert jnp.allclose(result, jnp.array(0.04, dtype=jnp.float32))
+
+    def test_linear_interpolation_at_exact_point(self):
+        """Linear interpolation returns exact value at data point."""
+        ts = {
+            "RATE": [
+                (ActusDateTime(2024, 1, 1), 0.04),
+                (ActusDateTime(2024, 7, 1), 0.05),
+            ]
+        }
+        observer = TimeSeriesRiskFactorObserver(ts, interpolation="linear")
+        result = observer.observe_risk_factor("RATE", ActusDateTime(2024, 1, 1))
+        assert jnp.allclose(result, jnp.array(0.04, dtype=jnp.float32))
+
+    def test_linear_interpolation_midpoint(self):
+        """Linear interpolation at midpoint returns average."""
+        ts = {
+            "RATE": [
+                (ActusDateTime(2024, 1, 1), 0.04),
+                (ActusDateTime(2025, 1, 1), 0.06),
+            ]
+        }
+        observer = TimeSeriesRiskFactorObserver(ts, interpolation="linear")
+        # Midpoint (approximately July 1-2 due to leap year)
+        result = observer.observe_risk_factor("RATE", ActusDateTime(2024, 7, 1))
+        # Should be close to 0.05 (proportional to days)
+        assert 0.049 < float(result) < 0.051
+
+    def test_flat_extrapolation_before_first(self):
+        """Flat extrapolation returns first value before series start."""
+        ts = {
+            "RATE": [
+                (ActusDateTime(2024, 1, 1), 0.04),
+                (ActusDateTime(2025, 1, 1), 0.05),
+            ]
+        }
+        observer = TimeSeriesRiskFactorObserver(ts, extrapolation="flat")
+        result = observer.observe_risk_factor("RATE", ActusDateTime(2023, 1, 1))
+        assert jnp.allclose(result, jnp.array(0.04, dtype=jnp.float32))
+
+    def test_flat_extrapolation_after_last(self):
+        """Flat extrapolation returns last value after series end."""
+        ts = {
+            "RATE": [
+                (ActusDateTime(2024, 1, 1), 0.04),
+                (ActusDateTime(2025, 1, 1), 0.05),
+            ]
+        }
+        observer = TimeSeriesRiskFactorObserver(ts, extrapolation="flat")
+        result = observer.observe_risk_factor("RATE", ActusDateTime(2026, 1, 1))
+        assert jnp.allclose(result, jnp.array(0.05, dtype=jnp.float32))
+
+    def test_raise_extrapolation_before_first(self):
+        """Raise extrapolation raises KeyError before series start."""
+        ts = {
+            "RATE": [
+                (ActusDateTime(2024, 1, 1), 0.04),
+                (ActusDateTime(2025, 1, 1), 0.05),
+            ]
+        }
+        observer = TimeSeriesRiskFactorObserver(ts, extrapolation="raise")
+        with pytest.raises(KeyError, match="before first"):
+            observer.observe_risk_factor("RATE", ActusDateTime(2023, 1, 1))
+
+    def test_raise_extrapolation_after_last(self):
+        """Raise extrapolation raises KeyError after series end."""
+        ts = {
+            "RATE": [
+                (ActusDateTime(2024, 1, 1), 0.04),
+                (ActusDateTime(2025, 1, 1), 0.05),
+            ]
+        }
+        observer = TimeSeriesRiskFactorObserver(ts, extrapolation="raise")
+        with pytest.raises(KeyError, match="after last"):
+            observer.observe_risk_factor("RATE", ActusDateTime(2026, 1, 1))
+
+    def test_unknown_identifier_raises_keyerror(self):
+        """Unknown identifier raises KeyError."""
+        ts = {"RATE": [(ActusDateTime(2024, 1, 1), 0.04)]}
+        observer = TimeSeriesRiskFactorObserver(ts)
+        with pytest.raises(KeyError, match="UNKNOWN"):
+            observer.observe_risk_factor("UNKNOWN", ActusDateTime(2024, 1, 1))
+
+    def test_event_data_step_interpolation(self):
+        """Event data supports step interpolation."""
+        event_data = {
+            "PP_AMOUNT": [
+                (ActusDateTime(2024, 1, 1), 1000.0),
+                (ActusDateTime(2024, 7, 1), 2000.0),
+            ]
+        }
+        observer = TimeSeriesRiskFactorObserver(
+            risk_factors={},
+            event_data=event_data,
+        )
+        result = observer.observe_event("PP_AMOUNT", EventType.PP, ActusDateTime(2024, 4, 1))
+        assert result == 1000.0
+
+    def test_event_data_unknown_raises_keyerror(self):
+        """Unknown event data identifier raises KeyError."""
+        observer = TimeSeriesRiskFactorObserver(risk_factors={})
+        with pytest.raises(KeyError, match="UNKNOWN"):
+            observer.observe_event("UNKNOWN", EventType.PP, ActusDateTime(2024, 1, 1))
+
+    def test_is_risk_factor_observer(self):
+        """TimeSeriesRiskFactorObserver implements RiskFactorObserver protocol."""
+        ts = {"RATE": [(ActusDateTime(2024, 1, 1), 0.04)]}
+        observer = TimeSeriesRiskFactorObserver(ts)
+        assert isinstance(observer, RiskFactorObserver)
+
+    def test_returns_jax_array(self):
+        """Returns JAX array with float32 dtype."""
+        ts = {"RATE": [(ActusDateTime(2024, 1, 1), 0.04)]}
+        observer = TimeSeriesRiskFactorObserver(ts)
+        result = observer.observe_risk_factor("RATE", ActusDateTime(2024, 1, 1))
+        assert isinstance(result, jnp.ndarray)
+        assert result.dtype == jnp.float32
+
+    def test_single_point_series(self):
+        """Single-point series works for any query time with flat extrapolation."""
+        ts = {"RATE": [(ActusDateTime(2024, 6, 1), 0.05)]}
+        observer = TimeSeriesRiskFactorObserver(ts, extrapolation="flat")
+        assert jnp.allclose(
+            observer.observe_risk_factor("RATE", ActusDateTime(2024, 1, 1)),
+            jnp.array(0.05, dtype=jnp.float32),
+        )
+        assert jnp.allclose(
+            observer.observe_risk_factor("RATE", ActusDateTime(2024, 6, 1)),
+            jnp.array(0.05, dtype=jnp.float32),
+        )
+
+
+class TestCurveRiskFactorObserver:
+    """Test CurveRiskFactorObserver."""
+
+    def test_init_sorts_curve_by_tenor(self):
+        """Curve is sorted by tenor at construction."""
+        curve = {
+            "YIELD": [
+                (5.0, 0.05),
+                (0.25, 0.03),
+                (1.0, 0.04),
+            ]
+        }
+        observer = CurveRiskFactorObserver(
+            curves=curve,
+            reference_date=ActusDateTime(2024, 1, 1),
+        )
+        # At ~3 months (0.25y), should get 0.03
+        result = observer.observe_risk_factor("YIELD", ActusDateTime(2024, 4, 1))
+        assert 0.029 < float(result) < 0.041
+
+    def test_init_invalid_interpolation_raises(self):
+        """Invalid interpolation raises ValueError."""
+        with pytest.raises(ValueError, match="interpolation"):
+            CurveRiskFactorObserver(
+                curves={"Y": [(1.0, 0.04)]}, interpolation="cubic"
+            )
+
+    def test_linear_interpolation_at_exact_tenor(self):
+        """Linear interpolation returns exact rate at tenor point."""
+        curve = {"YIELD": [(1.0, 0.04), (2.0, 0.05)]}
+        observer = CurveRiskFactorObserver(
+            curves=curve,
+            reference_date=ActusDateTime(2024, 1, 1),
+        )
+        # At exactly 1 year
+        result = observer.observe_risk_factor("YIELD", ActusDateTime(2025, 1, 1))
+        assert jnp.allclose(result, jnp.array(0.04, dtype=jnp.float32), atol=1e-3)
+
+    def test_linear_interpolation_between_tenors(self):
+        """Linear interpolation between tenor points."""
+        curve = {"YIELD": [(1.0, 0.04), (3.0, 0.06)]}
+        observer = CurveRiskFactorObserver(
+            curves=curve,
+            reference_date=ActusDateTime(2024, 1, 1),
+        )
+        # At 2 years (midpoint of 1y-3y), should be ~0.05
+        result = observer.observe_risk_factor("YIELD", ActusDateTime(2026, 1, 1))
+        assert 0.049 < float(result) < 0.051
+
+    def test_flat_extrapolation_before_first_tenor(self):
+        """Flat extrapolation returns first rate before curve start."""
+        curve = {"YIELD": [(1.0, 0.04), (5.0, 0.06)]}
+        observer = CurveRiskFactorObserver(
+            curves=curve,
+            reference_date=ActusDateTime(2024, 1, 1),
+        )
+        # At 0.1 years (before first tenor)
+        result = observer.observe_risk_factor("YIELD", ActusDateTime(2024, 2, 1))
+        assert jnp.allclose(result, jnp.array(0.04, dtype=jnp.float32))
+
+    def test_flat_extrapolation_after_last_tenor(self):
+        """Flat extrapolation returns last rate after curve end."""
+        curve = {"YIELD": [(1.0, 0.04), (5.0, 0.06)]}
+        observer = CurveRiskFactorObserver(
+            curves=curve,
+            reference_date=ActusDateTime(2024, 1, 1),
+        )
+        # At 10 years
+        result = observer.observe_risk_factor("YIELD", ActusDateTime(2034, 1, 1))
+        assert jnp.allclose(result, jnp.array(0.06, dtype=jnp.float32))
+
+    def test_log_linear_interpolation(self):
+        """Log-linear interpolation computes correctly."""
+        curve = {"YIELD": [(1.0, 0.04), (3.0, 0.06)]}
+        observer = CurveRiskFactorObserver(
+            curves=curve,
+            reference_date=ActusDateTime(2024, 1, 1),
+            interpolation="log_linear",
+        )
+        # At 2 years (midpoint)
+        result = observer.observe_risk_factor("YIELD", ActusDateTime(2026, 1, 1))
+        # Log-linear midpoint: exp(avg(log(0.04), log(0.06))) ~= 0.04899
+        assert 0.048 < float(result) < 0.051
+
+    def test_log_linear_rejects_non_positive_rates(self):
+        """Log-linear interpolation rejects non-positive rates."""
+        with pytest.raises(ValueError, match="positive rates"):
+            CurveRiskFactorObserver(
+                curves={"YIELD": [(1.0, 0.0), (2.0, 0.05)]},
+                interpolation="log_linear",
+            )
+
+    def test_reference_date_from_attributes(self):
+        """Falls back to attributes.status_date when no reference_date."""
+        curve = {"YIELD": [(1.0, 0.04), (5.0, 0.06)]}
+        observer = CurveRiskFactorObserver(curves=curve)
+        attrs = ContractAttributes(
+            contract_id="TEST001",
+            contract_type=ContractType.PAM,
+            contract_role=ContractRole.RPA,
+            status_date=ActusDateTime(2024, 1, 1),
+        )
+        result = observer.observe_risk_factor(
+            "YIELD", ActusDateTime(2025, 1, 1), attributes=attrs
+        )
+        assert jnp.allclose(result, jnp.array(0.04, dtype=jnp.float32), atol=1e-3)
+
+    def test_no_reference_date_no_attributes_raises(self):
+        """Raises ValueError when no reference date available."""
+        curve = {"YIELD": [(1.0, 0.04)]}
+        observer = CurveRiskFactorObserver(curves=curve)
+        with pytest.raises(ValueError, match="reference_date"):
+            observer.observe_risk_factor("YIELD", ActusDateTime(2025, 1, 1))
+
+    def test_unknown_identifier_raises_keyerror(self):
+        """Unknown identifier raises KeyError."""
+        observer = CurveRiskFactorObserver(
+            curves={"YIELD": [(1.0, 0.04)]},
+            reference_date=ActusDateTime(2024, 1, 1),
+        )
+        with pytest.raises(KeyError, match="UNKNOWN"):
+            observer.observe_risk_factor("UNKNOWN", ActusDateTime(2025, 1, 1))
+
+    def test_event_data_raises_keyerror(self):
+        """Event data raises KeyError (not supported)."""
+        observer = CurveRiskFactorObserver(
+            curves={"YIELD": [(1.0, 0.04)]},
+            reference_date=ActusDateTime(2024, 1, 1),
+        )
+        with pytest.raises(KeyError, match="does not support"):
+            observer.observe_event("YIELD", EventType.RR, ActusDateTime(2025, 1, 1))
+
+    def test_is_risk_factor_observer(self):
+        """CurveRiskFactorObserver implements RiskFactorObserver protocol."""
+        observer = CurveRiskFactorObserver(
+            curves={"YIELD": [(1.0, 0.04)]},
+            reference_date=ActusDateTime(2024, 1, 1),
+        )
+        assert isinstance(observer, RiskFactorObserver)
+
+    def test_returns_jax_array(self):
+        """Returns JAX array with float32 dtype."""
+        observer = CurveRiskFactorObserver(
+            curves={"YIELD": [(1.0, 0.04)]},
+            reference_date=ActusDateTime(2024, 1, 1),
+        )
+        result = observer.observe_risk_factor("YIELD", ActusDateTime(2025, 1, 1))
+        assert isinstance(result, jnp.ndarray)
+        assert result.dtype == jnp.float32
+
+
+class TestCallbackRiskFactorObserver:
+    """Test CallbackRiskFactorObserver."""
+
+    def test_callback_receives_identifier_and_time(self):
+        """Callback receives the correct identifier and time."""
+        calls = []
+
+        def my_callback(identifier, time):
+            calls.append((identifier, time))
+            return 0.05
+
+        observer = CallbackRiskFactorObserver(callback=my_callback)
+        t = ActusDateTime(2024, 6, 15)
+        observer.observe_risk_factor("LIBOR", t)
+
+        assert len(calls) == 1
+        assert calls[0] == ("LIBOR", t)
+
+    def test_callback_result_wrapped_as_jax_array(self):
+        """Callback result is wrapped as JAX array."""
+        observer = CallbackRiskFactorObserver(callback=lambda i, t: 0.05)
+        result = observer.observe_risk_factor("RATE", ActusDateTime(2024, 1, 1))
+        assert isinstance(result, jnp.ndarray)
+        assert result.dtype == jnp.float32
+        assert jnp.allclose(result, jnp.array(0.05, dtype=jnp.float32))
+
+    def test_event_callback_receives_identifier_type_time(self):
+        """Event callback receives identifier, event_type, and time."""
+        calls = []
+
+        def my_event_callback(identifier, event_type, time):
+            calls.append((identifier, event_type, time))
+            return 5000.0
+
+        observer = CallbackRiskFactorObserver(
+            callback=lambda i, t: 0.0,
+            event_callback=my_event_callback,
+        )
+        t = ActusDateTime(2024, 6, 15)
+        result = observer.observe_event("PP", EventType.PP, t)
+
+        assert len(calls) == 1
+        assert calls[0] == ("PP", EventType.PP, t)
+        assert result == 5000.0
+
+    def test_no_event_callback_raises_keyerror(self):
+        """Missing event callback raises KeyError."""
+        observer = CallbackRiskFactorObserver(callback=lambda i, t: 0.0)
+        with pytest.raises(KeyError, match="No event callback"):
+            observer.observe_event("PP", EventType.PP, ActusDateTime(2024, 1, 1))
+
+    def test_callback_exception_propagates(self):
+        """Exceptions from callback propagate."""
+
+        def bad_callback(identifier, time):
+            raise ValueError("bad data")
+
+        observer = CallbackRiskFactorObserver(callback=bad_callback)
+        with pytest.raises(ValueError, match="bad data"):
+            observer.observe_risk_factor("RATE", ActusDateTime(2024, 1, 1))
+
+    def test_is_risk_factor_observer(self):
+        """CallbackRiskFactorObserver implements RiskFactorObserver protocol."""
+        observer = CallbackRiskFactorObserver(callback=lambda i, t: 0.0)
+        assert isinstance(observer, RiskFactorObserver)
+
+
+class TestCompositeRiskFactorObserver:
+    """Test CompositeRiskFactorObserver."""
+
+    def test_init_empty_observers_raises(self):
+        """Empty observers list raises ValueError."""
+        with pytest.raises(ValueError, match="must not be empty"):
+            CompositeRiskFactorObserver([])
+
+    def test_first_observer_success(self):
+        """Returns result from first observer when it succeeds."""
+        obs1 = DictRiskFactorObserver({"RATE": 0.04})
+        obs2 = DictRiskFactorObserver({"RATE": 0.05})
+        composite = CompositeRiskFactorObserver([obs1, obs2])
+
+        result = composite.observe_risk_factor("RATE", ActusDateTime(2024, 1, 1))
+        assert jnp.allclose(result, jnp.array(0.04, dtype=jnp.float32))
+
+    def test_fallback_to_second_observer(self):
+        """Falls back to second observer when first raises KeyError."""
+        obs1 = DictRiskFactorObserver({"FX": 1.18})
+        obs2 = DictRiskFactorObserver({"RATE": 0.05})
+        composite = CompositeRiskFactorObserver([obs1, obs2])
+
+        result = composite.observe_risk_factor("RATE", ActusDateTime(2024, 1, 1))
+        assert jnp.allclose(result, jnp.array(0.05, dtype=jnp.float32))
+
+    def test_all_observers_fail_raises_keyerror(self):
+        """Raises KeyError when all observers fail."""
+        obs1 = DictRiskFactorObserver({"FX": 1.18})
+        obs2 = DictRiskFactorObserver({"RATE": 0.05})
+        composite = CompositeRiskFactorObserver([obs1, obs2])
+
+        with pytest.raises(KeyError, match="not found in any observer"):
+            composite.observe_risk_factor("UNKNOWN", ActusDateTime(2024, 1, 1))
+
+    def test_non_keyerror_propagates_immediately(self):
+        """Non-KeyError exceptions propagate without trying next observer."""
+
+        def bad_callback(identifier, time):
+            raise ValueError("bad data")
+
+        obs1 = CallbackRiskFactorObserver(callback=bad_callback)
+        obs2 = ConstantRiskFactorObserver(0.0)
+        composite = CompositeRiskFactorObserver([obs1, obs2])
+
+        with pytest.raises(ValueError, match="bad data"):
+            composite.observe_risk_factor("RATE", ActusDateTime(2024, 1, 1))
+
+    def test_event_data_fallback(self):
+        """Event data falls back through observer chain."""
+        obs1 = DictRiskFactorObserver({"R": 0.0}, event_data={"A": 100.0})
+        obs2 = DictRiskFactorObserver({"R": 0.0}, event_data={"B": 200.0})
+        composite = CompositeRiskFactorObserver([obs1, obs2])
+
+        result = composite.observe_event("B", EventType.PP, ActusDateTime(2024, 1, 1))
+        assert result == 200.0
+
+    def test_timeseries_with_constant_fallback(self):
+        """TimeSeriesRiskFactorObserver with ConstantRiskFactorObserver fallback."""
+        ts = TimeSeriesRiskFactorObserver({
+            "LIBOR-3M": [
+                (ActusDateTime(2024, 1, 1), 0.04),
+                (ActusDateTime(2025, 1, 1), 0.05),
+            ]
+        })
+        fallback = ConstantRiskFactorObserver(0.0)
+        composite = CompositeRiskFactorObserver([ts, fallback])
+
+        # Known identifier uses time series
+        result = composite.observe_risk_factor("LIBOR-3M", ActusDateTime(2024, 6, 1))
+        assert jnp.allclose(result, jnp.array(0.04, dtype=jnp.float32))
+
+        # Unknown identifier falls back to constant
+        result = composite.observe_risk_factor("OTHER", ActusDateTime(2024, 6, 1))
+        assert jnp.allclose(result, jnp.array(0.0, dtype=jnp.float32))
+
+    def test_is_risk_factor_observer(self):
+        """CompositeRiskFactorObserver implements RiskFactorObserver protocol."""
+        composite = CompositeRiskFactorObserver([ConstantRiskFactorObserver(0.0)])
+        assert isinstance(composite, RiskFactorObserver)

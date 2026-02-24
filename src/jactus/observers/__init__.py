@@ -7,10 +7,14 @@ from jactus.observers.child_contract import (
 )
 from jactus.observers.risk_factor import (
     BaseRiskFactorObserver,
+    CallbackRiskFactorObserver,
+    CompositeRiskFactorObserver,
     ConstantRiskFactorObserver,
+    CurveRiskFactorObserver,
     DictRiskFactorObserver,
     JaxRiskFactorObserver,
     RiskFactorObserver,
+    TimeSeriesRiskFactorObserver,
 )
 
 __all__ = [
@@ -18,6 +22,10 @@ __all__ = [
     "BaseRiskFactorObserver",
     "ConstantRiskFactorObserver",
     "DictRiskFactorObserver",
+    "TimeSeriesRiskFactorObserver",
+    "CurveRiskFactorObserver",
+    "CallbackRiskFactorObserver",
+    "CompositeRiskFactorObserver",
     "JaxRiskFactorObserver",
     "ChildContractObserver",
     "BaseChildContractObserver",
