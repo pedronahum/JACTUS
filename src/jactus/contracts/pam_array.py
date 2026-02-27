@@ -28,7 +28,6 @@ Example::
 
 from __future__ import annotations
 
-import calendar as _cal_mod
 import re as _re
 from datetime import datetime as _datetime
 from typing import Any, NamedTuple
@@ -830,6 +829,17 @@ def _dt_to_adt(dt: _datetime) -> ActusDateTime:
     return ActusDateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
 
 
+# Days-in-month lookup (index 0 unused). Avoids calendar.monthrange() overhead.
+_DAYS_IN_MONTH = (0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+
+
+def _days_in_month(y: int, m: int) -> int:
+    """Return number of days in month ``m`` of year ``y``."""
+    if m == 2 and (y % 4 == 0 and (y % 100 != 0 or y % 400 == 0)):
+        return 29
+    return _DAYS_IN_MONTH[m]
+
+
 def _fast_month_schedule(
     start_y: int,
     start_m: int,
@@ -843,19 +853,15 @@ def _fast_month_schedule(
     until the result exceeds ``end_dt``.  Day is clamped to the target
     month's maximum day.
     """
+    base = start_y * 12 + start_m - 1
     dates: list[_datetime] = []
     n = 0
     while True:
-        if n == 0:
-            d = min(start_d, _cal_mod.monthrange(start_y, start_m)[1])
-            current = _datetime(start_y, start_m, d)  # noqa: DTZ001
-        else:
-            total_months = n * cycle_months
-            total = (start_y * 12 + start_m - 1) + total_months
-            y = total // 12
-            m = (total % 12) + 1
-            d = min(start_d, _cal_mod.monthrange(y, m)[1])
-            current = _datetime(y, m, d)  # noqa: DTZ001
+        total = base + n * cycle_months
+        y = total // 12
+        m = (total % 12) + 1
+        d = min(start_d, _days_in_month(y, m))
+        current = _datetime(y, m, d)  # noqa: DTZ001
         if current > end_dt:
             break
         dates.append(current)
