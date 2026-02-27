@@ -452,8 +452,189 @@ def simulate_pam_array(
 # JIT-compiled version for single-contract use
 simulate_pam_array_jit = jax.jit(simulate_pam_array)
 
-# Vmapped version for batched portfolio simulation
-batch_simulate_pam = jax.vmap(simulate_pam_array)
+# Vmapped version (kept as fallback, e.g. for GPU where vmap is efficient)
+batch_simulate_pam_vmap = jax.vmap(simulate_pam_array)
+
+
+# ============================================================================
+# Manually-batched simulation — eliminates vmap dispatch overhead on CPU
+# ============================================================================
+
+
+@jax.jit
+def batch_simulate_pam(
+    initial_states: PAMArrayState,
+    event_types: jnp.ndarray,
+    year_fractions: jnp.ndarray,
+    rf_values: jnp.ndarray,
+    params: PAMArrayParams,
+) -> tuple[PAMArrayState, jnp.ndarray]:
+    """Batched PAM simulation without vmap — single scan over ``[B]`` arrays.
+
+    Eliminates JAX vmap CPU dispatch overhead by operating directly on
+    batch-dimensioned arrays.  Each scan step computes all event-type
+    outcomes for all contracts simultaneously using branchless
+    ``jnp.where`` dispatch.
+
+    Args:
+        initial_states: ``PAMArrayState`` with each field shape ``[B]``.
+        event_types: ``[B, T]`` int32 — event type indices per contract.
+        year_fractions: ``[B, T]`` float32.
+        rf_values: ``[B, T]`` float32.
+        params: ``PAMArrayParams`` with each field shape ``[B]``.
+
+    Returns:
+        ``(final_states, payoffs)`` where ``payoffs`` is ``[B, T]``.
+    """
+    # Transpose to [T, B] so scan iterates over time steps
+    et_t = event_types.T
+    yf_t = year_fractions.T
+    rf_t = rf_values.T
+
+    def step(
+        states: PAMArrayState,
+        inputs: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
+    ) -> tuple[PAMArrayState, jnp.ndarray]:
+        et, yf, rf = inputs  # each [B]
+
+        # Common sub-expression: interest accrual
+        accrue = states.ipac + yf * states.ipnr * states.nt
+
+        # ---- Payoffs (branchless jnp.where dispatch) ----
+        payoff = jnp.zeros_like(states.nt)
+
+        # IED: role_sign * (-1) * (notional + premium)
+        payoff = jnp.where(
+            et == _IED_IDX,
+            params.role_sign
+            * (-1.0)
+            * (params.notional_principal + params.premium_discount_at_ied),
+            payoff,
+        )
+        # MD: nsc * nt + isc * ipac + feac  (uses state.ipac, NOT accrue)
+        payoff = jnp.where(
+            et == _MD_IDX,
+            states.nsc * states.nt + states.isc * states.ipac + states.feac,
+            payoff,
+        )
+        # PP: rf (pre-computed prepayment amount)
+        payoff = jnp.where(et == _PP_IDX, rf, payoff)
+        # PY: penalty (type-dependent)
+        payoff = jnp.where(
+            et == _PY_IDX,
+            jnp.where(
+                params.penalty_type == 0,
+                params.penalty_rate,
+                yf * states.nt * params.penalty_rate,
+            ),
+            payoff,
+        )
+        # FP: fee payment (basis-dependent)
+        payoff = jnp.where(
+            et == _FP_IDX,
+            jnp.where(
+                params.fee_basis == 0,
+                params.fee_rate,
+                jnp.where(
+                    params.fee_basis == 1,
+                    yf * states.nt * params.fee_rate + states.feac,
+                    states.feac,
+                ),
+            ),
+            payoff,
+        )
+        # PRD: -(price + accrue)
+        payoff = jnp.where(
+            et == _PRD_IDX,
+            (-1.0) * (params.price_at_purchase_date + accrue),
+            payoff,
+        )
+        # TD: price + accrue
+        payoff = jnp.where(
+            et == _TD_IDX,
+            params.price_at_termination_date + accrue,
+            payoff,
+        )
+        # IP: isc * accrue
+        payoff = jnp.where(et == _IP_IDX, states.isc * accrue, payoff)
+
+        # ---- State transitions (branchless) ----
+
+        # nt: default unchanged
+        new_nt = states.nt
+        new_nt = jnp.where(
+            et == _IED_IDX,
+            params.role_sign * params.notional_principal,
+            new_nt,
+        )
+        new_nt = jnp.where((et == _MD_IDX) | (et == _TD_IDX), 0.0, new_nt)
+        new_nt = jnp.where(et == _PP_IDX, states.nt - rf, new_nt)
+        new_nt = jnp.where(et == _IPCI_IDX, states.nt + accrue, new_nt)
+
+        # ipnr: default unchanged
+        new_ipnr = states.ipnr
+        new_ipnr = jnp.where(et == _IED_IDX, params.nominal_interest_rate, new_ipnr)
+        # RR: clamp(multiplier * rf + spread, floor, cap)
+        raw_rate = params.rate_reset_multiplier * rf + params.rate_reset_spread
+        clamped = jnp.where(
+            params.has_rate_floor > 0.5,
+            jnp.maximum(raw_rate, params.rate_reset_floor),
+            raw_rate,
+        )
+        clamped = jnp.where(
+            params.has_rate_cap > 0.5,
+            jnp.minimum(clamped, params.rate_reset_cap),
+            clamped,
+        )
+        new_ipnr = jnp.where(et == _RR_IDX, clamped, new_ipnr)
+        new_ipnr = jnp.where(et == _RRF_IDX, params.rate_reset_next, new_ipnr)
+
+        # ipac: three distinct behaviours
+        #   accrue group: AD, PP, PY, FP, PRD, RR, RRF, SC, CE
+        #   zero group:   MD, TD, IP, IPCI
+        #   special:      IED → ied_ipac
+        #   default:      unchanged (NOP and unused event types)
+        is_accrue = (
+            (et == _AD_IDX)
+            | (et == _PP_IDX)
+            | (et == _PY_IDX)
+            | (et == _FP_IDX)
+            | (et == _PRD_IDX)
+            | (et == _RR_IDX)
+            | (et == _RRF_IDX)
+            | (et == _SC_IDX)
+            | (et == _CE_IDX)
+        )
+        is_zero_ipac = (et == _MD_IDX) | (et == _TD_IDX) | (et == _IP_IDX) | (et == _IPCI_IDX)
+        new_ipac = states.ipac
+        new_ipac = jnp.where(is_accrue, accrue, new_ipac)
+        new_ipac = jnp.where(is_zero_ipac, 0.0, new_ipac)
+        new_ipac = jnp.where(et == _IED_IDX, params.ied_ipac, new_ipac)
+
+        # feac: zero at IED, MD, FP, TD; unchanged otherwise
+        new_feac = jnp.where(
+            (et == _IED_IDX) | (et == _MD_IDX) | (et == _FP_IDX) | (et == _TD_IDX),
+            0.0,
+            states.feac,
+        )
+
+        # nsc, isc: only change at IED (set to 1.0)
+        new_nsc = jnp.where(et == _IED_IDX, 1.0, states.nsc)
+        new_isc = jnp.where(et == _IED_IDX, 1.0, states.isc)
+
+        new_state = PAMArrayState(
+            nt=new_nt,
+            ipnr=new_ipnr,
+            ipac=new_ipac,
+            feac=new_feac,
+            nsc=new_nsc,
+            isc=new_isc,
+        )
+        return new_state, payoff
+
+    final_states, payoffs_t = jax.lax.scan(step, initial_states, (et_t, yf_t, rf_t))
+    # payoffs_t is [T, B]; transpose back to [B, T]
+    return final_states, payoffs_t.T
 
 
 # ============================================================================
@@ -739,17 +920,20 @@ def _fast_schedule(
 
 
 # Cached EventType index values for fast comparison
+_AD_IDX = EventType.AD.index
 _IED_IDX = EventType.IED.index
+_MD_IDX = EventType.MD.index
+_PP_IDX = EventType.PP.index
+_PY_IDX = EventType.PY.index
+_FP_IDX = EventType.FP.index
+_PRD_IDX = EventType.PRD.index
+_TD_IDX = EventType.TD.index
 _IP_IDX = EventType.IP.index
 _IPCI_IDX = EventType.IPCI.index
 _RR_IDX = EventType.RR.index
 _RRF_IDX = EventType.RRF.index
-_FP_IDX = EventType.FP.index
 _SC_IDX = EventType.SC.index
-_PRD_IDX = EventType.PRD.index
-_TD_IDX = EventType.TD.index
-_MD_IDX = EventType.MD.index
-_PP_IDX = EventType.PP.index
+_CE_IDX = EventType.CE.index
 
 
 def _fast_pam_schedule(

@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-Vectorized Portfolio Valuation — Array-Mode PAM Simulation with jax.jit + jax.vmap
-===================================================================================
+Vectorized Portfolio Valuation — Array-Mode PAM Simulation with jax.jit
+========================================================================
 
-This example compares the original Python-level simulation path with the new
-array-mode path that uses ``jax.lax.scan`` for the event loop and ``jax.vmap``
-for portfolio-level vectorization.
+This example compares the original Python-level simulation path with the
+array-mode path that uses ``jax.lax.scan`` for the event loop and
+branchless ``jnp.where`` dispatch for portfolio-level batching.
 
 Architecture:
     Python path:   contract.simulate() → Python loop over events → per-event POF/STF
-    Array path:    prepare_pam_batch() → jax.lax.scan (JIT-compiled) → jax.vmap
+    Array path:    prepare_pam_batch() → jax.lax.scan (JIT-compiled, batched [B] arrays)
 
 The array-mode pre-computes event schedules and year fractions (Python, once),
 then runs the numerical simulation as a pure JAX function. This enables:
   - ``jax.jit``:  Compile the scan loop to XLA, eliminating Python overhead
-  - ``jax.vmap``: Vectorize across the entire portfolio in a single kernel
+  - Batch [B]:    All contracts simulated in a single scan (no vmap overhead)
   - ``jax.grad``: Automatic differentiation of portfolio PV w.r.t. any parameter
 
 Example: 500 PAM loans, comparing throughput and PV equivalence between paths.
@@ -125,7 +125,7 @@ def python_path_pv(loan: dict, rf_obs) -> float:
 
 def main():
     print("=" * 80)
-    print("  Array-Mode PAM Benchmark: Python path vs JIT+vmap path")
+    print("  Array-Mode PAM Benchmark: Python path vs JIT batched path")
     print("=" * 80)
 
     n_loans = 500
@@ -168,29 +168,29 @@ def main():
     )
 
     # -----------------------------------------------------------------------
-    # 3. Array-mode: batched vmap simulation
+    # 3. Array-mode: batched simulation (manually vectorized, no vmap)
     # -----------------------------------------------------------------------
     print(f"\n{'─' * 80}")
-    print("3. Array-mode: vmap kernel (JIT-compiled)")
+    print("3. Array-mode: batched kernel (JIT-compiled, branchless)")
 
-    # Warm-up JIT+vmap compilation
+    # Warm-up JIT compilation
     t0 = time.perf_counter()
     final_states, payoffs = batch_simulate_pam(
         batched_states, batched_et, batched_yf, batched_rf, batched_params
     )
     payoffs.block_until_ready()
-    vmap_warmup = time.perf_counter() - t0
-    print(f"   vmap compile:  {vmap_warmup:.3f}s (first call, includes XLA compilation)")
+    jit_warmup = time.perf_counter() - t0
+    print(f"   JIT compile:   {jit_warmup:.3f}s (first call, includes XLA compilation)")
 
     # Steady-state: re-run the compiled kernel (this is the real throughput)
-    n_reruns = 5
+    n_reruns = 20
     t0 = time.perf_counter()
     for _ in range(n_reruns):
         final_states, payoffs = batch_simulate_pam(
             batched_states, batched_et, batched_yf, batched_rf, batched_params
         )
         payoffs.block_until_ready()
-    vmap_elapsed = (time.perf_counter() - t0) / n_reruns
+    kernel_elapsed = (time.perf_counter() - t0) / n_reruns
 
     masked_payoffs = payoffs * batched_masks
     total_cf = float(jnp.sum(masked_payoffs))
@@ -198,11 +198,13 @@ def main():
     # PV with discounting
     cum_yfs = jnp.cumsum(batched_yf, axis=1)
     disc_factors = 1.0 / (1.0 + DISCOUNT_RATE * cum_yfs)
-    vmap_pvs = jnp.sum(masked_payoffs * disc_factors, axis=1)
-    vmap_total_pv = float(jnp.sum(vmap_pvs))
+    array_pvs = jnp.sum(masked_payoffs * disc_factors, axis=1)
+    array_total_pv = float(jnp.sum(array_pvs))
 
-    print(f"   Steady-state:  {vmap_elapsed:.4f}s ({n_active / vmap_elapsed:,.0f} contracts/sec)")
-    print(f"   Total PV:      ${vmap_total_pv:>15,.2f}")
+    print(
+        f"   Steady-state:  {kernel_elapsed:.4f}s ({n_active / kernel_elapsed:,.0f} contracts/sec)"
+    )
+    print(f"   Total PV:      ${array_total_pv:>15,.2f}")
     print(f"   Total cashflow: ${total_cf:>15,.2f}")
 
     # -----------------------------------------------------------------------
@@ -283,12 +285,12 @@ def main():
     print(f"   Rate:     {float(base_rate):.4f}")
     print(f"   PV:       ${float(pv_val):>12,.2f}")
     print(f"   dPV/dR:   ${float(grad_val):>12,.2f}")
-    print("   (A positive dPV/dR means higher rate → more interest → higher PV for lender)")
+    print("   (A positive dPV/dR means higher rate -> more interest -> higher PV for lender)")
 
     # -----------------------------------------------------------------------
     # Summary
     # -----------------------------------------------------------------------
-    e2e_elapsed = batch_prep_elapsed + vmap_elapsed
+    e2e_elapsed = batch_prep_elapsed + kernel_elapsed
     print(f"\n{'=' * 80}")
     print("Performance Summary")
     print(f"{'=' * 80}")
@@ -299,17 +301,17 @@ def main():
   {"─" * 70}
   Python (sequential simulate + PV)      {python_elapsed:>8.2f}s   {n_active / python_elapsed:>12,.0f} loans/sec
   Array batch prep (once)                {batch_prep_elapsed:>8.3f}s   {n_active / batch_prep_elapsed:>12,.0f} contracts/sec
-  Array vmap kernel (steady-state)       {vmap_elapsed:>8.4f}s   {n_active / vmap_elapsed:>12,.0f} contracts/sec
+  Array kernel (steady-state)            {kernel_elapsed:>8.4f}s   {n_active / kernel_elapsed:>12,.0f} contracts/sec
   End-to-end (prep + kernel)             {e2e_elapsed:>8.3f}s   {n_active / e2e_elapsed:>12,.0f} contracts/sec
   Scenario sweep (100 rates)             {scenario_elapsed:>8.3f}s   {n_scenarios / scenario_elapsed:>12,.0f} scenarios/sec
 
   Speedup vs Python:
-    Kernel only:     {python_elapsed / vmap_elapsed:>6.0f}x
+    Kernel only:     {python_elapsed / kernel_elapsed:>6.0f}x
     End-to-end:      {python_elapsed / e2e_elapsed:>6.0f}x  (incl. batch prep)
 
   Key insight: The array-mode separates the work into two phases:
     1. Batch preparation ({batch_prep_elapsed:.3f}s) — runs once per portfolio
-    2. JIT kernel ({vmap_elapsed:.4f}s) — runs as many times as needed
+    2. JIT kernel ({kernel_elapsed:.4f}s) — runs as many times as needed
 
   This makes the array-mode ideal for:
     - Scenario analysis (vary rates, run 1000s of times)
