@@ -8,6 +8,7 @@ a contract is compatible with array-mode.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import jax.numpy as jnp
 
@@ -77,7 +78,7 @@ class BatchSimulationResult:
         return jnp.sum(self.payoffs * self.masks * discount_factors, axis=1)
 
 
-def validate_pam_for_array_mode(attrs) -> list[str]:
+def validate_pam_for_array_mode(attrs: Any) -> list[str]:
     """Check whether contract attributes are compatible with array-mode.
 
     Returns a list of warning/error messages. Empty list means compatible.

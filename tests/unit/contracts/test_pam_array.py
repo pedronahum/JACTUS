@@ -16,37 +16,23 @@ from jactus.contracts.pam_array import (
     PAMArrayState,
     _pof_ad,
     _pof_ce,
-    _pof_fp,
     _pof_ied,
     _pof_ip,
     _pof_ipci,
     _pof_md,
     _pof_noop,
-    _pof_pp,
-    _pof_prd,
-    _pof_py,
     _pof_rr,
     _pof_rrf,
     _pof_sc,
-    _pof_td,
     _stf_ad,
-    _stf_ce,
-    _stf_fp,
     _stf_ied,
     _stf_ip,
     _stf_ipci,
     _stf_md,
     _stf_noop,
-    _stf_pp,
-    _stf_prd,
-    _stf_py,
     _stf_rr,
     _stf_rrf,
-    _stf_sc,
-    _stf_td,
-    batch_simulate_pam,
     precompute_pam_arrays,
-    prepare_pam_batch,
     simulate_pam_array,
     simulate_pam_array_jit,
     simulate_pam_portfolio,
@@ -57,7 +43,6 @@ from jactus.core import (
     ContractRole,
     ContractType,
     DayCountConvention,
-    EventType,
 )
 from jactus.engine.vectorized import (
     ArraySimulationResult,
@@ -377,14 +362,18 @@ class TestNoop:
         padded_yf = jnp.concatenate([year_fractions, jnp.zeros(n_pad)])
         padded_rf = jnp.concatenate([rf_values, jnp.zeros(n_pad)])
 
-        final_state, payoffs = simulate_pam_array(init_state, padded_et, padded_yf, padded_rf, params)
+        final_state, payoffs = simulate_pam_array(
+            init_state, padded_et, padded_yf, padded_rf, params
+        )
 
         # Padded payoffs should be zero
         for i in range(n_real, n_real + n_pad):
             assert float(payoffs[i]) == 0.0
 
         # Real payoffs should match non-padded
-        _, payoffs_real = simulate_pam_array(init_state, event_types, year_fractions, rf_values, params)
+        _, payoffs_real = simulate_pam_array(
+            init_state, event_types, year_fractions, rf_values, params
+        )
         for i in range(n_real):
             assert abs(float(payoffs[i]) - float(payoffs_real[i])) < 1e-6
 
@@ -415,9 +404,7 @@ class TestJIT:
         )
 
         assert jnp.allclose(payoffs_eager, payoffs_jit, atol=1e-6)
-        assert jnp.allclose(
-            jnp.array(final_eager), jnp.array(final_jit), atol=1e-6
-        )
+        assert jnp.allclose(jnp.array(final_eager), jnp.array(final_jit), atol=1e-6)
 
 
 # ============================================================================
@@ -699,27 +686,27 @@ class TestPOFNonZero:
         )
 
     def _make_params(self, **overrides):
-        defaults = dict(
-            role_sign=jnp.array(1.0),
-            notional_principal=jnp.array(100_000.0),
-            nominal_interest_rate=jnp.array(0.05),
-            premium_discount_at_ied=jnp.array(0.0),
-            accrued_interest=jnp.array(0.0),
-            fee_rate=jnp.array(0.0),
-            fee_basis=jnp.array(0, dtype=jnp.int32),
-            penalty_rate=jnp.array(0.0),
-            penalty_type=jnp.array(0, dtype=jnp.int32),
-            price_at_purchase_date=jnp.array(0.0),
-            price_at_termination_date=jnp.array(0.0),
-            rate_reset_spread=jnp.array(0.0),
-            rate_reset_multiplier=jnp.array(1.0),
-            rate_reset_floor=jnp.array(0.0),
-            rate_reset_cap=jnp.array(1.0),
-            rate_reset_next=jnp.array(0.05),
-            has_rate_floor=jnp.array(0.0),
-            has_rate_cap=jnp.array(0.0),
-            ied_ipac=jnp.array(0.0),
-        )
+        defaults = {
+            "role_sign": jnp.array(1.0),
+            "notional_principal": jnp.array(100_000.0),
+            "nominal_interest_rate": jnp.array(0.05),
+            "premium_discount_at_ied": jnp.array(0.0),
+            "accrued_interest": jnp.array(0.0),
+            "fee_rate": jnp.array(0.0),
+            "fee_basis": jnp.array(0, dtype=jnp.int32),
+            "penalty_rate": jnp.array(0.0),
+            "penalty_type": jnp.array(0, dtype=jnp.int32),
+            "price_at_purchase_date": jnp.array(0.0),
+            "price_at_termination_date": jnp.array(0.0),
+            "rate_reset_spread": jnp.array(0.0),
+            "rate_reset_multiplier": jnp.array(1.0),
+            "rate_reset_floor": jnp.array(0.0),
+            "rate_reset_cap": jnp.array(1.0),
+            "rate_reset_next": jnp.array(0.05),
+            "has_rate_floor": jnp.array(0.0),
+            "has_rate_cap": jnp.array(0.0),
+            "ied_ipac": jnp.array(0.0),
+        }
         defaults.update(overrides)
         return PAMArrayParams(**defaults)
 
@@ -775,27 +762,27 @@ class TestSTF:
         )
 
     def _make_params(self, **overrides):
-        defaults = dict(
-            role_sign=jnp.array(1.0),
-            notional_principal=jnp.array(100_000.0),
-            nominal_interest_rate=jnp.array(0.05),
-            premium_discount_at_ied=jnp.array(0.0),
-            accrued_interest=jnp.array(0.0),
-            fee_rate=jnp.array(0.0),
-            fee_basis=jnp.array(0, dtype=jnp.int32),
-            penalty_rate=jnp.array(0.0),
-            penalty_type=jnp.array(0, dtype=jnp.int32),
-            price_at_purchase_date=jnp.array(0.0),
-            price_at_termination_date=jnp.array(0.0),
-            rate_reset_spread=jnp.array(0.0),
-            rate_reset_multiplier=jnp.array(1.0),
-            rate_reset_floor=jnp.array(0.0),
-            rate_reset_cap=jnp.array(1.0),
-            rate_reset_next=jnp.array(0.05),
-            has_rate_floor=jnp.array(0.0),
-            has_rate_cap=jnp.array(0.0),
-            ied_ipac=jnp.array(0.0),
-        )
+        defaults = {
+            "role_sign": jnp.array(1.0),
+            "notional_principal": jnp.array(100_000.0),
+            "nominal_interest_rate": jnp.array(0.05),
+            "premium_discount_at_ied": jnp.array(0.0),
+            "accrued_interest": jnp.array(0.0),
+            "fee_rate": jnp.array(0.0),
+            "fee_basis": jnp.array(0, dtype=jnp.int32),
+            "penalty_rate": jnp.array(0.0),
+            "penalty_type": jnp.array(0, dtype=jnp.int32),
+            "price_at_purchase_date": jnp.array(0.0),
+            "price_at_termination_date": jnp.array(0.0),
+            "rate_reset_spread": jnp.array(0.0),
+            "rate_reset_multiplier": jnp.array(1.0),
+            "rate_reset_floor": jnp.array(0.0),
+            "rate_reset_cap": jnp.array(1.0),
+            "rate_reset_next": jnp.array(0.05),
+            "has_rate_floor": jnp.array(0.0),
+            "has_rate_cap": jnp.array(0.0),
+            "ied_ipac": jnp.array(0.0),
+        }
         defaults.update(overrides)
         return PAMArrayParams(**defaults)
 

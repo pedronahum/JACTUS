@@ -28,7 +28,7 @@ Example::
 
 from __future__ import annotations
 
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -37,7 +37,6 @@ from jactus.core import (
     ActusDateTime,
     ContractAttributes,
     ContractRole,
-    ContractType,
     EventType,
 )
 from jactus.core.types import NUM_EVENT_TYPES
@@ -344,7 +343,7 @@ def _stf_noop(
 # ============================================================================
 
 # fmt: off
-_POF_TABLE: list = [
+_POF_TABLE: list[Any] = [
     _pof_ad,    # 0  AD
     _pof_ied,   # 1  IED
     _pof_md,    # 2  MD
@@ -372,7 +371,7 @@ _POF_TABLE: list = [
     _pof_noop,  # 24 NOP  (padding)
 ]
 
-_STF_TABLE: list = [
+_STF_TABLE: list[Any] = [
     _stf_ad,    # 0  AD
     _stf_ied,   # 1  IED
     _stf_md,    # 2  MD
@@ -441,7 +440,9 @@ def simulate_pam_array(
         new_state = jax.lax.switch(evt_idx, _STF_TABLE, state, params, yf, rf)
         return new_state, payoff
 
-    final_state, payoffs = jax.lax.scan(step, initial_state, (event_types, year_fractions, rf_values))
+    final_state, payoffs = jax.lax.scan(
+        step, initial_state, (event_types, year_fractions, rf_values)
+    )
     return final_state, payoffs
 
 
@@ -570,7 +571,6 @@ def precompute_pam_arrays(
     dcc = attrs.day_count_convention or DayCountConvention.A360
 
     # Convert to arrays
-    n_events = len(schedule.events)
     event_type_list: list[int] = []
     yf_list: list[float] = []
     rf_list: list[float] = []
@@ -651,9 +651,7 @@ def _pad_arrays(
     n = event_types.shape[0]
     pad_n = max_events - n
     mask = jnp.concatenate([jnp.ones(n, dtype=_F32), jnp.zeros(pad_n, dtype=_F32)])
-    event_types = jnp.concatenate(
-        [event_types, jnp.full(pad_n, NOP_EVENT_IDX, dtype=jnp.int32)]
-    )
+    event_types = jnp.concatenate([event_types, jnp.full(pad_n, NOP_EVENT_IDX, dtype=jnp.int32)])
     year_fractions = jnp.concatenate([year_fractions, jnp.zeros(pad_n, dtype=_F32)])
     rf_values = jnp.concatenate([rf_values, jnp.zeros(pad_n, dtype=_F32)])
     return event_types, year_fractions, rf_values, mask
@@ -694,9 +692,9 @@ def prepare_pam_batch(
         mask_list.append(mask)
 
     # Stack into batched arrays
-    def _stack_named_tuples(tuples, cls):
+    def _stack_named_tuples(tuples: list[Any], cls: Any) -> Any:
         """Stack a list of NamedTuples into a single NamedTuple of batched arrays."""
-        fields = {}
+        fields: dict[str, jnp.ndarray] = {}
         for field_name in cls._fields:
             fields[field_name] = jnp.stack([getattr(t, field_name) for t in tuples])
         return cls(**fields)
@@ -715,7 +713,7 @@ def simulate_pam_portfolio(
     contracts: list[tuple[ContractAttributes, RiskFactorObserver]],
     discount_rate: float | None = None,
     year_fractions_from_valuation: jnp.ndarray | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """End-to-end portfolio simulation with optional PV.
 
     Args:
