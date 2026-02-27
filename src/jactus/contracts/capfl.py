@@ -535,8 +535,10 @@ class CapFloorContract(BaseContract):
                 self.attributes.rate_reset_market_object = market_object
 
         result = super().simulate(
-            risk_obs, child_contract_observer,
-            scenario=scenario, behavior_observers=behavior_observers,
+            risk_obs,
+            child_contract_observer,
+            scenario=scenario,
+            behavior_observers=behavior_observers,
         )
 
         # Filter out internal RR events — CAPFL only outputs IP events

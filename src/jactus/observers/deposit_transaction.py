@@ -186,9 +186,7 @@ class DepositTransactionObserver(BaseBehaviorRiskFactorObserver):
         Raises:
             KeyError: Always.
         """
-        raise KeyError(
-            f"DepositTransactionObserver does not support event data for '{identifier}'"
-        )
+        raise KeyError(f"DepositTransactionObserver does not support event data for '{identifier}'")
 
     def contract_start(
         self,

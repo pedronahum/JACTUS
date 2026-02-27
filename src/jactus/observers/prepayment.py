@@ -167,9 +167,7 @@ class PrepaymentSurfaceObserver(BaseBehaviorRiskFactorObserver):
         Raises:
             KeyError: Always.
         """
-        raise KeyError(
-            f"PrepaymentSurfaceObserver does not support event data for '{identifier}'"
-        )
+        raise KeyError(f"PrepaymentSurfaceObserver does not support event data for '{identifier}'")
 
     def contract_start(
         self,

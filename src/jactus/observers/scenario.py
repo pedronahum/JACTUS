@@ -98,9 +98,7 @@ class Scenario:
         """
         observers = list(self.market_observers.values())
         if not observers:
-            raise ValueError(
-                f"Scenario '{self.scenario_id}' has no market observers configured"
-            )
+            raise ValueError(f"Scenario '{self.scenario_id}' has no market observers configured")
         if len(observers) == 1:
             return observers[0]
         return CompositeRiskFactorObserver(observers, name=f"Scenario({self.scenario_id})")
@@ -136,9 +134,7 @@ class Scenario:
         """
         self.market_observers[identifier] = observer
 
-    def add_behavior_observer(
-        self, identifier: str, observer: BehaviorRiskFactorObserver
-    ) -> None:
+    def add_behavior_observer(self, identifier: str, observer: BehaviorRiskFactorObserver) -> None:
         """Add or replace a behavioral risk factor observer.
 
         Args:

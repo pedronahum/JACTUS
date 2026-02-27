@@ -69,13 +69,15 @@ def prepayment_surface():
     return Surface2D(
         x_margins=jnp.array([-5.0, 0.0, 1.0, 2.0, 3.0]),
         y_margins=jnp.array([0.0, 1.0, 2.0, 3.0, 5.0]),
-        values=jnp.array([
-            [0.00, 0.00, 0.00, 0.00, 0.00],
-            [0.00, 0.00, 0.01, 0.00, 0.00],
-            [0.00, 0.01, 0.02, 0.00, 0.00],
-            [0.00, 0.02, 0.05, 0.03, 0.005],
-            [0.01, 0.05, 0.10, 0.07, 0.02],
-        ]),
+        values=jnp.array(
+            [
+                [0.00, 0.00, 0.00, 0.00, 0.00],
+                [0.00, 0.00, 0.01, 0.00, 0.00],
+                [0.00, 0.01, 0.02, 0.00, 0.00],
+                [0.00, 0.02, 0.05, 0.03, 0.005],
+                [0.01, 0.05, 0.10, 0.07, 0.02],
+            ]
+        ),
     )
 
 
@@ -208,9 +210,7 @@ class TestBaseBehaviorRiskFactorObserver:
     def test_observe_risk_factor_with_state(self, sample_state):
         """observe_risk_factor uses state when provided."""
         observer = ConcreteBehavioralObserver(value=0.5)
-        result = observer.observe_risk_factor(
-            "any", ActusDateTime(2025, 1, 1), state=sample_state
-        )
+        result = observer.observe_risk_factor("any", ActusDateTime(2025, 1, 1), state=sample_state)
         # state.ipnr = 0.06, value = 0.5, result = 0.06 * 0.5 = 0.03
         assert float(result) == pytest.approx(0.03)
 
@@ -268,9 +268,7 @@ class TestPrepaymentSurfaceObserver:
     def test_observe_risk_factor_without_attributes(self, prepayment_surface, sample_state):
         """Returns 0 when attributes are not provided."""
         observer = PrepaymentSurfaceObserver(surface=prepayment_surface)
-        result = observer.observe_risk_factor(
-            "id", ActusDateTime(2025, 1, 1), state=sample_state
-        )
+        result = observer.observe_risk_factor("id", ActusDateTime(2025, 1, 1), state=sample_state)
         assert float(result) == 0.0
 
     def test_contract_start_generates_events(self, prepayment_surface, sample_attributes):
@@ -441,15 +439,15 @@ class TestDepositTransactionObserver:
         surface = LabeledSurface2D(
             x_labels=["DEP-001", "DEP-002"],
             y_labels=["2024-01-15T00:00:00", "2024-07-15T00:00:00"],
-            values=jnp.array([
-                [10000.0, -5000.0],
-                [20000.0, 0.0],
-            ]),
+            values=jnp.array(
+                [
+                    [10000.0, -5000.0],
+                    [20000.0, 0.0],
+                ]
+            ),
         )
         observer = DepositTransactionObserver.from_labeled_surface(surface)
-        result = observer.observe_risk_factor(
-            "DEP-001", ActusDateTime(2024, 1, 15)
-        )
+        result = observer.observe_risk_factor("DEP-001", ActusDateTime(2024, 1, 15))
         assert float(result) == pytest.approx(10000.0)
 
     def test_satisfies_protocol(self):

@@ -426,9 +426,7 @@ class BaseContract(nnx.Module, ABC):
 
         # Collect and merge callout events from behavioral observers
         if all_behavior_observers:
-            callout_events = _collect_callout_events(
-                all_behavior_observers, self.attributes
-            )
+            callout_events = _collect_callout_events(all_behavior_observers, self.attributes)
             if callout_events:
                 schedule = _merge_callout_events(schedule, callout_events, self.attributes)
 

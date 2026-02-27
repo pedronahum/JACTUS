@@ -116,16 +116,12 @@ class Surface2D:
 
         if x_clamped < x_arr[0] or x_clamped > x_arr[-1]:
             if self.extrapolation == "raise":
-                raise ValueError(
-                    f"x={x} is outside the grid [{x_arr[0]}, {x_arr[-1]}]"
-                )
+                raise ValueError(f"x={x} is outside the grid [{x_arr[0]}, {x_arr[-1]}]")
             x_clamped = max(x_arr[0], min(x_arr[-1], x_clamped))
 
         if y_clamped < y_arr[0] or y_clamped > y_arr[-1]:
             if self.extrapolation == "raise":
-                raise ValueError(
-                    f"y={y} is outside the grid [{y_arr[0]}, {y_arr[-1]}]"
-                )
+                raise ValueError(f"y={y} is outside the grid [{y_arr[0]}, {y_arr[-1]}]")
             y_clamped = max(y_arr[0], min(y_arr[-1], y_clamped))
 
         # Find x interval

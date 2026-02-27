@@ -92,11 +92,13 @@ class TestSurface2DEvaluate:
         return Surface2D(
             x_margins=jnp.array([0.0, 1.0, 2.0]),
             y_margins=jnp.array([0.0, 1.0, 2.0]),
-            values=jnp.array([
-                [0.0, 1.0, 2.0],
-                [3.0, 4.0, 5.0],
-                [6.0, 7.0, 8.0],
-            ]),
+            values=jnp.array(
+                [
+                    [0.0, 1.0, 2.0],
+                    [3.0, 4.0, 5.0],
+                    [6.0, 7.0, 8.0],
+                ]
+            ),
         )
 
     def test_evaluate_at_corner(self, simple_surface):
@@ -195,11 +197,13 @@ class TestSurface2DSerialization:
         original = Surface2D(
             x_margins=jnp.array([0.0, 1.0, 2.0]),
             y_margins=jnp.array([0.0, 0.5, 1.0]),
-            values=jnp.array([
-                [1.0, 2.0, 3.0],
-                [4.0, 5.0, 6.0],
-                [7.0, 8.0, 9.0],
-            ]),
+            values=jnp.array(
+                [
+                    [1.0, 2.0, 3.0],
+                    [4.0, 5.0, 6.0],
+                    [7.0, 8.0, 9.0],
+                ]
+            ),
         )
         restored = Surface2D.from_dict(original.to_dict())
         for x in [0.0, 0.5, 1.0, 1.5, 2.0]:
@@ -223,10 +227,12 @@ class TestLabeledSurface2D:
         return LabeledSurface2D(
             x_labels=["DEPOSIT-001", "DEPOSIT-002"],
             y_labels=["2024-Q1", "2024-Q2", "2024-Q3"],
-            values=jnp.array([
-                [1000.0, -500.0, 2000.0],
-                [5000.0, -1000.0, 3000.0],
-            ]),
+            values=jnp.array(
+                [
+                    [1000.0, -500.0, 2000.0],
+                    [5000.0, -1000.0, 3000.0],
+                ]
+            ),
         )
 
     def test_get_exact_value(self, labeled_surface):

@@ -1000,8 +1000,10 @@ class PlainVanillaSwapContract(BaseContract):
         computation, but only visible events are returned.
         """
         result = super().simulate(
-            risk_factor_observer, child_contract_observer,
-            scenario=scenario, behavior_observers=behavior_observers,
+            risk_factor_observer,
+            child_contract_observer,
+            scenario=scenario,
+            behavior_observers=behavior_observers,
         )
 
         # Filter events: keep only PRD onwards when purchaseDate is set
