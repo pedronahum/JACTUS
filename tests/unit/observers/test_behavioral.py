@@ -13,7 +13,7 @@ import jax.numpy as jnp
 import pytest
 
 from jactus.core import ActusDateTime, ContractAttributes, ContractState
-from jactus.core.types import ContractPerformance, ContractRole, ContractType, EventType
+from jactus.core.types import ContractPerformance, ContractRole, ContractType
 from jactus.observers import (
     BaseBehaviorRiskFactorObserver,
     BehaviorRiskFactorObserver,
@@ -23,17 +23,15 @@ from jactus.observers import (
     DictRiskFactorObserver,
     PrepaymentSurfaceObserver,
     Scenario,
-    TimeSeriesRiskFactorObserver,
 )
 from jactus.utilities.surface import LabeledSurface2D, Surface2D
-
 
 # ============================================================================
 # Fixtures
 # ============================================================================
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_attributes():
     """Create sample contract attributes for testing."""
     return ContractAttributes(
@@ -49,7 +47,7 @@ def sample_attributes():
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_state():
     """Create sample contract state for testing."""
     return ContractState(
@@ -65,7 +63,7 @@ def sample_state():
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def prepayment_surface():
     """Create a sample prepayment surface."""
     return Surface2D(

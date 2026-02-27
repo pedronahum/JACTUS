@@ -10,7 +10,6 @@ import pytest
 
 from jactus.utilities.surface import LabeledSurface2D, Surface2D
 
-
 # ============================================================================
 # Surface2D tests
 # ============================================================================
@@ -78,7 +77,7 @@ class TestSurface2DInit:
 class TestSurface2DEvaluate:
     """Test Surface2D evaluation (bilinear interpolation)."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def simple_surface(self):
         """2x2 surface for testing interpolation."""
         return Surface2D(
@@ -87,7 +86,7 @@ class TestSurface2DEvaluate:
             values=jnp.array([[0.0, 2.0], [4.0, 6.0]]),
         )
 
-    @pytest.fixture()
+    @pytest.fixture
     def larger_surface(self):
         """3x3 surface for more interpolation tests."""
         return Surface2D(
@@ -218,7 +217,7 @@ class TestSurface2DSerialization:
 class TestLabeledSurface2D:
     """Test LabeledSurface2D."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def labeled_surface(self):
         """Sample labeled surface."""
         return LabeledSurface2D(
