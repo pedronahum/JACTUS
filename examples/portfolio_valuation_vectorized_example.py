@@ -9,7 +9,7 @@ for portfolio-level vectorization.
 
 Architecture:
     Python path:   contract.simulate() → Python loop over events → per-event POF/STF
-    Array path:    precompute_pam_arrays() → jax.lax.scan (JIT-compiled) → jax.vmap
+    Array path:    prepare_pam_batch() → jax.lax.scan (JIT-compiled) → jax.vmap
 
 The array-mode pre-computes event schedules and year fractions (Python, once),
 then runs the numerical simulation as a pure JAX function. This enables:
@@ -28,11 +28,11 @@ import jax.numpy as jnp
 
 from jactus.contracts import create_contract
 from jactus.contracts.pam_array import (
+    batch_simulate_pam,
     precompute_pam_arrays,
     prepare_pam_batch,
     simulate_pam_array,
     simulate_pam_array_jit,
-    simulate_pam_portfolio,
 )
 from jactus.core import (
     ActusDateTime,
@@ -113,9 +113,7 @@ def python_path_pv(loan: dict, rf_obs) -> float:
             year_fracs.append(year_fraction(VALUATION_DATE, event.event_time, DCC))
     if cashflows:
         return float(
-            present_value_vectorized(
-                jnp.array(cashflows), jnp.array(year_fracs), DISCOUNT_RATE
-            )
+            present_value_vectorized(jnp.array(cashflows), jnp.array(year_fracs), DISCOUNT_RATE)
         )
     return 0.0
 
@@ -130,11 +128,11 @@ def main():
     print("  Array-Mode PAM Benchmark: Python path vs JIT+vmap path")
     print("=" * 80)
 
-    N_LOANS = 500
+    n_loans = 500
     rf_obs = ConstantRiskFactorObserver(constant_value=0.0)
-    portfolio = generate_portfolio(N_LOANS)
+    portfolio = generate_portfolio(n_loans)
     n_active = len(portfolio)
-    print(f"\nPortfolio: {n_active} active loans (from {N_LOANS} generated)")
+    print(f"\nPortfolio: {n_active} active loans (from {n_loans} generated)")
 
     # -----------------------------------------------------------------------
     # 1. Python path (sequential)
@@ -151,53 +149,29 @@ def main():
     print(f"   Throughput:  {n_active / python_elapsed:,.0f} loans/sec")
 
     # -----------------------------------------------------------------------
-    # 2. Array-mode: pre-computation
+    # 2. Array-mode: prepare_pam_batch (pre-compute + batch stack)
     # -----------------------------------------------------------------------
     print(f"\n{'─' * 80}")
-    print("2. Array-mode pre-computation (Python → JAX arrays)")
+    print("2. Array-mode: prepare_pam_batch (pre-compute + batch)")
     contracts = [(make_attrs(loan), rf_obs) for loan in portfolio]
 
     t0 = time.perf_counter()
-    precomputed = [precompute_pam_arrays(a, o) for a, o in contracts]
-    precompute_elapsed = time.perf_counter() - t0
-    print(f"   Pre-compute: {precompute_elapsed:.2f}s ({n_active / precompute_elapsed:,.0f} contracts/sec)")
+    batched_states, batched_et, batched_yf, batched_rf, batched_params, batched_masks = (
+        prepare_pam_batch(contracts)
+    )
+    batch_prep_elapsed = time.perf_counter() - t0
+    max_events = batched_et.shape[1]
+    print(
+        f"   Batch prep:    {batch_prep_elapsed:.3f}s"
+        f" ({n_active / batch_prep_elapsed:,.0f} contracts/sec,"
+        f" pad to {max_events} events)"
+    )
 
     # -----------------------------------------------------------------------
-    # 3. Array-mode: batched vmap simulation (prepare + run)
+    # 3. Array-mode: batched vmap simulation
     # -----------------------------------------------------------------------
     print(f"\n{'─' * 80}")
-    print("3. Array-mode: batched vmap portfolio simulation")
-
-    # Prepare batch from already-precomputed arrays (pad + stack only)
-    from jactus.contracts.pam_array import _pad_arrays, batch_simulate_pam, NOP_EVENT_IDX
-    max_events = max(et.shape[0] for _, et, _, _, _ in precomputed)
-
-    t0 = time.perf_counter()
-    from jactus.contracts.pam_array import PAMArrayState as _PAS, PAMArrayParams as _PAP
-    states_l, et_l, yf_l, rf_l, params_l, mask_l = [], [], [], [], [], []
-    for init_s, et, yf_arr, rf_arr, p in precomputed:
-        et_p, yf_p, rf_p, m = _pad_arrays(et, yf_arr, rf_arr, max_events)
-        states_l.append(init_s)
-        et_l.append(et_p)
-        yf_l.append(yf_p)
-        rf_l.append(rf_p)
-        params_l.append(p)
-        mask_l.append(m)
-
-    def _stack(tuples, cls):
-        fields = {}
-        for fn in cls._fields:
-            fields[fn] = jnp.stack([getattr(t, fn) for t in tuples])
-        return cls(**fields)
-
-    batched_states = _stack(states_l, _PAS)
-    batched_params = _stack(params_l, _PAP)
-    batched_et = jnp.stack(et_l)
-    batched_yf = jnp.stack(yf_l)
-    batched_rf = jnp.stack(rf_l)
-    batched_masks = jnp.stack(mask_l)
-    batch_prep_elapsed = time.perf_counter() - t0
-    print(f"   Batch stack:   {batch_prep_elapsed:.3f}s (pad to {max_events} events)")
+    print("3. Array-mode: vmap kernel (JIT-compiled)")
 
     # Warm-up JIT+vmap compilation
     t0 = time.perf_counter()
@@ -247,10 +221,14 @@ def main():
         pv = float(jnp.sum(masked_payoffs * disc))
         scenario_pvs.append(pv)
     scenario_elapsed = time.perf_counter() - t0
-    print(f"   {n_scenarios} scenarios in {scenario_elapsed:.3f}s"
-          f" ({n_scenarios / scenario_elapsed:,.0f} scenarios/sec)")
-    print(f"   PV range: ${min(scenario_pvs):,.0f} (rate={float(rates[-1]):.2%})"
-          f" to ${max(scenario_pvs):,.0f} (rate={float(rates[0]):.2%})")
+    print(
+        f"   {n_scenarios} scenarios in {scenario_elapsed:.3f}s"
+        f" ({n_scenarios / scenario_elapsed:,.0f} scenarios/sec)"
+    )
+    print(
+        f"   PV range: ${min(scenario_pvs):,.0f} (rate={float(rates[-1]):.2%})"
+        f" to ${max(scenario_pvs):,.0f} (rate={float(rates[0]):.2%})"
+    )
 
     # -----------------------------------------------------------------------
     # 5. Equivalence check
@@ -262,9 +240,9 @@ def main():
     n_check = min(20, n_active)
     max_diff = 0.0
     for i in range(n_check):
-        init_s, et, yf, rf, params = precomputed[i]
-        _, payoffs = simulate_pam_array_jit(init_s, et, yf, rf, params)
-        array_cf = float(jnp.sum(payoffs))
+        init_s, et, yf, rf, params = precompute_pam_arrays(make_attrs(portfolio[i]), rf_obs)
+        _, check_payoffs = simulate_pam_array_jit(init_s, et, yf, rf, params)
+        array_cf = float(jnp.sum(check_payoffs))
 
         # Python path total cashflow
         attrs = make_attrs(portfolio[i])
@@ -286,15 +264,15 @@ def main():
     print("6. Gradient demo: dPV/dRate (automatic differentiation)")
 
     # Use first contract
-    init_s, et, yf, rf, params = precomputed[0]
+    init_s, et, yf, rf, params = precompute_pam_arrays(make_attrs(portfolio[0]), rf_obs)
 
     def pv_as_fn_of_rate(rate):
         new_params = params._replace(nominal_interest_rate=rate)
         new_state = init_s._replace(ipnr=rate)
-        _, payoffs = simulate_pam_array(new_state, et, yf, rf, new_params)
+        _, grad_payoffs = simulate_pam_array(new_state, et, yf, rf, new_params)
         cum_yf = jnp.cumsum(yf)
         df = 1.0 / (1.0 + DISCOUNT_RATE * cum_yf)
-        return jnp.sum(payoffs * df)
+        return jnp.sum(grad_payoffs * df)
 
     grad_fn = jax.grad(pv_as_fn_of_rate)
     base_rate = jnp.array(float(portfolio[0]["nominal_interest_rate"]))
@@ -305,28 +283,32 @@ def main():
     print(f"   Rate:     {float(base_rate):.4f}")
     print(f"   PV:       ${float(pv_val):>12,.2f}")
     print(f"   dPV/dR:   ${float(grad_val):>12,.2f}")
-    print(f"   (A positive dPV/dR means higher rate → more interest → higher PV for lender)")
+    print("   (A positive dPV/dR means higher rate → more interest → higher PV for lender)")
 
     # -----------------------------------------------------------------------
     # Summary
     # -----------------------------------------------------------------------
+    e2e_elapsed = batch_prep_elapsed + vmap_elapsed
     print(f"\n{'=' * 80}")
     print("Performance Summary")
     print(f"{'=' * 80}")
     print(f"""
   Portfolio: {n_active} active PAM loans
 
-  {'Path':<40} {'Time':>10} {'Throughput':>18}
-  {'─' * 70}
+  {"Path":<40} {"Time":>10} {"Throughput":>18}
+  {"─" * 70}
   Python (sequential simulate + PV)      {python_elapsed:>8.2f}s   {n_active / python_elapsed:>12,.0f} loans/sec
-  Array pre-compute (Python, once)       {precompute_elapsed:>8.2f}s   {n_active / precompute_elapsed:>12,.0f} contracts/sec
+  Array batch prep (once)                {batch_prep_elapsed:>8.3f}s   {n_active / batch_prep_elapsed:>12,.0f} contracts/sec
   Array vmap kernel (steady-state)       {vmap_elapsed:>8.4f}s   {n_active / vmap_elapsed:>12,.0f} contracts/sec
+  End-to-end (prep + kernel)             {e2e_elapsed:>8.3f}s   {n_active / e2e_elapsed:>12,.0f} contracts/sec
   Scenario sweep (100 rates)             {scenario_elapsed:>8.3f}s   {n_scenarios / scenario_elapsed:>12,.0f} scenarios/sec
 
-  Kernel speedup vs Python:  {python_elapsed / vmap_elapsed:>8.0f}x  (simulation only, excl. precompute)
+  Speedup vs Python:
+    Kernel only:     {python_elapsed / vmap_elapsed:>6.0f}x
+    End-to-end:      {python_elapsed / e2e_elapsed:>6.0f}x  (incl. batch prep)
 
   Key insight: The array-mode separates the work into two phases:
-    1. Pre-computation (Python, ~{precompute_elapsed:.0f}s) — runs once per portfolio
+    1. Batch preparation ({batch_prep_elapsed:.3f}s) — runs once per portfolio
     2. JIT kernel ({vmap_elapsed:.4f}s) — runs as many times as needed
 
   This makes the array-mode ideal for:
@@ -335,7 +317,7 @@ def main():
     - Sensitivity sweeps (dPV/dRate, dPV/dNotional, etc.)
     - Monte Carlo simulations (re-run kernel with sampled risk factors)
 
-  The pre-computation cost is amortized across all re-runs of the kernel.
+  The batch preparation cost is amortized across all re-runs of the kernel.
 """)
 
 

@@ -28,6 +28,9 @@ Example::
 
 from __future__ import annotations
 
+import calendar as _cal_mod
+import re as _re
+from datetime import datetime as _datetime
 from typing import Any, NamedTuple
 
 import jax
@@ -543,15 +546,546 @@ def _extract_params(attrs: ContractAttributes) -> PAMArrayParams:
     )
 
 
+def _extract_params_raw(attrs: ContractAttributes) -> dict[str, float | int]:
+    """Extract params as plain Python floats/ints (no jnp.array overhead)."""
+    role_sign = _get_role_sign(attrs.contract_role)
+    nt = attrs.notional_principal or 0.0
+    ipnr = attrs.nominal_interest_rate or 0.0
+
+    ied_ipac = 0.0
+    if attrs.accrued_interest is not None:
+        ied_ipac = attrs.accrued_interest
+    elif (
+        attrs.interest_payment_anchor is not None
+        and attrs.initial_exchange_date is not None
+        and attrs.interest_payment_anchor < attrs.initial_exchange_date
+    ):
+        from jactus.core.types import DayCountConvention
+
+        dcc = attrs.day_count_convention or DayCountConvention.A360
+        yf = year_fraction(attrs.interest_payment_anchor, attrs.initial_exchange_date, dcc)
+        ied_ipac = yf * ipnr * abs(role_sign * nt)
+
+    return {
+        "role_sign": role_sign,
+        "notional_principal": nt,
+        "nominal_interest_rate": ipnr,
+        "premium_discount_at_ied": attrs.premium_discount_at_ied or 0.0,
+        "accrued_interest": attrs.accrued_interest or 0.0,
+        "fee_rate": attrs.fee_rate or 0.0,
+        "fee_basis": _encode_fee_basis(attrs),
+        "penalty_rate": attrs.penalty_rate or 0.0,
+        "penalty_type": _encode_penalty_type(attrs),
+        "price_at_purchase_date": attrs.price_at_purchase_date or 0.0,
+        "price_at_termination_date": attrs.price_at_termination_date or 0.0,
+        "rate_reset_spread": attrs.rate_reset_spread or 0.0,
+        "rate_reset_multiplier": (
+            attrs.rate_reset_multiplier if attrs.rate_reset_multiplier is not None else 1.0
+        ),
+        "rate_reset_floor": attrs.rate_reset_floor or 0.0,
+        "rate_reset_cap": attrs.rate_reset_cap or 1.0,
+        "rate_reset_next": attrs.rate_reset_next if attrs.rate_reset_next is not None else ipnr,
+        "has_rate_floor": 1.0 if attrs.rate_reset_floor is not None else 0.0,
+        "has_rate_cap": 1.0 if attrs.rate_reset_cap is not None else 0.0,
+        "ied_ipac": ied_ipac,
+    }
+
+
+def _params_raw_to_jax(raw: dict[str, float | int]) -> PAMArrayParams:
+    """Convert raw Python params to JAX PAMArrayParams."""
+    return PAMArrayParams(
+        role_sign=jnp.array(raw["role_sign"], dtype=_F32),
+        notional_principal=jnp.array(raw["notional_principal"], dtype=_F32),
+        nominal_interest_rate=jnp.array(raw["nominal_interest_rate"], dtype=_F32),
+        premium_discount_at_ied=jnp.array(raw["premium_discount_at_ied"], dtype=_F32),
+        accrued_interest=jnp.array(raw["accrued_interest"], dtype=_F32),
+        fee_rate=jnp.array(raw["fee_rate"], dtype=_F32),
+        fee_basis=jnp.array(raw["fee_basis"], dtype=jnp.int32),
+        penalty_rate=jnp.array(raw["penalty_rate"], dtype=_F32),
+        penalty_type=jnp.array(raw["penalty_type"], dtype=jnp.int32),
+        price_at_purchase_date=jnp.array(raw["price_at_purchase_date"], dtype=_F32),
+        price_at_termination_date=jnp.array(raw["price_at_termination_date"], dtype=_F32),
+        rate_reset_spread=jnp.array(raw["rate_reset_spread"], dtype=_F32),
+        rate_reset_multiplier=jnp.array(raw["rate_reset_multiplier"], dtype=_F32),
+        rate_reset_floor=jnp.array(raw["rate_reset_floor"], dtype=_F32),
+        rate_reset_cap=jnp.array(raw["rate_reset_cap"], dtype=_F32),
+        rate_reset_next=jnp.array(raw["rate_reset_next"], dtype=_F32),
+        has_rate_floor=jnp.array(raw["has_rate_floor"], dtype=_F32),
+        has_rate_cap=jnp.array(raw["has_rate_cap"], dtype=_F32),
+        ied_ipac=jnp.array(raw["ied_ipac"], dtype=_F32),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Fast schedule generation — bypasses PrincipalAtMaturityContract entirely
+# ---------------------------------------------------------------------------
+
+# Cache for EVENT_SCHEDULE_PRIORITY lookups
+_EVT_PRIORITY: dict[int, int] = {}
+
+
+def _get_evt_priority(evt_idx: int) -> int:
+    """Get sort priority for an event type index (cached)."""
+    if not _EVT_PRIORITY:
+        from jactus.core.types import EVENT_SCHEDULE_PRIORITY
+
+        for et, pri in EVENT_SCHEDULE_PRIORITY.items():
+            _EVT_PRIORITY[et.index] = pri
+    return _EVT_PRIORITY.get(evt_idx, 99)
+
+
+def _adt_to_dt(adt: ActusDateTime) -> _datetime:
+    """Convert ActusDateTime to Python datetime (fast path)."""
+    if adt.hour == 24:
+        from datetime import timedelta
+
+        return _datetime(adt.year, adt.month, adt.day) + timedelta(days=1)  # noqa: DTZ001
+    return _datetime(adt.year, adt.month, adt.day, adt.hour, adt.minute, adt.second)  # noqa: DTZ001
+
+
+def _dt_to_adt(dt: _datetime) -> ActusDateTime:
+    """Convert Python datetime to ActusDateTime."""
+    return ActusDateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
+
+
+def _fast_month_schedule(
+    start_y: int,
+    start_m: int,
+    start_d: int,
+    cycle_months: int,
+    end_dt: _datetime,
+) -> list[_datetime]:
+    """Generate monthly-based schedule using direct arithmetic.
+
+    Computes dates as ``start + n * cycle_months`` for n=0,1,2,...
+    until the result exceeds ``end_dt``.  Day is clamped to the target
+    month's maximum day.
+    """
+    dates: list[_datetime] = []
+    n = 0
+    while True:
+        if n == 0:
+            d = min(start_d, _cal_mod.monthrange(start_y, start_m)[1])
+            current = _datetime(start_y, start_m, d)  # noqa: DTZ001
+        else:
+            total_months = n * cycle_months
+            total = (start_y * 12 + start_m - 1) + total_months
+            y = total // 12
+            m = (total % 12) + 1
+            d = min(start_d, _cal_mod.monthrange(y, m)[1])
+            current = _datetime(y, m, d)  # noqa: DTZ001
+        if current > end_dt:
+            break
+        dates.append(current)
+        n += 1
+    return dates
+
+
+_CYCLE_MONTHS_MAP = {"M": 1, "Q": 3, "H": 6, "Y": 12}
+
+# Pre-compiled regex for cycle parsing (avoid re-compiling per call)
+_CYCLE_RE = _re.compile(r"^(\d+)([DWMQHY])([-+]?)$")
+
+
+def _parse_cycle_fast(cycle: str) -> tuple[int, str, str]:
+    """Parse cycle string without repeated re.match overhead."""
+    m = _CYCLE_RE.match(cycle.upper())
+    if not m:
+        from jactus.core.time import parse_cycle
+
+        return parse_cycle(cycle)
+    return int(m.group(1)), m.group(2), m.group(3)
+
+
+def _fast_schedule(
+    start: ActusDateTime | None,
+    cycle: str | None,
+    end: ActusDateTime | None,
+) -> list[_datetime]:
+    """Fast schedule generation returning Python datetimes.
+
+    Handles the common case (month-based cycles, EOMC=SD, BDC=NULL).
+    """
+    if start is None or end is None:
+        return []
+    if cycle is None or cycle == "":
+        return [_adt_to_dt(start)]
+
+    multiplier, period, _stub = _parse_cycle_fast(cycle)
+    end_dt = _adt_to_dt(end)
+
+    if period in _CYCLE_MONTHS_MAP:
+        cycle_months = multiplier * _CYCLE_MONTHS_MAP[period]
+        return _fast_month_schedule(start.year, start.month, start.day, cycle_months, end_dt)
+
+    # Day/week-based — use timedelta
+    from datetime import timedelta
+
+    start_dt = _adt_to_dt(start)
+    if period == "D":
+        delta = timedelta(days=multiplier)
+    else:
+        delta = timedelta(weeks=multiplier)
+
+    dates: list[_datetime] = []
+    n = 0
+    while True:
+        current = start_dt + delta * n
+        if current > end_dt:
+            break
+        dates.append(current)
+        n += 1
+    return dates
+
+
+# Cached EventType index values for fast comparison
+_IED_IDX = EventType.IED.index
+_IP_IDX = EventType.IP.index
+_IPCI_IDX = EventType.IPCI.index
+_RR_IDX = EventType.RR.index
+_RRF_IDX = EventType.RRF.index
+_FP_IDX = EventType.FP.index
+_SC_IDX = EventType.SC.index
+_PRD_IDX = EventType.PRD.index
+_TD_IDX = EventType.TD.index
+_MD_IDX = EventType.MD.index
+_PP_IDX = EventType.PP.index
+
+
+def _fast_pam_schedule(
+    attrs: ContractAttributes,
+) -> list[tuple[int, _datetime, _datetime]]:
+    """Generate PAM schedule as lightweight (evt_idx, evt_dt, calc_dt) tuples.
+
+    Replicates the logic of ``PrincipalAtMaturityContract.generate_event_schedule``
+    without creating ``ContractEvent`` objects or a ``PrincipalAtMaturityContract``.
+    """
+    from jactus.core.types import BusinessDayConvention
+
+    ied = attrs.initial_exchange_date
+    md = attrs.maturity_date
+    sd = attrs.status_date
+    assert ied is not None
+    assert md is not None
+
+    bdc = attrs.business_day_convention
+
+    # For non-NULL BDC or non-SD EOMC, fall back to the full path
+    has_bdc = bdc is not None and bdc != BusinessDayConvention.NULL
+    has_eomc = (
+        attrs.end_of_month_convention is not None and attrs.end_of_month_convention.value != "SD"
+    )
+    if has_bdc or has_eomc:
+        return _fallback_pam_schedule(attrs)
+
+    ied_dt = _adt_to_dt(ied)
+    md_dt = _adt_to_dt(md)
+    sd_dt = _adt_to_dt(sd)
+
+    # events: (evt_type_idx, event_time_dt, calc_time_dt)
+    events: list[tuple[int, _datetime, _datetime]] = []
+
+    # IED
+    if ied_dt >= sd_dt:
+        events.append((_IED_IDX, ied_dt, ied_dt))
+
+    # IP / IPCI
+    if attrs.interest_payment_cycle:
+        ip_anchor = attrs.interest_payment_anchor or ied
+        ipced = attrs.interest_capitalization_end_date
+        ip_dates = _fast_schedule(ip_anchor, attrs.interest_payment_cycle, md)
+        ipced_dt = _adt_to_dt(ipced) if ipced else None
+
+        # Add IPCED if not already on a cycle date
+        if ipced_dt and ipced_dt not in ip_dates:
+            ip_dates = sorted(set(ip_dates + [ipced_dt]))
+
+        # Stub handling
+        if md_dt not in ip_dates and ip_dates:
+            ip_cycle_str = attrs.interest_payment_cycle or ""
+            if ip_cycle_str.endswith("+"):
+                ip_dates[-1] = md_dt
+            else:
+                ip_dates.append(md_dt)
+            ip_dates = sorted(set(ip_dates))
+
+        for dt in ip_dates:
+            if dt < ied_dt:
+                continue
+            if ipced_dt and dt <= ipced_dt:
+                events.append((_IPCI_IDX, dt, dt))
+            else:
+                events.append((_IP_IDX, dt, dt))
+
+    # RR / RRF
+    if attrs.rate_reset_cycle and attrs.rate_reset_anchor:
+        rr_dates = _fast_schedule(attrs.rate_reset_anchor, attrs.rate_reset_cycle, md)
+        rr_cycle_str = attrs.rate_reset_cycle or ""
+        if rr_cycle_str.endswith("+") and rr_dates and rr_dates[-1] != md_dt:
+            rr_dates = rr_dates[:-1]
+        first_rr = True
+        for dt in rr_dates:
+            if dt >= md_dt:
+                break
+            if first_rr and attrs.rate_reset_next is not None:
+                events.append((_RRF_IDX, dt, dt))
+                first_rr = False
+            else:
+                events.append((_RR_IDX, dt, dt))
+                first_rr = False
+
+    # FP
+    if attrs.fee_payment_cycle:
+        fp_anchor = attrs.fee_payment_anchor or ied
+        fp_dates = _fast_schedule(fp_anchor, attrs.fee_payment_cycle, md)
+        for dt in fp_dates:
+            if dt > ied_dt:
+                events.append((_FP_IDX, dt, dt))
+
+    # SC
+    if attrs.scaling_index_cycle:
+        sc_anchor = attrs.scaling_index_anchor or ied
+        sc_dates = _fast_schedule(sc_anchor, attrs.scaling_index_cycle, md)
+        for dt in sc_dates:
+            if dt > ied_dt:
+                events.append((_SC_IDX, dt, dt))
+
+    # PRD
+    if attrs.purchase_date:
+        events.append((_PRD_IDX, _adt_to_dt(attrs.purchase_date), _adt_to_dt(attrs.purchase_date)))
+
+    # TD
+    if attrs.termination_date:
+        events.append(
+            (_TD_IDX, _adt_to_dt(attrs.termination_date), _adt_to_dt(attrs.termination_date))
+        )
+
+    # MD
+    events.append((_MD_IDX, md_dt, md_dt))
+
+    # Filter: remove events before SD
+    events = [(ei, et, ct) for ei, et, ct in events if et >= sd_dt]
+
+    # If PRD exists, remove IED and events before PRD
+    if attrs.purchase_date:
+        prd_dt = _adt_to_dt(attrs.purchase_date)
+        events = [(ei, et, ct) for ei, et, ct in events if ei != _IED_IDX and et >= prd_dt]
+
+    # Sort by (event_time, priority)
+    events.sort(key=lambda e: (e[1], _get_evt_priority(e[0])))
+
+    # If TD exists, remove all events after TD
+    if attrs.termination_date:
+        td_dt = _adt_to_dt(attrs.termination_date)
+        events = [(ei, et, ct) for ei, et, ct in events if et <= td_dt]
+
+    return events
+
+
+def _fallback_pam_schedule(
+    attrs: ContractAttributes,
+) -> list[tuple[int, _datetime, _datetime]]:
+    """Fall back to the full PrincipalAtMaturityContract for BDC/EOMC cases."""
+    from jactus.contracts.pam import PrincipalAtMaturityContract
+    from jactus.observers import ConstantRiskFactorObserver
+
+    rf_obs = ConstantRiskFactorObserver(constant_value=0.0)
+    contract = PrincipalAtMaturityContract(attrs, rf_obs)
+    schedule = contract.generate_event_schedule()
+    result: list[tuple[int, _datetime, _datetime]] = []
+    for event in schedule.events:
+        evt_dt = _adt_to_dt(event.event_time)
+        calc_dt = _adt_to_dt(event.calculation_time) if event.calculation_time else evt_dt
+        result.append((event.event_type.index, evt_dt, calc_dt))
+    return result
+
+
+def _fast_pam_init_state(
+    attrs: ContractAttributes,
+) -> tuple[float, float, float, float, float, float, _datetime]:
+    """Compute initial PAM state as Python floats.
+
+    Returns ``(nt, ipnr, ipac, feac, nsc, isc, sd_datetime)``.
+    """
+    sd = attrs.status_date
+    ied = attrs.initial_exchange_date
+    sd_dt = _adt_to_dt(sd)
+
+    needs_post_ied = (ied and ied < sd) or attrs.purchase_date
+    if needs_post_ied:
+        role_sign = _get_role_sign(attrs.contract_role)
+        nt = role_sign * (attrs.notional_principal or 0.0)
+        ipnr = attrs.nominal_interest_rate or 0.0
+
+        if ied and ied >= sd and attrs.purchase_date:
+            init_sd_dt = _adt_to_dt(ied)
+            ipac = 0.0
+        else:
+            init_sd_dt = sd_dt
+            accrual_start = attrs.interest_payment_anchor or ied
+            if attrs.accrued_interest is not None:
+                ipac = attrs.accrued_interest
+            elif accrual_start and accrual_start < sd:
+                from jactus.core.types import DayCountConvention
+
+                dcc = attrs.day_count_convention or DayCountConvention.A360
+                ipac = year_fraction(accrual_start, sd, dcc) * ipnr * abs(nt)
+            else:
+                ipac = 0.0
+
+        return (nt, ipnr, ipac, 0.0, 1.0, 1.0, init_sd_dt)
+
+    return (0.0, 0.0, 0.0, 0.0, 1.0, 1.0, sd_dt)
+
+
+# Year fraction fast paths for common day count conventions
+def _yf_a360(d1: _datetime, d2: _datetime) -> float:
+    return (d2 - d1).days / 360.0
+
+
+def _yf_a365(d1: _datetime, d2: _datetime) -> float:
+    return (d2 - d1).days / 365.0
+
+
+def _yf_30e360(d1: _datetime, d2: _datetime) -> float:
+    y1, m1, dd1 = d1.year, d1.month, d1.day
+    y2, m2, dd2 = d2.year, d2.month, d2.day
+    if dd1 == 31:
+        dd1 = 30
+    if dd2 == 31:
+        dd2 = 30
+    return ((y2 - y1) * 360 + (m2 - m1) * 30 + (dd2 - dd1)) / 360.0
+
+
+def _yf_b30360(d1: _datetime, d2: _datetime) -> float:
+    y1, m1, dd1 = d1.year, d1.month, d1.day
+    y2, m2, dd2 = d2.year, d2.month, d2.day
+    if dd1 == 31:
+        dd1 = 30
+    if dd1 >= 30 and dd2 == 31:
+        dd2 = 30
+    return ((y2 - y1) * 360 + (m2 - m1) * 30 + (dd2 - dd1)) / 360.0
+
+
+class _RawPrecomputed(NamedTuple):
+    """Pre-computed data as Python types (no JAX overhead)."""
+
+    state: tuple[float, float, float, float, float, float]  # nt, ipnr, ipac, feac, nsc, isc
+    event_types: list[int]
+    year_fractions: list[float]
+    rf_values: list[float]
+    params: dict[str, float | int]
+
+
+def _precompute_raw(
+    attrs: ContractAttributes,
+    rf_observer: RiskFactorObserver,
+) -> _RawPrecomputed:
+    """Pre-compute all data as pure Python types (no JAX arrays).
+
+    This is the core pre-computation that can be batched efficiently —
+    all JAX array creation is deferred to the caller.
+    """
+    from jactus.core.types import DayCountConvention
+
+    # 1. Fast schedule generation (no contract object)
+    schedule = _fast_pam_schedule(attrs)
+
+    # 2. Fast state initialization (no contract object)
+    nt, ipnr, ipac, feac, nsc, isc, init_sd_dt = _fast_pam_init_state(attrs)
+
+    # 3. Compute year fractions and risk factors
+    dcc = attrs.day_count_convention or DayCountConvention.A360
+
+    # Pick fast YF function for common DCCs
+    if dcc == DayCountConvention.A360:
+        yf_fn = _yf_a360
+    elif dcc == DayCountConvention.A365:
+        yf_fn = _yf_a365
+    elif dcc == DayCountConvention.E30360:
+        yf_fn = _yf_30e360
+    elif dcc == DayCountConvention.B30360:
+        yf_fn = _yf_b30360
+    else:
+        yf_fn = None  # fall back to full year_fraction
+
+    event_type_list: list[int] = []
+    yf_list: list[float] = []
+    rf_list: list[float] = []
+    current_sd_dt = init_sd_dt
+
+    market_object = attrs.rate_reset_market_object or ""
+    contract_id = attrs.contract_id or ""
+
+    for evt_idx, evt_dt, calc_dt in schedule:
+        event_type_list.append(evt_idx)
+
+        # Year fraction
+        if yf_fn is not None:
+            yf_list.append(yf_fn(current_sd_dt, calc_dt))
+        else:
+            yf_list.append(year_fraction(_dt_to_adt(current_sd_dt), _dt_to_adt(calc_dt), dcc))
+
+        # Risk factor pre-query
+        rf_val = 0.0
+        if evt_idx == _RR_IDX:
+            try:
+                rf_val = float(rf_observer.observe_risk_factor(market_object, _dt_to_adt(evt_dt)))
+            except (KeyError, NotImplementedError, TypeError):
+                rf_val = 0.0
+        elif evt_idx == _PP_IDX:
+            try:
+                rf_val = float(
+                    rf_observer.observe_event(contract_id, EventType.PP, _dt_to_adt(evt_dt))
+                )
+            except (KeyError, NotImplementedError, TypeError):
+                rf_val = 0.0
+        rf_list.append(rf_val)
+
+        current_sd_dt = evt_dt
+
+    # 4. Extract params as raw Python dict
+    params_raw = _extract_params_raw(attrs)
+
+    return _RawPrecomputed(
+        state=(nt, ipnr, ipac, feac, nsc, isc),
+        event_types=event_type_list,
+        year_fractions=yf_list,
+        rf_values=rf_list,
+        params=params_raw,
+    )
+
+
+def _raw_to_jax(
+    raw: _RawPrecomputed,
+) -> tuple[PAMArrayState, jnp.ndarray, jnp.ndarray, jnp.ndarray, PAMArrayParams]:
+    """Convert raw pre-computed data to JAX arrays."""
+    nt, ipnr, ipac, feac, nsc, isc = raw.state
+    return (
+        PAMArrayState(
+            nt=jnp.array(nt, dtype=_F32),
+            ipnr=jnp.array(ipnr, dtype=_F32),
+            ipac=jnp.array(ipac, dtype=_F32),
+            feac=jnp.array(feac, dtype=_F32),
+            nsc=jnp.array(nsc, dtype=_F32),
+            isc=jnp.array(isc, dtype=_F32),
+        ),
+        jnp.array(raw.event_types, dtype=jnp.int32),
+        jnp.array(raw.year_fractions, dtype=_F32),
+        jnp.array(raw.rf_values, dtype=_F32),
+        _params_raw_to_jax(raw.params),
+    )
+
+
 def precompute_pam_arrays(
     attrs: ContractAttributes,
     rf_observer: RiskFactorObserver,
 ) -> tuple[PAMArrayState, jnp.ndarray, jnp.ndarray, jnp.ndarray, PAMArrayParams]:
     """Pre-compute JAX arrays for array-mode PAM simulation.
 
-    Uses the existing ``PrincipalAtMaturityContract`` to generate the event
-    schedule and initial state, then converts to JAX arrays suitable for
-    ``simulate_pam_array``.
+    Generates the event schedule and initial state directly from attributes
+    (bypassing ``PrincipalAtMaturityContract``), then converts to JAX arrays
+    suitable for ``simulate_pam_array``.
 
     Args:
         attrs: Contract attributes (must be PAM type).
@@ -560,76 +1094,7 @@ def precompute_pam_arrays(
     Returns:
         ``(initial_state, event_types, year_fractions, rf_values, params)``
     """
-    from jactus.contracts.pam import PrincipalAtMaturityContract
-    from jactus.core.types import DayCountConvention
-
-    # Use existing contract to generate schedule and initial state
-    contract = PrincipalAtMaturityContract(attrs, rf_observer)
-    schedule = contract.generate_event_schedule()
-    init_state = contract.initialize_state()
-
-    dcc = attrs.day_count_convention or DayCountConvention.A360
-
-    # Convert to arrays
-    event_type_list: list[int] = []
-    yf_list: list[float] = []
-    rf_list: list[float] = []
-
-    # Track sd for year fraction computation
-    current_sd: ActusDateTime = init_state.sd
-
-    for event in schedule.events:
-        # Event type index
-        event_type_list.append(event.event_type.index)
-
-        # Year fraction from current sd to event time
-        calc_time = event.calculation_time or event.event_time
-        yf = year_fraction(current_sd, calc_time, dcc)
-        yf_list.append(yf)
-
-        # Pre-query risk factor for RR events
-        rf_val = 0.0
-        if event.event_type == EventType.RR:
-            market_object = attrs.rate_reset_market_object or ""
-            try:
-                rf_val = float(rf_observer.observe_risk_factor(market_object, event.event_time))
-            except (KeyError, NotImplementedError, TypeError):
-                rf_val = 0.0
-        elif event.event_type == EventType.PP:
-            try:
-                rf_val = float(
-                    rf_observer.observe_event(
-                        attrs.contract_id or "",
-                        EventType.PP,
-                        event.event_time,
-                    )
-                )
-            except (KeyError, NotImplementedError, TypeError):
-                rf_val = 0.0
-        rf_list.append(rf_val)
-
-        # All PAM STFs set sd = time
-        current_sd = event.event_time
-
-    # Convert ContractState → PAMArrayState
-    initial_array_state = PAMArrayState(
-        nt=jnp.array(float(init_state.nt), dtype=_F32),
-        ipnr=jnp.array(float(init_state.ipnr), dtype=_F32),
-        ipac=jnp.array(float(init_state.ipac), dtype=_F32),
-        feac=jnp.array(float(init_state.feac), dtype=_F32),
-        nsc=jnp.array(float(init_state.nsc), dtype=_F32),
-        isc=jnp.array(float(init_state.isc), dtype=_F32),
-    )
-
-    params = _extract_params(attrs)
-
-    return (
-        initial_array_state,
-        jnp.array(event_type_list, dtype=jnp.int32),
-        jnp.array(yf_list, dtype=_F32),
-        jnp.array(rf_list, dtype=_F32),
-        params,
-    )
+    return _raw_to_jax(_precompute_raw(attrs, rf_observer))
 
 
 # ============================================================================
@@ -662,6 +1127,10 @@ def prepare_pam_batch(
 ) -> tuple[PAMArrayState, jnp.ndarray, jnp.ndarray, jnp.ndarray, PAMArrayParams, jnp.ndarray]:
     """Pre-compute and pad arrays for a batch of PAM contracts.
 
+    Uses a two-phase approach for efficiency:
+    1. Pre-compute all contracts as Python types (no JAX overhead)
+    2. Batch-convert to JAX arrays in a single pass
+
     Args:
         contracts: List of ``(attributes, rf_observer)`` pairs.
 
@@ -669,42 +1138,64 @@ def prepare_pam_batch(
         ``(initial_states, event_types, year_fractions, rf_values, params, masks)``
         where each array has a leading batch dimension.
     """
-    precomputed = [precompute_pam_arrays(attrs, obs) for attrs, obs in contracts]
-    max_events = max(et.shape[0] for _, et, _, _, _ in precomputed)
+    # Phase 1: Pre-compute everything as Python types
+    raw_list = [_precompute_raw(attrs, obs) for attrs, obs in contracts]
+    max_events = max(len(r.event_types) for r in raw_list)
 
-    # Pad and stack
-    states_list = []
-    et_list = []
-    yf_list = []
-    rf_list = []
-    params_list = []
-    mask_list = []
+    # Phase 2: Pad and batch-convert to JAX arrays
+    # Build Python lists for batch conversion (one jnp.array per field)
 
-    for init_state, event_types, year_fracs, rf_vals, params in precomputed:
-        et_padded, yf_padded, rf_padded, mask = _pad_arrays(
-            event_types, year_fracs, rf_vals, max_events
-        )
-        states_list.append(init_state)
-        et_list.append(et_padded)
-        yf_list.append(yf_padded)
-        rf_list.append(rf_padded)
-        params_list.append(params)
-        mask_list.append(mask)
+    # State fields: (batch,) each
+    state_nt = [r.state[0] for r in raw_list]
+    state_ipnr = [r.state[1] for r in raw_list]
+    state_ipac = [r.state[2] for r in raw_list]
+    state_feac = [r.state[3] for r in raw_list]
+    state_nsc = [r.state[4] for r in raw_list]
+    state_isc = [r.state[5] for r in raw_list]
 
-    # Stack into batched arrays
-    def _stack_named_tuples(tuples: list[Any], cls: Any) -> Any:
-        """Stack a list of NamedTuples into a single NamedTuple of batched arrays."""
-        fields: dict[str, jnp.ndarray] = {}
-        for field_name in cls._fields:
-            fields[field_name] = jnp.stack([getattr(t, field_name) for t in tuples])
-        return cls(**fields)
+    # Event arrays: (batch, max_events) each, with padding
+    et_batch: list[list[int]] = []
+    yf_batch: list[list[float]] = []
+    rf_batch: list[list[float]] = []
+    mask_batch: list[list[float]] = []
 
-    batched_states = _stack_named_tuples(states_list, PAMArrayState)
-    batched_params = _stack_named_tuples(params_list, PAMArrayParams)
-    batched_et = jnp.stack(et_list)
-    batched_yf = jnp.stack(yf_list)
-    batched_rf = jnp.stack(rf_list)
-    batched_masks = jnp.stack(mask_list)
+    for r in raw_list:
+        n_events = len(r.event_types)
+        pad_n = max_events - n_events
+        et_batch.append(r.event_types + [NOP_EVENT_IDX] * pad_n)
+        yf_batch.append(r.year_fractions + [0.0] * pad_n)
+        rf_batch.append(r.rf_values + [0.0] * pad_n)
+        mask_batch.append([1.0] * n_events + [0.0] * pad_n)
+
+    # Param fields: (batch,) each
+    param_fields: dict[str, list[float | int]] = {k: [] for k in PAMArrayParams._fields}
+    for r in raw_list:
+        for k in PAMArrayParams._fields:
+            param_fields[k].append(r.params[k])
+
+    # Single batch conversion to JAX arrays
+    batched_states = PAMArrayState(
+        nt=jnp.array(state_nt, dtype=_F32),
+        ipnr=jnp.array(state_ipnr, dtype=_F32),
+        ipac=jnp.array(state_ipac, dtype=_F32),
+        feac=jnp.array(state_feac, dtype=_F32),
+        nsc=jnp.array(state_nsc, dtype=_F32),
+        isc=jnp.array(state_isc, dtype=_F32),
+    )
+
+    batched_et = jnp.array(et_batch, dtype=jnp.int32)
+    batched_yf = jnp.array(yf_batch, dtype=_F32)
+    batched_rf = jnp.array(rf_batch, dtype=_F32)
+    batched_masks = jnp.array(mask_batch, dtype=_F32)
+
+    # Params: determine dtype per field (int32 for fee_basis/penalty_type, float32 otherwise)
+    _int_fields = {"fee_basis", "penalty_type"}
+    batched_params = PAMArrayParams(
+        **{
+            k: jnp.array(param_fields[k], dtype=jnp.int32 if k in _int_fields else _F32)
+            for k in PAMArrayParams._fields
+        }
+    )
 
     return batched_states, batched_et, batched_yf, batched_rf, batched_params, batched_masks
 
