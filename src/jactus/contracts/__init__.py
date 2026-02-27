@@ -41,6 +41,17 @@ from jactus.contracts.lax import ExoticLinearAmortizerContract
 from jactus.contracts.nam import NegativeAmortizerContract
 from jactus.contracts.optns import OptionContract
 from jactus.contracts.pam import PrincipalAtMaturityContract
+from jactus.contracts.pam_array import (
+    PAMArrayParams,
+    PAMArrayState,
+    batch_simulate_pam,
+    batch_simulate_pam_vmap,
+    precompute_pam_arrays,
+    prepare_pam_batch,
+    simulate_pam_array,
+    simulate_pam_array_jit,
+    simulate_pam_portfolio,
+)
 from jactus.contracts.stk import StockContract
 from jactus.contracts.swaps import GenericSwapContract
 from jactus.contracts.swppv import PlainVanillaSwapContract
@@ -214,4 +225,14 @@ __all__ = [
     "create_contract",
     "register_contract_type",
     "get_available_contract_types",
+    # Array-mode PAM simulation
+    "PAMArrayState",
+    "PAMArrayParams",
+    "simulate_pam_array",
+    "simulate_pam_array_jit",
+    "batch_simulate_pam",
+    "batch_simulate_pam_vmap",
+    "precompute_pam_arrays",
+    "prepare_pam_batch",
+    "simulate_pam_portfolio",
 ]

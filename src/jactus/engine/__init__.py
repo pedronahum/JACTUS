@@ -13,6 +13,11 @@ from jactus.engine.simulator import (
     create_cashflow_matrix,
     simulate_contracts,
 )
+from jactus.engine.vectorized import (
+    ArraySimulationResult,
+    BatchSimulationResult,
+    validate_pam_for_array_mode,
+)
 
 __all__ = [
     # Lifecycle management
@@ -26,4 +31,8 @@ __all__ = [
     "SimulationResult",
     "create_cashflow_matrix",
     "simulate_contracts",
+    # Vectorized / array-mode
+    "ArraySimulationResult",
+    "BatchSimulationResult",
+    "validate_pam_for_array_mode",
 ]
