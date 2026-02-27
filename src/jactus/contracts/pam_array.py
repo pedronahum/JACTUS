@@ -35,6 +35,7 @@ from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 from jactus.core import (
     ActusDateTime,
@@ -1357,26 +1358,33 @@ def prepare_pam_batch(
         for k in PAMArrayParams._fields:
             param_fields[k].append(r.params[k])
 
-    # Single batch conversion to JAX arrays
+    # Single batch conversion: build NumPy arrays first (fast C-level construction
+    # from Python lists), then transfer to JAX via jnp.asarray (near-zero copy).
+    # This avoids jnp.array()'s tracing/dispatch overhead which dominated prep time.
     batched_states = PAMArrayState(
-        nt=jnp.array(state_nt, dtype=_F32),
-        ipnr=jnp.array(state_ipnr, dtype=_F32),
-        ipac=jnp.array(state_ipac, dtype=_F32),
-        feac=jnp.array(state_feac, dtype=_F32),
-        nsc=jnp.array(state_nsc, dtype=_F32),
-        isc=jnp.array(state_isc, dtype=_F32),
+        nt=jnp.asarray(np.array(state_nt, dtype=np.float32)),
+        ipnr=jnp.asarray(np.array(state_ipnr, dtype=np.float32)),
+        ipac=jnp.asarray(np.array(state_ipac, dtype=np.float32)),
+        feac=jnp.asarray(np.array(state_feac, dtype=np.float32)),
+        nsc=jnp.asarray(np.array(state_nsc, dtype=np.float32)),
+        isc=jnp.asarray(np.array(state_isc, dtype=np.float32)),
     )
 
-    batched_et = jnp.array(et_batch, dtype=jnp.int32)
-    batched_yf = jnp.array(yf_batch, dtype=_F32)
-    batched_rf = jnp.array(rf_batch, dtype=_F32)
-    batched_masks = jnp.array(mask_batch, dtype=_F32)
+    batched_et = jnp.asarray(np.array(et_batch, dtype=np.int32))
+    batched_yf = jnp.asarray(np.array(yf_batch, dtype=np.float32))
+    batched_rf = jnp.asarray(np.array(rf_batch, dtype=np.float32))
+    batched_masks = jnp.asarray(np.array(mask_batch, dtype=np.float32))
 
     # Params: determine dtype per field (int32 for fee_basis/penalty_type, float32 otherwise)
     _int_fields = {"fee_basis", "penalty_type"}
     batched_params = PAMArrayParams(
         **{
-            k: jnp.array(param_fields[k], dtype=jnp.int32 if k in _int_fields else _F32)
+            k: jnp.asarray(
+                np.array(
+                    param_fields[k],
+                    dtype=np.int32 if k in _int_fields else np.float32,
+                )
+            )
             for k in PAMArrayParams._fields
         }
     )
