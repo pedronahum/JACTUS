@@ -473,6 +473,8 @@ All contracts require a `RiskFactorObserver`:
 - Can be constant or time-varying
 - Used for rate resets and valuations
 
+**Behavioral observers** (`PrepaymentSurfaceObserver`, `DepositTransactionObserver`) extend the standard observer framework by injecting `CalloutEvent`s into the simulation timeline. For example, a prepayment model can generate prepayment events based on rate incentive and loan seasoning, allowing behavioral risk factors to influence derivative contract cash flows alongside standard market data.
+
 ## Testing
 
 Run derivative contract tests:

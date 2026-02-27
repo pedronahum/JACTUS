@@ -59,7 +59,9 @@ from jactus.core import (
 from jactus.core.types import DayCountConvention
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.observers import ChildContractObserver, RiskFactorObserver
+from jactus.observers.behavioral import BehaviorRiskFactorObserver
 from jactus.observers.child_contract import SimulatedChildContractObserver
+from jactus.observers.scenario import Scenario
 from jactus.utilities.schedules import generate_schedule
 
 
@@ -449,6 +451,8 @@ class CreditEnhancementGuaranteeContract(BaseContract):
         self,
         risk_factor_observer: RiskFactorObserver | None = None,
         child_contract_observer: ChildContractObserver | None = None,
+        scenario: Scenario | None = None,  # noqa: ARG002
+        behavior_observers: list[BehaviorRiskFactorObserver] | None = None,  # noqa: ARG002
     ) -> SimulationHistory:
         """Simulate CEG contract with comprehensive event generation.
 

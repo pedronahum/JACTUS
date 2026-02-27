@@ -89,6 +89,14 @@ Mathematical Functions
    :undoc-members:
    :show-inheritance:
 
+2D Surface Interpolation
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: jactus.utilities.surface
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Contract Implementations
 ------------------------
 
@@ -294,6 +302,38 @@ Child Contract Observer
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. automodule:: jactus.observers.child_contract
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Behavioral Observer Framework
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: jactus.observers.behavioral
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Prepayment Surface Observer
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: jactus.observers.prepayment
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Deposit Transaction Observer
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: jactus.observers.deposit_transaction
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Scenario Management
+^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: jactus.observers.scenario
    :members:
    :undoc-members:
    :show-inheritance:

@@ -41,7 +41,10 @@ Required workflow — always follow these steps in order:
 2. jactus_get_contract_schema → get required/optional fields for your contract type
 3. jactus_validate_attributes → verify your attributes before simulation
 4. jactus_simulate_contract → run the simulation and get cash flows
-5. jactus_search_docs or jactus_get_topic_guide → only if you need deeper understanding
+5. jactus_list_risk_factor_observers → discover all observer types (market + behavioral)
+6. jactus_get_topic_guide → structured guides: "contracts", "behavioral", "scenario",
+   "jax", "events", "attributes"
+7. jactus_search_docs → keyword search across documentation
 
 The schema tool returns everything you need to build valid attributes: field names,
 types, descriptions, and example code. All 18 contract types can be simulated via MCP.
@@ -62,6 +65,13 @@ Key concepts:
 For derivative contracts (SWPPV, OPTNS, FUTUR, CAPFL), risk_factors or time_series
 is usually required. For simple principal contracts (PAM, LAM), constant_value
 is often sufficient.
+
+Behavioral observers: PrepaymentSurfaceObserver and DepositTransactionObserver extend
+the observer framework with state-dependent models that inject callout events into
+the simulation timeline. These require the Python API (not MCP simulation).
+- For behavioral observer details: jactus_get_topic_guide("behavioral")
+- For scenario management (bundling market + behavioral observers): jactus_get_topic_guide("scenario")
+- For a complete observer listing: jactus_list_risk_factor_observers
 """,
 )
 
@@ -170,6 +180,9 @@ def jactus_list_risk_factor_observers() -> dict[str, Any]:
     For MCP simulation, you can use: constant_value (default), risk_factors (dict), or
     time_series (time-varying). For advanced observers (curves, composites, callbacks,
     JAX), use the Python API directly.
+
+    Also includes behavioral observers (PrepaymentSurfaceObserver, DepositTransactionObserver)
+    that inject callout events into the simulation timeline. These require the Python API.
     """
     return contracts.list_risk_factor_observers()
 
@@ -378,6 +391,8 @@ def jactus_get_topic_guide(topic: str) -> dict[str, Any]:
 
     Args:
         topic: Topic name. Available: "contracts" (overview of all types),
+            "behavioral" (behavioral observers, callout events, prepayment/deposit models),
+            "scenario" (scenario management, bundling observers),
             "jax" (JAX integration and autodiff), "events" (event types and lifecycle),
             "attributes" (contract parameters and conventions).
     """

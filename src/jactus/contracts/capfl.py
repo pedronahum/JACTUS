@@ -51,6 +51,8 @@ from jactus.core import (
 from jactus.core.types import DayCountConvention
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.observers import ChildContractObserver, RiskFactorObserver
+from jactus.observers.behavioral import BehaviorRiskFactorObserver
+from jactus.observers.scenario import Scenario
 from jactus.utilities.conventions import year_fraction
 from jactus.utilities.schedules import generate_schedule
 
@@ -516,6 +518,8 @@ class CapFloorContract(BaseContract):
         self,
         risk_factor_observer: RiskFactorObserver | None = None,
         child_contract_observer: ChildContractObserver | None = None,
+        scenario: Scenario | None = None,
+        behavior_observers: list[BehaviorRiskFactorObserver] | None = None,
     ) -> SimulationHistory:
         """Simulate CAPFL contract.
 
@@ -530,7 +534,10 @@ class CapFloorContract(BaseContract):
             if market_object and not self.attributes.rate_reset_market_object:
                 self.attributes.rate_reset_market_object = market_object
 
-        result = super().simulate(risk_obs, child_contract_observer)
+        result = super().simulate(
+            risk_obs, child_contract_observer,
+            scenario=scenario, behavior_observers=behavior_observers,
+        )
 
         # Filter out internal RR events — CAPFL only outputs IP events
         # Zero out state for IP events (CAPFL is a derivative with no own notional/rate)

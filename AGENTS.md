@@ -19,7 +19,11 @@ Required workflow:
 2. `jactus_get_contract_schema` — get required/optional fields and example code
 3. `jactus_validate_attributes` — verify attributes before simulation
 4. `jactus_simulate_contract` — run the simulation
-5. `jactus_search_docs` / `jactus_get_topic_guide` — only if deeper understanding is needed
+5. `jactus_list_risk_factor_observers` — discover market and behavioral observer types
+6. `jactus_get_topic_guide` — structured guides on: `"contracts"`, `"behavioral"`, `"scenario"`, `"jax"`, `"events"`, `"attributes"`
+7. `jactus_search_docs` — keyword search across documentation
+
+For behavioral observers (prepayment, deposit transactions, callout events, scenarios), use `jactus_get_topic_guide("behavioral")` and `jactus_get_topic_guide("scenario")`.
 
 Only read source code if you need to modify or debug JACTUS itself. For using JACTUS (simulating contracts, generating code, understanding parameters), the MCP tools are sufficient.
 
@@ -29,6 +33,9 @@ Run: `python -m jactus_mcp` (stdio) or `python -m jactus_mcp --transport streama
 
 - **Contract Types**: PAM, LAM, LAX, NAM, ANN, CLM, UMP, CSH, STK, COM, FXOUT, OPTNS, FUTUR, SWPPV, SWAPS, CAPFL, CEG, CEC (18 total)
 - **Risk Factor Observers**: `ConstantRiskFactorObserver`, `DictRiskFactorObserver`, `TimeSeriesRiskFactorObserver`, `CurveRiskFactorObserver`, `CompositeRiskFactorObserver`, `CallbackRiskFactorObserver`, `JaxRiskFactorObserver`
+- **Behavioral Risk Factor Observers**: `PrepaymentSurfaceObserver`, `DepositTransactionObserver` — extend the observer framework with behavioral models that inject `CalloutEvent`s into the simulation timeline (protocol: `BehaviorRiskFactorObserver`, base class: `BaseBehaviorRiskFactorObserver`)
+- **Scenario Management**: `Scenario` — defines simulation scenarios combining contract attributes with risk factor and behavioral observer configurations
+- **Utilities**: `Surface2D`, `LabeledSurface2D` — 2D surface interpolation utilities used by behavioral observers (e.g., prepayment surfaces indexed by rate incentive and seasoning)
 - **Events**: IED, IP, PR, MD, RR, etc. — represent cash flows and state transitions
 - **ContractAttributes**: Pydantic model defining all contract parameters (`src/jactus/core/attributes.py`)
 

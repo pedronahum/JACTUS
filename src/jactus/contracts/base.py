@@ -24,6 +24,8 @@ from jactus.core import (
 )
 from jactus.functions import PayoffFunction, StateTransitionFunction
 from jactus.observers import ChildContractObserver, RiskFactorObserver
+from jactus.observers.behavioral import BehaviorRiskFactorObserver, CalloutEvent
+from jactus.observers.scenario import Scenario
 
 
 @dataclass
@@ -353,44 +355,85 @@ class BaseContract(nnx.Module, ABC):
         self,
         risk_factor_observer: RiskFactorObserver | None = None,
         child_contract_observer: ChildContractObserver | None = None,  # noqa: ARG002
+        scenario: Scenario | None = None,
+        behavior_observers: list[BehaviorRiskFactorObserver] | None = None,
     ) -> SimulationHistory:
         """Simulate contract through all events.
 
         Executes the full ACTUS algorithm:
-        1. Initialize state
-        2. For each event:
-           a. Apply state transition function (STF)
-           b. Calculate payoff (POF)
+        1. Collect callout events from behavioral observers (if any)
+        2. Merge callout events into the scheduled event timeline
+        3. Initialize state
+        4. For each event:
+           a. Calculate payoff (POF) using pre-event state
+           b. Apply state transition function (STF)
            c. Store event with states
 
+        Behavioral observers can be provided in three ways:
+        - Via a ``Scenario`` object (recommended for production use)
+        - Via the ``behavior_observers`` list parameter
+        - By passing a ``BehaviorRiskFactorObserver`` as the ``risk_factor_observer``
+
         Args:
-            risk_factor_observer: Optional override for risk factor observer
-            child_contract_observer: Optional override for child contract observer
+            risk_factor_observer: Optional override for risk factor observer.
+            child_contract_observer: Optional override for child contract observer.
+            scenario: Optional Scenario bundling market + behavioral observers.
+                If provided, its market observer is used as the risk factor
+                observer (unless ``risk_factor_observer`` is also provided),
+                and its behavioral observers are activated for callout events.
+            behavior_observers: Optional list of behavioral observers to
+                activate for callout event injection.
 
         Returns:
-            SimulationHistory with events and states
+            SimulationHistory with events and states.
 
         Example:
+            >>> # Simple simulation (no behavioral models)
             >>> history = contract.simulate()
-            >>> for event in history.events:
-            ...     print(f"{event.event_time}: {event.payoff}")
+            >>>
+            >>> # With a scenario
+            >>> history = contract.simulate(scenario=my_scenario)
+            >>>
+            >>> # With explicit behavioral observers
+            >>> history = contract.simulate(
+            ...     behavior_observers=[prepayment_model],
+            ... )
 
         References:
             ACTUS v1.1 Section 4 - Algorithm
         """
-        # Use provided observers or fall back to instance observers
-        risk_obs = risk_factor_observer or self.risk_factor_observer
-        # child_contract_observer available for future use with composite contracts
+        # Resolve risk factor observer
+        if scenario is not None and risk_factor_observer is None:
+            risk_obs = scenario.get_observer()
+        else:
+            risk_obs = risk_factor_observer or self.risk_factor_observer
+
+        # Collect all behavioral observers
+        all_behavior_observers: list[BehaviorRiskFactorObserver] = []
+        if scenario is not None:
+            all_behavior_observers.extend(scenario.behavior_observers.values())
+        if behavior_observers is not None:
+            all_behavior_observers.extend(behavior_observers)
+        if isinstance(risk_obs, BehaviorRiskFactorObserver):
+            all_behavior_observers.append(risk_obs)
 
         # Initialize
         state = self.initialize_state()
         initial_state = state
-        events_with_states = []
 
         # Get scheduled events
         schedule = self.get_events()
 
+        # Collect and merge callout events from behavioral observers
+        if all_behavior_observers:
+            callout_events = _collect_callout_events(
+                all_behavior_observers, self.attributes
+            )
+            if callout_events:
+                schedule = _merge_callout_events(schedule, callout_events, self.attributes)
+
         # Process each event
+        events_with_states = []
         for event in schedule.events:
             # Get functions for this event type
             stf = self.get_state_transition_function(event.event_type)
@@ -581,3 +624,78 @@ def merge_scheduled_and_observed_events(
 
     # Sort by time and sequence
     return sort_events_by_sequence(unique_events)
+
+
+def _collect_callout_events(
+    behavior_observers: list[BehaviorRiskFactorObserver],
+    attributes: ContractAttributes,
+) -> list[CalloutEvent]:
+    """Collect callout events from all behavioral observers.
+
+    Calls ``contract_start()`` on each behavioral observer and aggregates
+    the returned callout events, sorted by time.
+
+    Args:
+        behavior_observers: List of behavioral observers.
+        attributes: Contract attributes.
+
+    Returns:
+        Sorted list of all callout events.
+    """
+    all_events: list[CalloutEvent] = []
+    for observer in behavior_observers:
+        events = observer.contract_start(attributes)
+        all_events.extend(events)
+    return sorted(all_events, key=lambda e: e.time)
+
+
+def _merge_callout_events(
+    schedule: EventSchedule,
+    callout_events: list[CalloutEvent],
+    attributes: ContractAttributes,
+) -> EventSchedule:
+    """Merge callout events into an existing event schedule.
+
+    Converts ``CalloutEvent`` objects into ``ContractEvent`` objects using
+    the ``PP`` (Principal Prepayment) event type for MRD callouts and
+    ``AD`` (Analysis/Monitoring) for other callout types, then merges
+    them into the schedule.
+
+    Args:
+        schedule: Existing event schedule.
+        callout_events: Callout events to merge.
+        attributes: Contract attributes (for currency).
+
+    Returns:
+        New EventSchedule with callout events merged in.
+    """
+    from jactus.core.events import EVENT_SEQUENCE_ORDER
+    from jactus.core.types import EventType
+
+    # Map callout types to ACTUS event types
+    callout_type_map: dict[str, EventType] = {
+        "MRD": EventType.PP,  # Prepayment → Principal Prepayment event
+        "AFD": EventType.AD,  # Deposit transaction → Analysis/Monitoring event
+    }
+
+    new_events = list(schedule.events)
+    existing_times_and_types = {(e.event_time, e.event_type) for e in schedule.events}
+
+    for callout in callout_events:
+        event_type = callout_type_map.get(callout.callout_type, EventType.AD)
+        key = (callout.time, event_type)
+
+        # Don't add duplicate events
+        if key not in existing_times_and_types:
+            new_event = ContractEvent(
+                event_type=event_type,
+                event_time=callout.time,
+                payoff=jnp.array(0.0),
+                currency=attributes.currency or "XXX",
+                sequence=EVENT_SEQUENCE_ORDER.get(event_type, 20),
+            )
+            new_events.append(new_event)
+            existing_times_and_types.add(key)
+
+    new_events.sort()
+    return EventSchedule(tuple(new_events), schedule.contract_id)

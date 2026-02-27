@@ -497,6 +497,153 @@ Implement custom observers for dynamic rates::
             # Interpolate rate from yield curve
             return self.curve.get_rate(time)
 
+Behavioral Risk Factor Observers
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+JACTUS distinguishes between two categories of risk factor observers:
+
+* **Market observers** return values based solely on an identifier and time (e.g.,
+  interest rate curves, FX rates). They are stateless with respect to the contract.
+* **Behavioral observers** are aware of the contract's internal state (notional,
+  interest rate, loan age, performance status) and can dynamically inject events
+  into the simulation timeline. They model borrower or depositor behavior that
+  depends on the contract's current condition.
+
+Behavioral observers implement the ``BehaviorRiskFactorObserver`` protocol, which
+extends the standard risk factor observer with a ``contract_start()`` method. This
+method inspects the contract attributes and returns a list of ``CalloutEvent``
+objects that are merged into the simulation schedule. At each callout time, the
+simulation engine evaluates the behavioral observer with the current contract state.
+
+**Built-in behavioral observers:**
+
+* ``PrepaymentSurfaceObserver`` -- Models prepayment rates as a function of
+  interest rate spread and loan age using a 2D interpolation surface. Returns a
+  Multiplicative Reduction Delta (MRD) that reduces the outstanding notional.
+* ``DepositTransactionObserver`` -- Models deposit inflows and outflows for UMP
+  (Undefined Maturity Profile) contracts. Returns an Absolute Funded Delta (AFD)
+  representing the change in deposit balance.
+
+**Example: Prepayment model with a PAM contract**
+
+Define a 2D prepayment surface and attach it to a PAM contract::
+
+    import jax.numpy as jnp
+    from jactus.core import (
+        ContractAttributes, ContractType, ContractRole, ActusDateTime,
+    )
+    from jactus.contracts import create_contract
+    from jactus.observers import ConstantRiskFactorObserver
+    from jactus.utilities.surface import Surface2D
+    from jactus.observers.prepayment import PrepaymentSurfaceObserver
+
+    # Define a prepayment surface: spread (rows) x loan age in years (columns)
+    surface = Surface2D(
+        x_margins=jnp.array([-2.0, 0.0, 1.0, 2.0, 3.0]),   # spread %
+        y_margins=jnp.array([0.0, 1.0, 2.0, 3.0, 5.0, 10.0]),  # age years
+        values=jnp.array([
+            [0.00, 0.00, 0.00, 0.00, 0.00, 0.00],  # spread=-2%
+            [0.00, 0.00, 0.01, 0.00, 0.00, 0.00],  # spread= 0%
+            [0.00, 0.01, 0.02, 0.00, 0.00, 0.00],  # spread= 1%
+            [0.00, 0.02, 0.05, 0.03, 0.005, 0.00], # spread= 2%
+            [0.01, 0.05, 0.10, 0.07, 0.02, 0.00],  # spread= 3%
+        ]),
+    )
+
+    # Create prepayment observer with semi-annual observations
+    prepayment_observer = PrepaymentSurfaceObserver(
+        surface=surface,
+        fixed_market_rate=0.04,   # Current market rate for spread calculation
+        prepayment_cycle="6M",    # Observe every 6 months
+        model_id="ppm01",
+    )
+
+    # Define PAM contract
+    attrs = ContractAttributes(
+        contract_id="MORTGAGE-001",
+        contract_type=ContractType.PAM,
+        contract_role=ContractRole.RPA,
+        status_date=ActusDateTime(2024, 1, 1),
+        initial_exchange_date=ActusDateTime(2024, 1, 15),
+        maturity_date=ActusDateTime(2034, 1, 15),
+        notional_principal=500_000.0,
+        nominal_interest_rate=0.065,
+        interest_payment_cycle="1M",
+        interest_payment_anchor=ActusDateTime(2024, 2, 15),
+        currency="USD",
+    )
+
+    # Create contract and simulate with behavioral observer
+    rf_observer = ConstantRiskFactorObserver(0.0)
+    contract = create_contract(attrs, rf_observer)
+    result = contract.simulate(behavior_observers=[prepayment_observer])
+
+    # Callout events inject PP (Principal Prepayment) observations into the timeline
+    for event in result.events:
+        print(f"{event.event_type}: {event.event_time} -> ${event.payoff:.2f}")
+
+Scenario Management
+^^^^^^^^^^^^^^^^^^^^
+
+The ``Scenario`` class bundles market and behavioral observers into a single,
+named, reusable simulation configuration. This enables easy comparison between
+different simulation environments (e.g., base case vs. stress scenarios).
+
+**Example: Creating and using a Scenario**::
+
+    from jactus.observers import ConstantRiskFactorObserver
+    from jactus.observers.scenario import Scenario
+    from jactus.observers.prepayment import PrepaymentSurfaceObserver
+
+    # Base case: low rates, moderate prepayment
+    base_scenario = Scenario(
+        scenario_id="base-case",
+        description="Stable rates with moderate prepayment behavior",
+        market_observers={
+            "rates": ConstantRiskFactorObserver(0.04),
+        },
+        behavior_observers={
+            "prepayment": prepayment_observer,
+        },
+    )
+
+    # Stress scenario: rising rates, no prepayment
+    stress_scenario = Scenario(
+        scenario_id="rising-rates",
+        description="Rising rate environment, no prepayment",
+        market_observers={
+            "rates": ConstantRiskFactorObserver(0.07),
+        },
+        behavior_observers={},
+    )
+
+    # Run both scenarios and compare
+    base_result = contract.simulate(scenario=base_scenario)
+    stress_result = contract.simulate(scenario=stress_scenario)
+
+    print(f"Base case net cashflow:   {sum(e.payoff for e in base_result.events):,.2f}")
+    print(f"Stress case net cashflow: {sum(e.payoff for e in stress_result.events):,.2f}")
+
+A scenario provides two key methods:
+
+* ``get_observer()`` -- Returns a unified ``RiskFactorObserver`` composing all
+  market observers, suitable for passing to the simulation engine.
+* ``get_callout_events(attributes)`` -- Collects and merges callout events from
+  all behavioral observers, sorted by time.
+
+**Callout Event Integration in** ``BaseContract.simulate()``
+
+The ``simulate()`` method on ``BaseContract`` natively supports behavioral observers.
+When behavioral observers are provided (via a ``Scenario``, the ``behavior_observers``
+parameter, or as the ``risk_factor_observer`` itself), the simulation engine:
+
+1. Calls ``contract_start()`` on each behavioral observer to collect callout events
+2. Merges callout events into the scheduled event timeline
+3. At each callout time, evaluates the behavioral observer with the current state
+
+This means no special setup is required beyond creating the behavioral observer and
+passing it to ``simulate()``.
+
 See Also
 --------
 

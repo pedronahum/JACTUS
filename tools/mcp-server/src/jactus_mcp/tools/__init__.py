@@ -1,6 +1,6 @@
 """JACTUS MCP Tools."""
 
-from . import contracts, examples, validation, documentation, system, simulate
+from . import contracts, documentation, examples, simulate, system, validation
 from ._utils import get_jactus_root
 
 __all__ = [

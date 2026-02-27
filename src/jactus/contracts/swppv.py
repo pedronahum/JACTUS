@@ -56,6 +56,8 @@ from jactus.core import (
 from jactus.core.types import DayCountConvention
 from jactus.functions import BasePayoffFunction, BaseStateTransitionFunction
 from jactus.observers import RiskFactorObserver
+from jactus.observers.behavioral import BehaviorRiskFactorObserver
+from jactus.observers.scenario import Scenario
 from jactus.utilities import year_fraction
 from jactus.utilities.schedules import generate_schedule
 
@@ -988,6 +990,8 @@ class PlainVanillaSwapContract(BaseContract):
         self,
         risk_factor_observer: RiskFactorObserver | None = None,
         child_contract_observer: Any = None,
+        scenario: Scenario | None = None,
+        behavior_observers: list[BehaviorRiskFactorObserver] | None = None,
     ) -> SimulationHistory:
         """Simulate SWPPV contract.
 
@@ -995,7 +999,10 @@ class PlainVanillaSwapContract(BaseContract):
         terminationDate. The full event schedule is processed for state
         computation, but only visible events are returned.
         """
-        result = super().simulate(risk_factor_observer, child_contract_observer)
+        result = super().simulate(
+            risk_factor_observer, child_contract_observer,
+            scenario=scenario, behavior_observers=behavior_observers,
+        )
 
         # Filter events: keep only PRD onwards when purchaseDate is set
         if self.attributes.purchase_date:

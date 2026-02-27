@@ -158,8 +158,9 @@ def year_fraction(
 │               │  │                │  │              │
 │ • 18 types    │  │ • RiskFactor   │  │ • Schedules  │
 │ • Principal   │  │ • ChildContract│  │ • Conventions│
-│ • Derivative  │  │ • Constant     │  │ • Calendars  │
-│ • Exotic      │  │                │  │ • Math       │
+│ • Derivative  │  │ • Behavioral   │  │ • Calendars  │
+│ • Exotic      │  │ • Scenario     │  │ • Math       │
+│               │  │                │  │ • Surface2D  │
 └───────────────┘  └────────────────┘  └──────────────┘
         │                   │                   │
         └───────────────────┼───────────────────┘
@@ -201,10 +202,11 @@ def year_fraction(
 |-------|---------|----------------|
 | **Application** | User-facing functionality | Contract modeling, simulation, analytics |
 | **Contracts** | 18 ACTUS implementations | PAM, LAM, ANN, STK, COM, FXOUT, SWAPS, etc. |
+| **Observers** | Market data + behavioral models | RiskFactor, Behavioral, Scenario |
 | **Engine** | Simulation orchestration | LifecycleEngine, SimulationEngine |
 | **Functions** | ACTUS logic | PayoffFunction, StateTransitionFunction |
 | **Core** | Fundamental types | State, Attributes, Events, DateTime |
-| **Utilities** | Helper functions | Schedules, conventions, calendars |
+| **Utilities** | Helper functions | Schedules, conventions, calendars, Surface2D |
 | **Foundation** | JAX framework | Arrays, JIT, vmap, grad |
 
 ---
@@ -414,6 +416,95 @@ contract = create_contract(attrs, rf_obs)  # Auto-selects PAM implementation
 
 **File**: `src/jactus/contracts/__init__.py`
 
+### 8. Behavioral Risk Factor Observers
+
+**Purpose**: Model state-dependent risk factors (prepayment, deposit behavior) that depend on the contract's internal state and can inject events into the simulation schedule.
+
+**Key Distinction from Market Observers**: Market risk factor observers return values based solely on an identifier and time (e.g., a yield curve lookup). Behavioral observers are aware of contract state (notional, interest rate, age, performance status) and dynamically inject **callout events** into the simulation timeline.
+
+**Core Types**:
+
+- `CalloutEvent` — Frozen dataclass representing an event a behavioral model requests be added to the simulation schedule. Fields: `model_id`, `time`, `callout_type` (e.g., `"MRD"`, `"AFD"`), and optional `metadata`.
+- `BehaviorRiskFactorObserver` — `runtime_checkable` Protocol extending `RiskFactorObserver` with a `contract_start(attributes)` method that returns a list of `CalloutEvent` objects.
+- `BaseBehaviorRiskFactorObserver` — Abstract base class extending `BaseRiskFactorObserver` with abstract `contract_start()`. Subclasses implement `_get_risk_factor()` (state-aware), `_get_event_data()`, and `contract_start()`.
+
+**Callout Event Mechanism**:
+
+When `BaseContract.simulate()` is called with behavioral observers (via a `Scenario` or explicitly), the engine:
+1. Calls `contract_start(attributes)` on each behavioral observer to collect callout events.
+2. Merges the callout events into the scheduled event timeline (sorted by time).
+3. During simulation, when a callout event is reached, the behavioral observer is evaluated with the current contract state.
+
+**Callout Types**:
+- `"MRD"` (Multiplicative Reduction Delta) — Used by prepayment models. Represents a fraction by which the notional principal is reduced.
+- `"AFD"` (Absolute Funded Delta) — Used by deposit transaction models. Represents an absolute change in the deposit balance.
+
+**Concrete Implementations**:
+
+| Observer | Callout Type | Use Case | File |
+|----------|-------------|----------|------|
+| `PrepaymentSurfaceObserver` | MRD | 2D surface-based prepayment model (spread x loan age) | `observers/prepayment.py` |
+| `DepositTransactionObserver` | AFD | Deposit inflows/outflows for UMP contracts | `observers/deposit_transaction.py` |
+
+**Files**: `src/jactus/observers/behavioral.py`, `src/jactus/observers/prepayment.py`, `src/jactus/observers/deposit_transaction.py`
+
+### 9. Scenario
+
+**Purpose**: Bundle market and behavioral observers into named, reusable simulation configurations.
+
+**Implementation**: Dataclass with `scenario_id`, `description`, `market_observers` dict, and `behavior_observers` dict.
+
+**Key Methods**:
+- `get_observer()` — Returns a unified `RiskFactorObserver` by composing all market observers via `CompositeRiskFactorObserver`. If only one market observer is present, returns it directly.
+- `get_callout_events(attributes)` — Calls `contract_start()` on all behavioral observers and returns the aggregated callout events sorted by time.
+- `add_market_observer(id, observer)` / `add_behavior_observer(id, observer)` — Mutators for building scenarios incrementally.
+
+**Usage**:
+```python
+from jactus.observers.scenario import Scenario
+from jactus.observers import TimeSeriesRiskFactorObserver
+from jactus.observers.prepayment import PrepaymentSurfaceObserver
+
+scenario = Scenario(
+    scenario_id="base-case",
+    description="Base case with moderate prepayment",
+    market_observers={
+        "rates": TimeSeriesRiskFactorObserver(...),
+    },
+    behavior_observers={
+        "prepayment": PrepaymentSurfaceObserver(...),
+    },
+)
+
+# Pass to simulation — market observer and callout events are handled automatically
+history = contract.simulate(scenario=scenario)
+```
+
+**Design Decisions**:
+- Scenarios separate market data (time series, curves) from behavioral models (prepayment, deposit transactions)
+- Enables easy scenario comparison (base case vs. stress) by swapping observers
+- The `Scenario` does not own contracts — it is purely an environment configuration
+
+**File**: `src/jactus/observers/scenario.py`
+
+### 10. Surface2D and LabeledSurface2D
+
+**Purpose**: JAX-compatible 2D surface interpolation, used primarily by behavioral risk models.
+
+**`Surface2D`** (frozen dataclass):
+- Defined by `x_margins` (sorted 1D array), `y_margins` (sorted 1D array), and `values` (2D array of shape `(len(x_margins), len(y_margins))`)
+- `evaluate(x, y)` performs bilinear interpolation within the grid
+- Configurable `extrapolation`: `"constant"` (clamp to nearest edge) or `"raise"` (error on out-of-bounds)
+- Serializable via `from_dict()` / `to_dict()`
+
+**`LabeledSurface2D`** (dataclass):
+- Uses string labels instead of numeric margins (e.g., contract IDs on x-axis, date strings on y-axis)
+- `get(x_label, y_label)` for exact label-based lookups
+- `get_row(x_label)` / `get_column(y_label)` for slicing
+- Used by `DepositTransactionObserver` for contract-indexed transaction schedules
+
+**File**: `src/jactus/utilities/surface.py`
+
 ---
 
 ## Data Flow
@@ -466,6 +557,39 @@ contract = create_contract(attrs, rf_obs)  # Auto-selects PAM implementation
    result = SimulationResult(events=events)
    cashflows = result.get_cashflows()
    # Returns: [(time, amount, currency), ...]
+```
+
+### Simulation with Behavioral Observers
+
+When behavioral observers are present (via a `Scenario` or passed directly), the simulation flow gains an additional phase before event processing:
+
+```
+1. USER CREATES CONTRACT + SCENARIO
+   ↓
+   scenario = Scenario(
+       market_observers={"rates": ts_observer},
+       behavior_observers={"prepay": prepayment_observer},
+   )
+   contract = create_contract(attrs, rf_obs)
+
+2. COLLECT CALLOUT EVENTS (new phase)
+   ↓
+   For each behavioral observer:
+     callout_events = observer.contract_start(attrs)
+   # Returns: [MRD(2024-07-15), MRD(2025-01-15), ...]
+
+3. MERGE INTO SCHEDULE
+   ↓
+   Callout events are inserted into the regular event schedule
+   sorted by time alongside IED, IP, MD, etc.
+   # Schedule: [IED(2024-01-15), IP(2024-07-15), MRD(2024-07-15), ...]
+
+4. PROCESS ALL EVENTS (standard + callout)
+   ↓
+   For each event in merged schedule:
+     4a. PAYOFF (POF) — behavioral events use state-aware observer
+     4b. STATE TRANSITION (STF) — callout events may modify notional
+     4c. STORE EVENT + UPDATE STATE
 ```
 
 ### State Evolution Example (PAM)
@@ -689,6 +813,66 @@ def test_lam_principal_amortizes():
     # Check principal reduces by 10k each period
     assert result.events[1].state_post.nt == 110000
     assert result.events[2].state_post.nt == 100000
+```
+
+### Adding a New Behavioral Risk Observer
+
+**Example**: Implementing a credit migration model that adjusts the interest rate based on a credit rating transition matrix.
+
+#### Step 1: Subclass BaseBehaviorRiskFactorObserver
+
+```python
+class CreditMigrationObserver(BaseBehaviorRiskFactorObserver):
+    def __init__(self, transition_matrix, observation_cycle="1Y", model_id="credit-migration"):
+        super().__init__(name=f"CreditMigration({model_id})")
+        self.transition_matrix = transition_matrix
+        self.observation_cycle = observation_cycle
+        self.model_id = model_id
+```
+
+#### Step 2: Implement `contract_start()` to Generate Callout Events
+
+```python
+    def contract_start(self, attributes):
+        from jactus.core.time import add_period
+        events = []
+        current = add_period(attributes.initial_exchange_date, self.observation_cycle)
+        while current < attributes.maturity_date:
+            events.append(CalloutEvent(
+                model_id=self.model_id,
+                time=current,
+                callout_type="MRD",  # or a custom type
+            ))
+            current = add_period(current, self.observation_cycle)
+        return events
+```
+
+#### Step 3: Implement `_get_risk_factor()` with State Awareness
+
+```python
+    def _get_risk_factor(self, identifier, time, state, attributes):
+        # Use contract state to compute risk factor
+        current_rate = float(state.ipnr)
+        credit_adjustment = self.transition_matrix.lookup(current_rate, time)
+        return jnp.array(credit_adjustment, dtype=jnp.float32)
+```
+
+#### Step 4: Implement `_get_event_data()`
+
+```python
+    def _get_event_data(self, identifier, event_type, time, state, attributes):
+        raise KeyError("No event data")
+```
+
+#### Step 5: Use with a Scenario
+
+```python
+scenario = Scenario(
+    scenario_id="credit-stress",
+    market_observers={"rates": rate_observer},
+    behavior_observers={"credit": CreditMigrationObserver(matrix)},
+)
+history = contract.simulate(scenario=scenario)
 ```
 
 ---

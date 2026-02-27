@@ -376,6 +376,8 @@ class JaxRiskFactorObserver:
 - **Testability**: Easy to mock market data for testing
 - **Flexibility**: Can plug in different data sources (historical, Monte Carlo, real-time)
 
+**Behavioral observers** (`PrepaymentSurfaceObserver`, `DepositTransactionObserver`) extend this framework by implementing the `BehaviorRiskFactorObserver` protocol. Rather than simply providing market data values, behavioral observers inject `CalloutEvent`s into the simulation timeline, enabling models like prepayment and deposit withdrawal to influence contract cash flows.
+
 **PAM Usage**:
 ```python
 # For fixed-rate loan

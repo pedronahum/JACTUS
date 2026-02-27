@@ -27,6 +27,7 @@ def search_docs(query: str) -> dict[str, Any]:
 
     results = []
     query_lower = query.lower()
+    query_words = query_lower.split()
 
     for doc_file in doc_files:
         if not doc_file.exists():
@@ -36,10 +37,11 @@ def search_docs(query: str) -> dict[str, Any]:
             content = doc_file.read_text()
             lines = content.split("\n")
 
-            # Search for query in content
+            # Search for query in content (word-based: match lines containing any query word)
             matches = []
             for i, line in enumerate(lines):
-                if query_lower in line.lower():
+                line_lower = line.lower()
+                if any(word in line_lower for word in query_words):
                     # Get context (2 lines before and after)
                     start = max(0, i - 2)
                     end = min(len(lines), i + 3)
@@ -185,6 +187,166 @@ result = contract.simulate()
 ```
 
 See examples/ for more detailed examples.
+
+## Behavioral Observers
+
+Behavioral risk factor observers extend the standard observer framework with
+state-dependent models that inject **CalloutEvents** into the simulation timeline.
+Use `behavior_observers` or `scenario` parameters in `contract.simulate()`.
+
+Available: `PrepaymentSurfaceObserver`, `DepositTransactionObserver`
+See `jactus_get_topic_guide("behavioral")` for details.
+""",
+        },
+        "behavioral": {
+            "title": "Behavioral Risk Factor Observers",
+            "content": """
+# Behavioral Risk Factor Observers
+
+Behavioral observers are state-aware risk models that inject **callout events**
+into the simulation timeline. Unlike market observers (which only look up data
+by identifier and time), behavioral observers use the contract's internal state
+(notional, interest rate, age) to compute their output.
+
+## Two-Phase Protocol
+
+1. **Registration** — At simulation start, the engine calls `contract_start(attributes)`
+   on each behavioral observer. The observer returns `CalloutEvent` objects specifying
+   when it needs to be evaluated.
+2. **Evaluation** — When the simulation reaches a callout time, it calls
+   `observe_risk_factor(identifier, time, state, attributes)` with the current
+   contract state, and the observer returns a value that drives a contract event.
+
+## Callout Types
+
+| Type | Event | Description |
+|------|-------|-------------|
+| MRD  | PP (Prepayment) | Multiplicative Reduction Delta — fraction of notional to prepay |
+| AFD  | AD (Account Debit/Credit) | Absolute Funded Delta — exact transaction amount |
+
+## Available Observers
+
+### PrepaymentSurfaceObserver
+2D surface-based prepayment model: spread (contract rate - market rate) x loan age → prepayment rate.
+
+```python
+from jactus.observers.prepayment import PrepaymentSurfaceObserver
+from jactus.utilities.surface import Surface2D
+import jax.numpy as jnp
+
+surface = Surface2D(
+    x_margins=jnp.array([0.0, 1.0, 2.0, 3.0]),   # spread %
+    y_margins=jnp.array([0.0, 1.0, 3.0, 5.0]),    # loan age (years)
+    values=jnp.array([
+        [0.00, 0.00, 0.00, 0.00],
+        [0.00, 0.01, 0.02, 0.00],
+        [0.00, 0.02, 0.05, 0.01],
+        [0.01, 0.05, 0.10, 0.02],
+    ]),
+)
+
+observer = PrepaymentSurfaceObserver(
+    surface=surface,
+    fixed_market_rate=0.03,
+    prepayment_cycle="6M",
+)
+```
+
+### DepositTransactionObserver
+Models deposit inflows/outflows for UMP contracts by contract ID and date.
+
+```python
+from jactus.observers.deposit_transaction import DepositTransactionObserver
+from jactus.core import ActusDateTime
+
+observer = DepositTransactionObserver(
+    transactions={
+        "DEP-001": [
+            (ActusDateTime(2024, 1, 1), 1000.0),   # deposit
+            (ActusDateTime(2024, 6, 1), -500.0),    # withdrawal
+        ],
+    },
+)
+```
+
+## Using with simulate()
+
+```python
+contract.simulate(behavior_observers=[observer])
+# Or via Scenario:
+from jactus.observers.scenario import Scenario
+scenario = Scenario(
+    scenario_id="base",
+    market_observers={"rates": market_obs},
+    behavior_observers={"prepayment": prepay_obs},
+)
+contract.simulate(scenario=scenario)
+```
+""",
+        },
+        "scenario": {
+            "title": "Scenario Management",
+            "content": """
+# Scenario Management
+
+A `Scenario` bundles market observers and behavioral observers into a named,
+reusable simulation configuration. This enables easy scenario comparison
+(base case vs. stress) and consistent grouping of market data with behavioral models.
+
+## Creating a Scenario
+
+```python
+from jactus.observers.scenario import Scenario
+from jactus.observers import TimeSeriesRiskFactorObserver
+from jactus.observers.prepayment import PrepaymentSurfaceObserver
+
+scenario = Scenario(
+    scenario_id="base-case",
+    description="Base case with moderate prepayment",
+    market_observers={
+        "rates": TimeSeriesRiskFactorObserver({
+            "UST-5Y": [
+                (ActusDateTime(2024, 1, 1), 0.045),
+                (ActusDateTime(2025, 1, 1), 0.035),
+            ],
+        }),
+    },
+    behavior_observers={
+        "prepayment": PrepaymentSurfaceObserver(...),
+    },
+)
+```
+
+## Using a Scenario
+
+```python
+# Pass to simulate — the scenario provides both market and behavioral observers
+contract.simulate(scenario=scenario)
+
+# Access the unified market observer
+observer = scenario.get_observer()
+
+# Collect callout events
+events = scenario.get_callout_events(attributes)
+```
+
+## Scenario Comparison
+
+```python
+base = Scenario(scenario_id="base", market_observers={...}, behavior_observers={...})
+stress = Scenario(scenario_id="stress", market_observers={...}, behavior_observers={...})
+
+base_result = contract.simulate(scenario=base)
+stress_result = contract.simulate(scenario=stress)
+```
+
+## Key Methods
+
+- `get_observer()` — returns unified `CompositeRiskFactorObserver` for all market observers
+- `get_callout_events(attributes)` — collects callout events from all behavioral observers
+- `add_market_observer(id, obs)` — add/replace a market observer
+- `add_behavior_observer(id, obs)` — add/replace a behavioral observer
+- `list_risk_factors()` — list all configured observer sources
 """,
         },
         "jax": {

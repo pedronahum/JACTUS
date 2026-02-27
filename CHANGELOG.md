@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Behavioral risk factor observer framework (`BehaviorRiskFactorObserver` protocol,
+  `BaseBehaviorRiskFactorObserver` ABC, `CalloutEvent`)
+- `PrepaymentSurfaceObserver` — 2D surface-based prepayment model (spread x loan age
+  -> prepayment rate)
+- `DepositTransactionObserver` — deposit transaction model for UMP contracts
+- `Scenario` class for bundling market and behavioral observers into named configurations
+- `Surface2D` and `LabeledSurface2D` — JAX-compatible 2D surface interpolation
+- Callout event integration in simulation engine — behavioral observers can inject events
+  into the timeline
+- MCP server updated with behavioral observer documentation in
+  `jactus_list_risk_factor_observers`
+
 ## [0.1.2] - 2026-02-24
 
 ### Added

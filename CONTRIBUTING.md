@@ -194,6 +194,15 @@ def calculate_cashflow(
 - Write both unit tests and integration tests
 - Use property-based testing (Hypothesis) where appropriate
 
+### Behavioral Observer Tests
+
+Behavioral risk factor observers (`PrepaymentSurfaceObserver`, `DepositTransactionObserver`) and their supporting utilities (`Surface2D`, `LabeledSurface2D`) have dedicated test files:
+
+- `tests/unit/observers/test_behavioral.py` — tests for behavioral observer implementations
+- `tests/unit/utilities/test_surface.py` — tests for 2D surface interpolation utilities
+
+When modifying or extending the behavioral observer framework, ensure these tests pass and add coverage for any new behavior.
+
 ### Test Structure
 
 ```python

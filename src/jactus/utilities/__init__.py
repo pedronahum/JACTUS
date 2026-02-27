@@ -30,6 +30,7 @@ from jactus.utilities.schedules import (
     generate_array_schedule,
     generate_schedule,
 )
+from jactus.utilities.surface import LabeledSurface2D, Surface2D
 
 __all__ = [
     # Schedule generation
@@ -61,4 +62,7 @@ __all__ = [
     "compound_factor_vectorized",
     "present_value",
     "present_value_vectorized",
+    # 2D Surface interpolation
+    "Surface2D",
+    "LabeledSurface2D",
 ]

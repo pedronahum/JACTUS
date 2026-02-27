@@ -778,6 +778,41 @@ def list_risk_factor_observers() -> dict[str, Any]:
                 "use_case": "Automatic differentiation, sensitivity analysis, batch scenarios",
                 "python_only": True,
             },
+            "PrepaymentSurfaceObserver": {
+                "description": (
+                    "Behavioral model: 2D surface-based prepayment model "
+                    "(spread × loan age → prepayment rate). State-aware — uses "
+                    "contract's nominal interest rate and initial exchange date."
+                ),
+                "use_case": "Mortgage-backed securities, CLO modeling, loan portfolio prepayment",
+                "python_only": True,
+                "behavioral": True,
+                "callout_type": "MRD (Multiplicative Reduction Delta)",
+            },
+            "DepositTransactionObserver": {
+                "description": (
+                    "Behavioral model: models deposit inflows/outflows as a function "
+                    "of contract ID and date for UMP contracts."
+                ),
+                "use_case": "Bank balance sheet modeling, deposit behavior for UMP contracts",
+                "python_only": True,
+                "behavioral": True,
+                "callout_type": "AFD (Absolute Funded Delta)",
+            },
+        },
+        "behavioral_observers": {
+            "description": (
+                "Behavioral observers are state-aware risk models that can inject "
+                "callout events into the simulation timeline. Unlike market observers "
+                "that only look up data by identifier and time, behavioral observers "
+                "use the contract's internal state (notional, interest rate, age, etc.) "
+                "to compute their output."
+            ),
+            "available": ["PrepaymentSurfaceObserver", "DepositTransactionObserver"],
+            "scenario_management": (
+                "Use the Scenario class to bundle market observers with behavioral "
+                "observers into named, reusable simulation configurations."
+            ),
         },
         "guidance": {
             "simple_fixed_rate": (
@@ -791,6 +826,15 @@ def list_risk_factor_observers() -> dict[str, Any]:
             "time_varying_rates": (
                 "Use time_series for floating-rate contracts with rate resets "
                 "that need temporal market data"
+            ),
+            "behavioral_models": (
+                "Use PrepaymentSurfaceObserver for prepayment modeling or "
+                "DepositTransactionObserver for UMP deposit behavior. "
+                "These require the Python API."
+            ),
+            "scenario_management": (
+                "Use the Scenario class to bundle multiple observers into a "
+                "named configuration. Pass scenario=my_scenario to simulate()."
             ),
             "advanced": (
                 "For yield curves, composites, callbacks, or JAX gradients, "

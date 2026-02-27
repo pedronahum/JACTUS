@@ -20,6 +20,8 @@ JACTUS is a Python library that implements the **ACTUS (Algorithmic Contract Typ
 
 - **High Performance**: Leverages JAX's JIT compilation and GPU acceleration
 - **Automatic Differentiation**: Built-in support for gradient-based risk analytics
+- **Behavioral Risk Models**: Prepayment surfaces, deposit behavior, and dynamic event injection via callout events
+- **Scenario Management**: Bundle market and behavioral observers into named configurations
 - **Type Safety**: Full type annotations with mypy support
 - **Comprehensive**: Implements the complete ACTUS standard
 - **Well Tested**: 276 official ACTUS cross-validation test cases passing across all 18 contract types
@@ -118,6 +120,29 @@ JACTUS implements **18 ACTUS contract types** covering the complete ACTUS specif
 - **CEC** - Credit Enhancement Collateral (collateral management)
 
 **Test Coverage:** 1,200+ unit/integration tests plus 276 official ACTUS cross-validation cases passing across all 18 contract types
+
+## Risk Factor and Behavioral Observers
+
+JACTUS provides a layered observer framework for market data and behavioral modeling:
+
+### Market Risk Factor Observers
+- **ConstantRiskFactorObserver** - Fixed constant value for all risk factors
+- **DictRiskFactorObserver** - Per-identifier static values
+- **TimeSeriesRiskFactorObserver** - Time-varying market data with step/linear interpolation
+- **CurveRiskFactorObserver** - Yield/rate curves keyed by tenor
+- **CompositeRiskFactorObserver** - Priority-based fallback across multiple observers
+- **CallbackRiskFactorObserver** - Delegates to user-provided callables
+- **JaxRiskFactorObserver** - Differentiable JAX-native observer for gradient-based analytics
+
+### Behavioral Risk Factor Observers
+- **BehaviorRiskFactorObserver** protocol and **BaseBehaviorRiskFactorObserver** ABC for custom behavioral models
+- **PrepaymentSurfaceObserver** - 2D surface-based prepayment model (spread x loan age -> prepayment rate)
+- **DepositTransactionObserver** - Deposit transaction behavior model for UMP contracts
+- **CalloutEvent** - Dynamic event injection allowing behavioral observers to add events to the simulation timeline
+
+### Scenario Management
+- **Scenario** - Bundle market and behavioral observers into named configurations for reproducible analysis
+- **Surface2D** / **LabeledSurface2D** - JAX-compatible 2D surface interpolation utilities
 
 ## Documentation
 
@@ -317,7 +342,7 @@ jactus/
 │   ├── core/               # Core type definitions and enums
 │   ├── utilities/          # Date/time and calendar utilities
 │   ├── functions/          # Payoff and state transition functions
-│   ├── observers/          # Risk factor observers
+│   ├── observers/          # Risk factor and behavioral observers
 │   ├── engine/             # Event generation and simulation engines
 │   ├── contracts/          # 18 ACTUS contract implementations
 │   │   ├── base.py         # BaseContract abstract class

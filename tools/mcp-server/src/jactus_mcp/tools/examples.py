@@ -2,7 +2,6 @@
 
 import subprocess
 import sys
-from pathlib import Path
 from typing import Any
 
 from ._utils import get_jactus_root

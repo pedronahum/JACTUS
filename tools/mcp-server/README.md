@@ -131,6 +131,7 @@ The MCP server provides 15 tools to AI assistants:
 | `jactus_get_contract_info` | Get detailed info about a contract type |
 | `jactus_get_contract_schema` | Get required/optional parameters for all 18 types |
 | `jactus_get_event_types` | List all ACTUS event types |
+| `jactus_list_risk_factor_observers` | List all risk factor observer types with usage guidance |
 | `jactus_simulate_contract` | **Simulate a contract and get structured cash flows** |
 
 ### Example Tools
@@ -193,6 +194,13 @@ You can also provide risk factors for market-data-dependent contracts:
   "risk_factors": {"LIBOR-3M": 0.05, "USD/EUR": 1.18}
 }
 ```
+
+### Risk Factor Observers
+
+Use `jactus_list_risk_factor_observers` to discover all available observer types. JACTUS provides two categories:
+
+- **Standard observers**: `ConstantRiskFactorObserver`, `DictRiskFactorObserver`, `TimeSeriesRiskFactorObserver`, etc. Some are available via MCP simulation (constant, dict, time series); others require the Python API.
+- **Behavioral observers**: `PrepaymentSurfaceObserver`, `DepositTransactionObserver` — these extend the observer framework with behavioral models that inject `CalloutEvent`s into the simulation timeline. Behavioral observers are Python-API only but discoverable via the `jactus_list_risk_factor_observers` MCP tool.
 
 ## MCP Resources
 
