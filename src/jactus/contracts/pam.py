@@ -74,6 +74,27 @@ from jactus.observers import ChildContractObserver, RiskFactorObserver
 from jactus.utilities import contract_role_sign, generate_schedule, year_fraction
 
 
+def _last_cycle_date_before(
+    anchor: ActusDateTime,
+    cycle: str,
+    target: ActusDateTime,
+) -> ActusDateTime:
+    """Find the last date in a cycle sequence that is <= target.
+
+    Walks forward from *anchor* by *cycle* until exceeding *target*,
+    then returns the previous step.  Used to compute the correct
+    accrual start for contracts whose IED predates the status date.
+    """
+    from jactus.core.time import add_period
+
+    current = anchor
+    while True:
+        next_date = add_period(current, cycle)
+        if next_date > target:
+            return current
+        current = next_date
+
+
 class PAMPayoffFunction(BasePayoffFunction):
     """Payoff function for PAM contracts.
 
@@ -1203,6 +1224,12 @@ class PrincipalAtMaturityContract(BaseContract):
                 if attrs.accrued_interest is not None:
                     ipac = attrs.accrued_interest
                 elif accrual_start and accrual_start < sd:
+                    # Walk forward through the IP cycle to find the last
+                    # payment date before SD — past IP events reset ipac.
+                    if attrs.interest_payment_cycle and accrual_start < sd:
+                        accrual_start = _last_cycle_date_before(
+                            accrual_start, attrs.interest_payment_cycle, sd
+                        )
                     yf = year_fraction(accrual_start, sd, dcc)
                     ipac = yf * ipnr * abs(nt)
                 else:

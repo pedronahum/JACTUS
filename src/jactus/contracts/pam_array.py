@@ -1173,6 +1173,14 @@ def _fast_pam_init_state(
             elif accrual_start and accrual_start < sd:
                 from jactus.core.types import DayCountConvention
 
+                # Walk forward through the IP cycle to find the last
+                # payment date before SD — past IP events reset ipac.
+                if attrs.interest_payment_cycle:
+                    from jactus.contracts.pam import _last_cycle_date_before
+
+                    accrual_start = _last_cycle_date_before(
+                        accrual_start, attrs.interest_payment_cycle, sd
+                    )
                 dcc = attrs.day_count_convention or DayCountConvention.A360
                 ipac = year_fraction(accrual_start, sd, dcc) * ipnr * abs(nt)
             else:

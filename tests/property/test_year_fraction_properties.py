@@ -113,9 +113,13 @@ class TestYearFractionBounds:
 
         yf = abs(year_fraction(date1, date2, dcc))
 
-        # Year fraction should not exceed year diff by more than 1 year
-        # (accounting for day of year differences)
-        assert yf <= year_diff + 1.1, (
+        # BUS252 counts weekdays / 252; a Mon-Fri calendar has ~261 weekdays
+        # per year, so the ratio ~1.036 accumulates over multi-year spans.
+        max_slack = 1.5 if dcc == DayCountConvention.BUS252 else 1.1
+
+        # Year fraction should not exceed year diff by more than max_slack
+        # (accounting for day of year differences and convention specifics)
+        assert yf <= year_diff + max_slack, (
             f"Year fraction {yf} too large for {year_diff} year difference"
         )
 

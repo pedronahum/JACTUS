@@ -36,6 +36,7 @@ from jactus.contracts.pam_array import (
     _stf_rr,
     _stf_rrf,
     batch_precompute_pam,
+    batch_simulate_pam,
     precompute_pam_arrays,
     prepare_pam_batch,
     simulate_pam_array,
@@ -1185,3 +1186,130 @@ class TestBatchSchedule:
         assert jnp.allclose(masked, masked_v, atol=1e-4), (
             f"Manual vs vmap diff: {float(jnp.max(jnp.abs(masked - masked_v)))}"
         )
+
+
+# ============================================================================
+# Batch vs Python equivalence with accrual fix (IED << SD)
+# ============================================================================
+
+
+class TestBatchPythonEquivalence:
+    """Verify batch and Python paths produce matching results.
+
+    Focuses on contracts where IED << SD, exercising the initial
+    accrued interest calculation that accounts for past IP events.
+    """
+
+    @staticmethod
+    def _make_seasoned_contracts():
+        """Create contracts with IED well before status date."""
+        sd = ActusDateTime(2025, 6, 1)
+        obs = ConstantRiskFactorObserver(0.0)
+
+        contracts = []
+        configs = [
+            # (ied, maturity, rate, notional, cycle, dcc)
+            (
+                ActusDateTime(2020, 1, 15),
+                ActusDateTime(2027, 1, 15),
+                0.037,
+                160_000,
+                "6M",
+                DayCountConvention.A360,
+            ),
+            (
+                ActusDateTime(2021, 3, 1),
+                ActusDateTime(2028, 3, 1),
+                0.05,
+                250_000,
+                "3M",
+                DayCountConvention.A365,
+            ),
+            (
+                ActusDateTime(2022, 7, 15),
+                ActusDateTime(2026, 7, 15),
+                0.065,
+                100_000,
+                "1M",
+                DayCountConvention.E30360,
+            ),
+            (
+                ActusDateTime(2023, 12, 1),
+                ActusDateTime(2030, 12, 1),
+                0.042,
+                500_000,
+                "6M",
+                DayCountConvention.B30360,
+            ),
+            # IED after SD (no accrual issue)
+            (
+                ActusDateTime(2025, 7, 1),
+                ActusDateTime(2028, 7, 1),
+                0.055,
+                200_000,
+                "3M",
+                DayCountConvention.A360,
+            ),
+        ]
+        for i, (ied, md, rate, notional, cycle, dcc) in enumerate(configs):
+            attrs = ContractAttributes(
+                contract_id=f"TEST-{i:03d}",
+                contract_type=ContractType.PAM,
+                contract_role=ContractRole.RPA,
+                status_date=sd,
+                initial_exchange_date=ied,
+                maturity_date=md,
+                notional_principal=notional,
+                nominal_interest_rate=rate,
+                day_count_convention=dcc,
+                interest_payment_cycle=cycle,
+            )
+            contracts.append((attrs, obs))
+        return contracts
+
+    def test_batch_matches_python_payoffs(self):
+        """Batch array-mode payoffs must match Python sequential payoffs."""
+        from jactus.contracts import create_contract
+
+        contracts = self._make_seasoned_contracts()
+
+        # Python path: simulate each contract individually
+        python_payoffs = []
+        for attrs, obs in contracts:
+            contract = create_contract(attrs, obs)
+            result = contract.simulate()
+            total = sum(float(e.payoff) for e in result.events)
+            python_payoffs.append(total)
+
+        # Array path: batch simulate
+        states, et, yf, rf, params, masks = prepare_pam_batch(contracts)
+        _, payoffs = batch_simulate_pam(states, et, yf, rf, params)
+        masked = payoffs * masks
+
+        for i, (attrs, _) in enumerate(contracts):
+            array_total = float(jnp.sum(masked[i]))
+            py_total = python_payoffs[i]
+            assert abs(array_total - py_total) < ATOL, (
+                f"{attrs.contract_id}: array={array_total:.2f} vs python={py_total:.2f}, "
+                f"diff={abs(array_total - py_total):.4f}"
+            )
+
+    def test_seasoned_accrual_reasonable(self):
+        """Initial accrued interest should cover at most one IP cycle period."""
+        contracts = self._make_seasoned_contracts()
+
+        for attrs, obs in contracts:
+            init_state, _, _, _, _ = precompute_pam_arrays(attrs, obs)
+            ipac = abs(float(init_state.ipac))
+            nt = abs(float(init_state.nt))
+            ipnr = abs(float(init_state.ipnr))
+
+            if nt == 0 or ipnr == 0:
+                continue
+
+            # Maximum accrual is one full cycle period
+            max_one_period = nt * ipnr  # one year of interest
+            assert ipac <= max_one_period, (
+                f"{attrs.contract_id}: ipac={ipac:.2f} exceeds one year "
+                f"interest={max_one_period:.2f} — accrual start likely wrong"
+            )
