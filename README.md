@@ -7,6 +7,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://pedronahum.github.io/JACTUS/)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/pedronahum/JACTUS/blob/main/examples/notebooks/00_getting_started_pam.ipynb)
+[![GPU Benchmark](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/pedronahum/JACTUS/blob/main/examples/notebooks/05_gpu_tpu_portfolio_benchmark.ipynb)
 
 <p align="center">
   <img src="docs/jactus-demo.gif" alt="JACTUS Demo">
@@ -284,6 +285,7 @@ Hands-on tutorials with visualizations in `examples/notebooks/`:
 - **[02 - Options Contracts](examples/notebooks/02_options_contracts.ipynb)** - Call/Put options with payoff diagrams
 - **[03 - Interest Rate Cap](examples/notebooks/03_interest_rate_cap.ipynb)** - Interest rate protection scenarios
 - **[04 - Stock & Commodity](examples/notebooks/04_stock_commodity.ipynb)** - Asset position tracking
+- **[05 - GPU/TPU Portfolio Benchmark](examples/notebooks/05_gpu_tpu_portfolio_benchmark.ipynb)** - Array-mode PAM with 50K contracts [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/pedronahum/JACTUS/blob/main/examples/notebooks/05_gpu_tpu_portfolio_benchmark.ipynb)
 
 ### Python Scripts
 
