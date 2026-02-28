@@ -1854,14 +1854,34 @@ def _jax_batch_year_fractions(
     return yf
 
 
+def _batch_precompute_pam_impl(
+    params: _BatchContractParams,
+    max_ip: int,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """Inner implementation for batch pre-computation (pure JAX)."""
+    ip_ords, ip_valid = _jax_batch_ip_schedule(params, max_ip)
+    evt_types, evt_ords, evt_valid, _n_events = _jax_batch_assemble(
+        params, ip_ords, ip_valid
+    )
+    yf = _jax_batch_year_fractions(evt_ords, evt_valid, params)
+    rf = jnp.zeros_like(yf)  # no RR/FP/SC in batch-eligible contracts
+    masks = evt_valid.astype(jnp.float32)
+    return evt_types, yf, rf, masks
+
+
+_batch_precompute_pam_jit = jax.jit(
+    _batch_precompute_pam_impl, static_argnums=(1,)
+)
+
+
 def batch_precompute_pam(
     params: _BatchContractParams,
     max_ip: int,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """JAX-native batch schedule generation + year fractions.
 
-    Pure JAX function — JIT-compilable, GPU/TPU-ready.  Can be composed
-    with ``batch_simulate_pam`` under a single ``jax.jit``.
+    Wraps a JIT-compiled kernel.  ``max_ip`` is a compile-time constant
+    (recompiles only when ``max_ip`` changes).
 
     Args:
         params: Batch contract parameters (shape ``(N,)`` per field).
@@ -1871,14 +1891,7 @@ def batch_precompute_pam(
         ``(event_types, year_fractions, rf_values, masks)`` —
         all shape ``(N, max_events)`` where ``max_events = max_ip + 3``.
     """
-    ip_ords, ip_valid = _jax_batch_ip_schedule(params, max_ip)
-    evt_types, evt_ords, evt_valid, _n_events = _jax_batch_assemble(
-        params, ip_ords, ip_valid
-    )
-    yf = _jax_batch_year_fractions(evt_ords, evt_valid, params)
-    rf = jnp.zeros_like(yf)  # no RR/FP/SC in batch-eligible contracts
-    masks = evt_valid.astype(jnp.float32)
-    return evt_types, yf, rf, masks
+    return _batch_precompute_pam_jit(params, max_ip)
 
 
 def _raw_to_jax(
@@ -2024,6 +2037,92 @@ def _prepare_pam_batch_sequential(
     return _raw_list_to_jax_batch(raw_list)
 
 
+def _extract_batch_states_and_params(
+    contracts: list[tuple[ContractAttributes, "RiskFactorObserver"]],
+    indices: list[int],
+) -> tuple[PAMArrayState, PAMArrayParams]:
+    """Extract initial states and simulation params in bulk NumPy.
+
+    Replaces the per-contract loop over ``_fast_pam_init_state`` +
+    ``_extract_params_raw`` with a single vectorised pass.
+
+    Returns JAX arrays ready for the simulation kernel.
+    """
+    from jactus.core.types import DayCountConvention
+
+    n = len(indices)
+    _int_fields = {"fee_basis", "penalty_type"}
+
+    # Pre-allocate NumPy arrays for states
+    s_nt = np.zeros(n, dtype=np.float32)
+    s_ipnr = np.zeros(n, dtype=np.float32)
+    s_ipac = np.zeros(n, dtype=np.float32)
+    s_feac = np.zeros(n, dtype=np.float32)
+    s_nsc = np.ones(n, dtype=np.float32)
+    s_isc = np.ones(n, dtype=np.float32)
+
+    # Pre-allocate NumPy arrays for params
+    p_arrays: dict[str, np.ndarray] = {
+        k: np.zeros(n, dtype=np.int32 if k in _int_fields else np.float32)
+        for k in PAMArrayParams._fields
+    }
+
+    for j, idx in enumerate(indices):
+        attrs, _ = contracts[idx]
+        nt, ipnr, ipac, feac, nsc, isc, _ = _fast_pam_init_state(attrs)
+        s_nt[j] = nt
+        s_ipnr[j] = ipnr
+        s_ipac[j] = ipac
+        s_feac[j] = feac
+        s_nsc[j] = nsc
+        s_isc[j] = isc
+
+        p = _extract_params_raw(attrs)
+        for k in PAMArrayParams._fields:
+            p_arrays[k][j] = p[k]
+
+    # Single NumPy → JAX transfer
+    states = PAMArrayState(
+        nt=jnp.asarray(s_nt),
+        ipnr=jnp.asarray(s_ipnr),
+        ipac=jnp.asarray(s_ipac),
+        feac=jnp.asarray(s_feac),
+        nsc=jnp.asarray(s_nsc),
+        isc=jnp.asarray(s_isc),
+    )
+    params = PAMArrayParams(
+        **{k: jnp.asarray(p_arrays[k]) for k in PAMArrayParams._fields}
+    )
+    return states, params
+
+
+def _prepare_pam_batch_all_eligible(
+    contracts: list[tuple[ContractAttributes, RiskFactorObserver]],
+    batch_idx: list[int],
+) -> tuple[PAMArrayState, jnp.ndarray, jnp.ndarray, jnp.ndarray, PAMArrayParams, jnp.ndarray]:
+    """Fast path when ALL contracts are batch-eligible.
+
+    Avoids the JAX→NumPy→JAX round-trip used by the mixed batch/fallback
+    path.  Schedule arrays stay as JAX arrays throughout.
+    """
+    bp = _extract_batch_params(contracts, batch_idx)
+    max_ip = _compute_max_ip(bp)
+
+    evt_types, yf, rf, masks = batch_precompute_pam(bp, max_ip)
+
+    # Trim trailing NOP padding
+    actual_max = int(masks.sum(axis=1).max())
+    evt_types = evt_types[:, :actual_max]
+    yf = yf[:, :actual_max]
+    rf = rf[:, :actual_max]
+    masks = masks[:, :actual_max]
+
+    # Extract states + params (NumPy bulk → single JAX transfer)
+    states, params = _extract_batch_states_and_params(contracts, batch_idx)
+
+    return states, evt_types, yf, rf, params, masks
+
+
 def prepare_pam_batch(
     contracts: list[tuple[ContractAttributes, RiskFactorObserver]],
 ) -> tuple[PAMArrayState, jnp.ndarray, jnp.ndarray, jnp.ndarray, PAMArrayParams, jnp.ndarray]:
@@ -2033,6 +2132,9 @@ def prepare_pam_batch(
     schedules and year fractions generated via a JAX-native batch path
     (GPU/TPU-ready).  Ineligible contracts fall back to per-contract
     Python pre-computation.
+
+    When **all** contracts are batch-eligible, a fast path avoids the
+    JAX→NumPy→JAX round-trip, keeping schedule arrays on-device.
 
     Args:
         contracts: List of ``(attributes, rf_observer)`` pairs.
@@ -2049,7 +2151,11 @@ def prepare_pam_batch(
     if not batch_idx:
         return _prepare_pam_batch_sequential(contracts)
 
-    # --- Batch path: JAX-native schedule + YF for eligible contracts ---
+    # --- Fast path: all contracts are batch-eligible ---
+    if not fallback_idx:
+        return _prepare_pam_batch_all_eligible(contracts, batch_idx)
+
+    # --- Mixed path: batch + fallback ---
     bp = _extract_batch_params(contracts, batch_idx)
     max_ip = _compute_max_ip(bp)
 
@@ -2099,7 +2205,7 @@ def prepare_pam_batch(
     final_rf[batch_idx_np, :max_events_batch] = np.asarray(rf_jax)
     final_mask[batch_idx_np, :max_events_batch] = np.asarray(masks_jax)
 
-    # States + params for batch contracts (fast Python field reads)
+    # States + params for batch contracts
     for j, idx in enumerate(batch_idx):
         attrs, _ = contracts[idx]
         nt, ipnr, ipac, feac, nsc, isc, _ = _fast_pam_init_state(attrs)
@@ -2179,8 +2285,8 @@ def simulate_pam_portfolio(
         batched_masks,
     ) = prepare_pam_batch(contracts)
 
-    # Run batched simulation
-    final_states, payoffs = batch_simulate_pam(
+    # Run batched simulation (auto-selects vmap on GPU/TPU, manual on CPU)
+    final_states, payoffs = batch_simulate_pam_auto(
         batched_states, batched_et, batched_yf, batched_rf, batched_params
     )
 

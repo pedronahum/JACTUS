@@ -39,6 +39,31 @@ pip install jactus
 
 **Requirements:** Python 3.10+, JAX >= 0.4.20
 
+### GPU / TPU Acceleration
+
+JACTUS runs on CPU by default. To enable hardware acceleration, install the
+appropriate JAX backend **before** or **after** installing JACTUS:
+
+```bash
+# NVIDIA GPU (CUDA 13 — recommended)
+pip install "jax[cuda13]"
+
+# NVIDIA GPU (CUDA 12)
+pip install "jax[cuda12]"
+
+# Google Cloud TPU
+pip install "jax[tpu]"
+```
+
+No code changes are required — JACTUS automatically detects the available
+backend and selects the optimal execution strategy (e.g. `vmap` on GPU/TPU,
+manual batching on CPU).
+
+> **Precision note:** The array-mode simulation path uses float32 for
+> performance. TPUs do not support float64. For CPU/GPU workloads requiring
+> full double precision, enable it before importing JACTUS:
+> `jax.config.update("jax_enable_x64", True)`
+
 For development:
 
 ```bash

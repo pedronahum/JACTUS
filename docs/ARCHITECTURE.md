@@ -937,11 +937,45 @@ for i in range(0, len(portfolio), batch_size):
     results = process_batch(batch)
 ```
 
+### GPU / TPU Acceleration
+
+The array-mode simulation path (`pam_array.py`) is designed for transparent
+hardware acceleration:
+
+- **Device dispatch**: `batch_simulate_pam_auto()` selects `jax.vmap` on
+  GPU/TPU (parallel across CUDA cores / TPU vector units) and manual batching
+  on CPU (lower dispatch overhead).
+- **JIT-compiled pre-computation**: `batch_precompute_pam()` generates event
+  schedules and year fractions as pure JAX operations, keeping data on-device.
+- **`lax.scan(unroll=8)`**: Reduces GPU kernel launches by 8× compared to
+  un-unrolled scans.
+
+No code changes are needed — install `jax[cuda13]` or `jax[tpu]` and JACTUS
+uses the accelerator automatically.
+
+#### Float Precision
+
+| Backend | Default dtype | float64 support |
+|---------|--------------|-----------------|
+| CPU     | float32      | Yes (enable with `jax_enable_x64`) |
+| GPU     | float32      | Yes (enable with `jax_enable_x64`) |
+| TPU     | float32      | **Not supported** |
+
+The array-mode path uses float32 throughout for performance. The ACTUS
+cross-validation tolerance is ±1.0, well within float32 range. For workloads
+requiring double precision (e.g., long-dated swaps, high notionals), enable
+64-bit mode before importing JACTUS:
+
+```python
+import jax
+jax.config.update("jax_enable_x64", True)
+```
+
 ### Potential Optimizations
 
-1. **GPU Acceleration**: Move array operations to GPU for large-scale portfolios
-2. **Parallel Simulation**: Use pmap for multi-device processing
-3. **Compiled Contracts**: JIT-compile entire contract simulations
+1. **Array-mode for more contract types**: Extend the `pam_array.py` pattern to LAM, ANN, NAM
+2. **Multi-device parallelism**: Use `jax.experimental.shard_map` for 100K+ contract portfolios
+3. **Compilation cache**: `jax.config.update("jax_compilation_cache_dir", "/tmp/jax_cache")` avoids re-JIT across runs
 4. **Cache Event Schedules**: Pre-compute and cache schedules for repeated simulations
 
 ---
