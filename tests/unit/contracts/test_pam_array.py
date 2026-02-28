@@ -872,3 +872,337 @@ class TestSTF:
         params = self._make_params(rate_reset_next=jnp.array(0.07))
         new = _stf_rrf(state, params, jnp.array(0.0), jnp.array(0.0))
         assert abs(float(new.ipnr) - 0.07) < 1e-8
+
+
+# ============================================================================
+# Batch schedule generation tests
+# ============================================================================
+
+
+from jactus.contracts.pam_array import (
+    _BatchContractParams,
+    _classify_contracts_for_batch,
+    _extract_batch_params,
+    _prepare_pam_batch_sequential,
+    batch_precompute_pam,
+    batch_simulate_pam_auto,
+    prepare_pam_batch,
+)
+
+
+class TestBatchSchedule:
+    """Tests for JAX-native batch schedule generation."""
+
+    @staticmethod
+    def _make_contracts(
+        n: int = 5,
+        cycle: str = "3M",
+        dcc: DayCountConvention = DayCountConvention.A360,
+    ) -> list[tuple[ContractAttributes, ConstantRiskFactorObserver]]:
+        rf = ConstantRiskFactorObserver(constant_value=0.0)
+        contracts = []
+        for i in range(n):
+            attrs = ContractAttributes(
+                contract_id=f"BATCH-{i:04d}",
+                contract_type=ContractType.PAM,
+                contract_role=ContractRole.RPA,
+                status_date=ActusDateTime(2024, 1, 1),
+                initial_exchange_date=ActusDateTime(2024, 1, 15),
+                maturity_date=ActusDateTime(2024 + 2 + i, 1, 15),
+                notional_principal=100_000.0,
+                nominal_interest_rate=0.04 + i * 0.005,
+                day_count_convention=dcc,
+                interest_payment_cycle=cycle,
+            )
+            contracts.append((attrs, rf))
+        return contracts
+
+    def test_batch_matches_sequential_simple(self):
+        """Batch path produces identical results to sequential for simple contracts."""
+        contracts = self._make_contracts(10)
+        states_b, et_b, yf_b, rf_b, params_b, masks_b = prepare_pam_batch(contracts)
+        states_s, et_s, yf_s, rf_s, params_s, masks_s = _prepare_pam_batch_sequential(
+            contracts
+        )
+
+        assert jnp.array_equal(et_b, et_s), "Event types differ"
+        assert jnp.allclose(yf_b, yf_s, atol=1e-6), (
+            f"Year fractions differ: max diff = {float(jnp.max(jnp.abs(yf_b - yf_s)))}"
+        )
+        assert jnp.array_equal(masks_b, masks_s), "Masks differ"
+        assert jnp.allclose(states_b.nt, states_s.nt), "States nt differ"
+        assert jnp.allclose(states_b.ipnr, states_s.ipnr), "States ipnr differ"
+        assert jnp.allclose(states_b.ipac, states_s.ipac), "States ipac differ"
+
+    def test_batch_varied_ip_cycles(self):
+        """Batch path handles different IP cycles correctly."""
+        rf = ConstantRiskFactorObserver(constant_value=0.0)
+        contracts = []
+        for cycle in ["1M", "3M", "6M", "1Y"]:
+            attrs = ContractAttributes(
+                contract_id=f"CYCLE-{cycle}",
+                contract_type=ContractType.PAM,
+                contract_role=ContractRole.RPA,
+                status_date=ActusDateTime(2024, 1, 1),
+                initial_exchange_date=ActusDateTime(2024, 1, 15),
+                maturity_date=ActusDateTime(2027, 1, 15),
+                notional_principal=100_000.0,
+                nominal_interest_rate=0.05,
+                day_count_convention=DayCountConvention.A360,
+                interest_payment_cycle=cycle,
+            )
+            contracts.append((attrs, rf))
+
+        states_b, et_b, yf_b, rf_b, params_b, masks_b = prepare_pam_batch(contracts)
+        states_s, et_s, yf_s, rf_s, params_s, masks_s = _prepare_pam_batch_sequential(
+            contracts
+        )
+
+        assert jnp.array_equal(et_b, et_s), "Event types differ for varied cycles"
+        assert jnp.allclose(yf_b, yf_s, atol=1e-6), "Year fractions differ"
+
+    def test_batch_varied_dccs(self):
+        """Batch path handles different day count conventions."""
+        for dcc in [
+            DayCountConvention.A360,
+            DayCountConvention.A365,
+            DayCountConvention.E30360,
+            DayCountConvention.B30360,
+        ]:
+            contracts = self._make_contracts(3, dcc=dcc)
+            states_b, et_b, yf_b, rf_b, _, masks_b = prepare_pam_batch(contracts)
+            states_s, et_s, yf_s, rf_s, _, masks_s = _prepare_pam_batch_sequential(
+                contracts
+            )
+            assert jnp.array_equal(et_b, et_s), f"ET differ for {dcc}"
+            assert jnp.allclose(yf_b, yf_s, atol=1e-6), (
+                f"YF differ for {dcc}: max diff = "
+                f"{float(jnp.max(jnp.abs(yf_b - yf_s)))}"
+            )
+
+    def test_batch_with_fallback_mix(self):
+        """Mix of batch-eligible and fallback contracts produces correct results."""
+        rf = ConstantRiskFactorObserver(constant_value=0.0)
+        ts_obs = TimeSeriesRiskFactorObserver(
+            {"LIBOR": [(ActusDateTime(2024, 1, 1), 0.04)]}
+        )
+
+        # Simple PAM (batch-eligible)
+        simple_attrs = ContractAttributes(
+            contract_id="SIMPLE",
+            contract_type=ContractType.PAM,
+            contract_role=ContractRole.RPA,
+            status_date=ActusDateTime(2024, 1, 1),
+            initial_exchange_date=ActusDateTime(2024, 1, 15),
+            maturity_date=ActusDateTime(2026, 1, 15),
+            notional_principal=100_000.0,
+            nominal_interest_rate=0.05,
+            day_count_convention=DayCountConvention.A360,
+            interest_payment_cycle="3M",
+        )
+
+        # PAM with rate reset (fallback)
+        rr_attrs = ContractAttributes(
+            contract_id="FLOAT",
+            contract_type=ContractType.PAM,
+            contract_role=ContractRole.RPA,
+            status_date=ActusDateTime(2024, 1, 1),
+            initial_exchange_date=ActusDateTime(2024, 1, 15),
+            maturity_date=ActusDateTime(2026, 1, 15),
+            notional_principal=100_000.0,
+            nominal_interest_rate=0.04,
+            day_count_convention=DayCountConvention.A360,
+            interest_payment_cycle="3M",
+            rate_reset_cycle="3M",
+            rate_reset_anchor=ActusDateTime(2024, 4, 15),
+            rate_reset_market_object="LIBOR",
+        )
+
+        contracts = [(simple_attrs, rf), (rr_attrs, ts_obs)]
+
+        # Classify
+        batch_idx, fallback_idx = _classify_contracts_for_batch(contracts)
+        assert batch_idx == [0], "Simple should be batch-eligible"
+        assert fallback_idx == [1], "RR should be fallback"
+
+        # Run both paths and compare
+        states_b, et_b, yf_b, rf_b, params_b, masks_b = prepare_pam_batch(contracts)
+        states_s, et_s, yf_s, rf_s, params_s, masks_s = _prepare_pam_batch_sequential(
+            contracts
+        )
+
+        assert jnp.array_equal(et_b, et_s), "ET differ for mixed batch"
+        assert jnp.allclose(yf_b, yf_s, atol=1e-6), "YF differ for mixed batch"
+
+    def test_batch_all_fallback(self):
+        """All contracts require fallback — graceful degradation."""
+        rf = ConstantRiskFactorObserver(constant_value=0.0)
+        contracts = []
+        for i in range(3):
+            attrs = ContractAttributes(
+                contract_id=f"FLOAT-{i}",
+                contract_type=ContractType.PAM,
+                contract_role=ContractRole.RPA,
+                status_date=ActusDateTime(2024, 1, 1),
+                initial_exchange_date=ActusDateTime(2024, 1, 15),
+                maturity_date=ActusDateTime(2026, 1, 15),
+                notional_principal=100_000.0,
+                nominal_interest_rate=0.05,
+                day_count_convention=DayCountConvention.A360,
+                interest_payment_cycle="3M",
+                rate_reset_cycle="3M",
+                rate_reset_anchor=ActusDateTime(2024, 4, 15),
+            )
+            contracts.append((attrs, rf))
+
+        batch_idx, fallback_idx = _classify_contracts_for_batch(contracts)
+        assert len(batch_idx) == 0
+        assert len(fallback_idx) == 3
+
+        # Should still work (falls back to sequential)
+        states, et, yf, rf_v, params, masks = prepare_pam_batch(contracts)
+        assert et.shape[0] == 3
+
+    def test_batch_single_contract(self):
+        """Single contract uses sequential path."""
+        contracts = self._make_contracts(1)
+        states, et, yf, rf_v, params, masks = prepare_pam_batch(contracts)
+        assert et.shape[0] == 1
+
+    def test_batch_stub_handling(self):
+        """Stub IP event added when MD is not on IP cycle."""
+        rf = ConstantRiskFactorObserver(constant_value=0.0)
+        # MD on 2025-06-20, IP cycle 3M from 2024-01-15
+        # Cycle dates: 4/15, 7/15, 10/15, 1/15, 4/15, ... — 6/20 is NOT on cycle
+        attrs = ContractAttributes(
+            contract_id="STUB",
+            contract_type=ContractType.PAM,
+            contract_role=ContractRole.RPA,
+            status_date=ActusDateTime(2024, 1, 1),
+            initial_exchange_date=ActusDateTime(2024, 1, 15),
+            maturity_date=ActusDateTime(2025, 6, 20),
+            notional_principal=100_000.0,
+            nominal_interest_rate=0.05,
+            day_count_convention=DayCountConvention.A360,
+            interest_payment_cycle="3M",
+        )
+        contracts = [(attrs, rf)]
+
+        states_b, et_b, yf_b, rf_b, params_b, masks_b = prepare_pam_batch(contracts)
+        states_s, et_s, yf_s, rf_s, params_s, masks_s = _prepare_pam_batch_sequential(
+            contracts
+        )
+
+        assert jnp.array_equal(et_b, et_s), (
+            f"Stub ET mismatch:\n  batch={et_b[0].tolist()}\n  seq={et_s[0].tolist()}"
+        )
+        assert jnp.allclose(yf_b, yf_s, atol=1e-6), "Stub YF mismatch"
+
+    def test_batch_ied_before_sd(self):
+        """Contracts where IED < SD (already started)."""
+        rf = ConstantRiskFactorObserver(constant_value=0.0)
+        contracts = []
+        for i in range(3):
+            attrs = ContractAttributes(
+                contract_id=f"POST-IED-{i}",
+                contract_type=ContractType.PAM,
+                contract_role=ContractRole.RPA,
+                status_date=ActusDateTime(2025, 1, 1),
+                initial_exchange_date=ActusDateTime(2024, 1, 15),
+                maturity_date=ActusDateTime(2026 + i, 1, 15),
+                notional_principal=100_000.0 + i * 50_000,
+                nominal_interest_rate=0.05,
+                day_count_convention=DayCountConvention.A360,
+                interest_payment_cycle="3M",
+            )
+            contracts.append((attrs, rf))
+
+        states_b, et_b, yf_b, rf_b, params_b, masks_b = prepare_pam_batch(contracts)
+        states_s, et_s, yf_s, rf_s, params_s, masks_s = _prepare_pam_batch_sequential(
+            contracts
+        )
+
+        assert jnp.array_equal(et_b, et_s), "IED<SD ET mismatch"
+        assert jnp.allclose(yf_b, yf_s, atol=1e-6), "IED<SD YF mismatch"
+        # Check initial states match (notional, rate)
+        assert jnp.allclose(states_b.nt, states_s.nt, atol=1e-4), "States nt differ"
+        assert jnp.allclose(states_b.ipnr, states_s.ipnr), "States ipnr differ"
+
+    def test_batch_precompute_jittable(self):
+        """batch_precompute_pam works under jax.jit."""
+        contracts = self._make_contracts(3)
+        bp = _extract_batch_params(contracts, list(range(3)))
+        from jactus.contracts.pam_array import _compute_max_ip
+
+        max_ip = _compute_max_ip(bp)
+
+        # First call (triggers JIT compilation)
+        import functools
+
+        jit_fn = functools.partial(jax.jit, static_argnums=(1,))(batch_precompute_pam)
+        et, yf, rf, masks = jit_fn(bp, max_ip)
+
+        # Second call (uses cached trace)
+        et2, yf2, rf2, masks2 = jit_fn(bp, max_ip)
+
+        assert jnp.array_equal(et, et2)
+        assert jnp.allclose(yf, yf2)
+
+    def test_classify_contracts(self):
+        """Classification criteria work correctly."""
+        rf = ConstantRiskFactorObserver(constant_value=0.0)
+        base = dict(
+            contract_type=ContractType.PAM,
+            contract_role=ContractRole.RPA,
+            status_date=ActusDateTime(2024, 1, 1),
+            initial_exchange_date=ActusDateTime(2024, 1, 15),
+            maturity_date=ActusDateTime(2026, 1, 15),
+            notional_principal=100_000.0,
+            nominal_interest_rate=0.05,
+            day_count_convention=DayCountConvention.A360,
+            interest_payment_cycle="3M",
+        )
+
+        # Eligible
+        eligible = ContractAttributes(contract_id="OK", **base)
+        # Ineligible: has RR
+        with_rr = ContractAttributes(
+            contract_id="RR",
+            **{**base, "rate_reset_cycle": "3M", "rate_reset_anchor": ActusDateTime(2024, 4, 15)},
+        )
+        # Ineligible: has PRD
+        with_prd = ContractAttributes(
+            contract_id="PRD",
+            **{**base, "purchase_date": ActusDateTime(2024, 6, 1)},
+        )
+        # Ineligible: AA day count
+        with_aa = ContractAttributes(
+            contract_id="AA",
+            **{**base, "day_count_convention": DayCountConvention.AA},
+        )
+
+        contracts = [(eligible, rf), (with_rr, rf), (with_prd, rf), (with_aa, rf)]
+        batch_idx, fallback_idx = _classify_contracts_for_batch(contracts)
+
+        assert batch_idx == [0], "Only simple should be eligible"
+        assert sorted(fallback_idx) == [1, 2, 3]
+
+    def test_unroll_does_not_change_results(self):
+        """Verify unroll=8 doesn't alter simulation results."""
+        contracts = self._make_contracts(3)
+        states, et, yf, rf, params, masks = prepare_pam_batch(contracts)
+
+        from jactus.contracts.pam_array import batch_simulate_pam
+
+        final_states, payoffs = batch_simulate_pam(states, et, yf, rf, params)
+        masked = payoffs * masks
+
+        # Compare with vmap path
+        from jactus.contracts.pam_array import batch_simulate_pam_vmap
+
+        final_v, payoffs_v = batch_simulate_pam_vmap(states, et, yf, rf, params)
+        masked_v = payoffs_v * masks
+
+        assert jnp.allclose(masked, masked_v, atol=1e-4), (
+            f"Manual vs vmap diff: {float(jnp.max(jnp.abs(masked - masked_v)))}"
+        )

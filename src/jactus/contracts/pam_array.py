@@ -58,8 +58,36 @@ NOP_EVENT_IDX: int = NUM_EVENT_TYPES  # 24 (one past the last valid EventType.in
 _USE_DATE_ARRAY: bool = True
 
 # ---------------------------------------------------------------------------
+# Batch schedule feature flag — enables JAX-native batch schedule generation.
+# Set to False to fall back to the per-contract Python loop.
+# ---------------------------------------------------------------------------
+_USE_BATCH_SCHEDULE: bool = True
+
+# ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
+
+
+class _BatchContractParams(NamedTuple):
+    """Contract parameters for JAX-native batch schedule generation.
+
+    All fields are ``jnp.ndarray`` with shape ``(N,)`` where *N* is the number
+    of batch-eligible contracts.  This structure is passed to JIT-compiled
+    functions so all fields must be JAX arrays.
+    """
+
+    ied_y: jnp.ndarray       # int32 — IED year
+    ied_m: jnp.ndarray       # int32 — IED month
+    ied_d: jnp.ndarray       # int32 — IED day
+    ied_ord: jnp.ndarray     # int32 — IED ordinal
+    md_ord: jnp.ndarray      # int32 — MD ordinal
+    sd_ord: jnp.ndarray      # int32 — SD ordinal
+    ip_anchor_y: jnp.ndarray  # int32 — IP anchor year
+    ip_anchor_m: jnp.ndarray  # int32 — IP anchor month
+    ip_anchor_d: jnp.ndarray  # int32 — IP anchor day
+    cycle_months: jnp.ndarray  # int32 — IP cycle in months
+    has_ip_cycle: jnp.ndarray  # int32 — 1 if contract has IP cycle, 0 otherwise
+    dcc_code: jnp.ndarray     # int32 — 0=A360, 1=A365, 2=E30360, 3=B30360
 
 
 class PAMArrayState(NamedTuple):
@@ -450,7 +478,7 @@ def simulate_pam_array(
         return new_state, payoff
 
     final_state, payoffs = jax.lax.scan(
-        step, initial_state, (event_types, year_fractions, rf_values)
+        step, initial_state, (event_types, year_fractions, rf_values), unroll=8
     )
     return final_state, payoffs
 
@@ -460,6 +488,28 @@ simulate_pam_array_jit = jax.jit(simulate_pam_array)
 
 # Vmapped version (kept as fallback, e.g. for GPU where vmap is efficient)
 batch_simulate_pam_vmap = jax.vmap(simulate_pam_array)
+
+
+def batch_simulate_pam_auto(
+    initial_states: PAMArrayState,
+    event_types: jnp.ndarray,
+    year_fractions: jnp.ndarray,
+    rf_values: jnp.ndarray,
+    params: PAMArrayParams,
+) -> tuple[PAMArrayState, jnp.ndarray]:
+    """Device-aware batched simulation.
+
+    Selects ``vmap`` on GPU/TPU (better parallelism across cores) and
+    manually-batched ``lax.scan`` on CPU (lower dispatch overhead).
+    """
+    backend = jax.default_backend()
+    if backend in ("gpu", "tpu"):
+        return batch_simulate_pam_vmap(
+            initial_states, event_types, year_fractions, rf_values, params
+        )
+    return batch_simulate_pam(
+        initial_states, event_types, year_fractions, rf_values, params
+    )
 
 
 # ============================================================================
@@ -638,7 +688,9 @@ def batch_simulate_pam(
         )
         return new_state, payoff
 
-    final_states, payoffs_t = jax.lax.scan(step, initial_states, (et_t, yf_t, rf_t))
+    final_states, payoffs_t = jax.lax.scan(
+        step, initial_states, (et_t, yf_t, rf_t), unroll=8
+    )
     # payoffs_t is [T, B]; transpose back to [B, T]
     return final_states, payoffs_t.T
 
@@ -1418,6 +1470,417 @@ def _np_yf_b30360(
     return days.astype(np.float64) / 360.0
 
 
+# ---------------------------------------------------------------------------
+# JAX-native batch schedule generation (GPU/TPU-ready)
+# ---------------------------------------------------------------------------
+
+# DCC encoding for batch path
+_DCC_A360 = 0
+_DCC_A365 = 1
+_DCC_E30360 = 2
+_DCC_B30360 = 3
+
+
+def _classify_contracts_for_batch(
+    contracts: list[tuple[ContractAttributes, "RiskFactorObserver"]],
+) -> tuple[list[int], list[int]]:
+    """Partition contract indices into batch-eligible vs fallback.
+
+    Batch-eligible criteria (conservative):
+    - BDC is NULL or None, EOMC is SD or None
+    - IP cycle is month-based (M, Q, H, Y), no ``+`` stub
+    - No RR/FP/SC cycles, no PRD/TD/IPCED
+    - DCC in {A360, A365, E30360, B30360}
+    """
+    from jactus.core.types import BusinessDayConvention, DayCountConvention
+
+    _BATCH_DCCS = frozenset({
+        DayCountConvention.A360,
+        DayCountConvention.A365,
+        DayCountConvention.E30360,
+        DayCountConvention.B30360,
+    })
+
+    batch_idx: list[int] = []
+    fallback_idx: list[int] = []
+
+    for i, (attrs, _obs) in enumerate(contracts):
+        # BDC / EOMC check
+        bdc = attrs.business_day_convention
+        if bdc is not None and bdc != BusinessDayConvention.NULL:
+            fallback_idx.append(i)
+            continue
+        if (
+            attrs.end_of_month_convention is not None
+            and attrs.end_of_month_convention.value != "SD"
+        ):
+            fallback_idx.append(i)
+            continue
+
+        # IP cycle must be month-based, no + stub
+        ip_cycle = attrs.interest_payment_cycle
+        if ip_cycle:
+            _mult, period, stub = _parse_cycle_fast(ip_cycle)
+            if period not in _CYCLE_MONTHS_MAP:
+                fallback_idx.append(i)
+                continue
+            if stub == "+":
+                fallback_idx.append(i)
+                continue
+
+        # No complex features
+        if (
+            attrs.rate_reset_cycle
+            or attrs.fee_payment_cycle
+            or attrs.scaling_index_cycle
+            or attrs.purchase_date
+            or attrs.termination_date
+            or attrs.interest_capitalization_end_date
+        ):
+            fallback_idx.append(i)
+            continue
+
+        # DCC check
+        dcc = attrs.day_count_convention or DayCountConvention.A360
+        if dcc not in _BATCH_DCCS:
+            fallback_idx.append(i)
+            continue
+
+        batch_idx.append(i)
+
+    return batch_idx, fallback_idx
+
+
+def _extract_batch_params(
+    contracts: list[tuple[ContractAttributes, "RiskFactorObserver"]],
+    indices: list[int],
+) -> _BatchContractParams:
+    """Extract schedule parameters into JAX arrays for batch processing."""
+    from jactus.core.types import DayCountConvention
+
+    _DCC_MAP = {
+        DayCountConvention.A360: _DCC_A360,
+        DayCountConvention.A365: _DCC_A365,
+        DayCountConvention.E30360: _DCC_E30360,
+        DayCountConvention.B30360: _DCC_B30360,
+    }
+
+    n = len(indices)
+    ied_y = np.empty(n, dtype=np.int32)
+    ied_m = np.empty(n, dtype=np.int32)
+    ied_d = np.empty(n, dtype=np.int32)
+    md_y = np.empty(n, dtype=np.int32)
+    md_m = np.empty(n, dtype=np.int32)
+    md_d = np.empty(n, dtype=np.int32)
+    sd_y = np.empty(n, dtype=np.int32)
+    sd_m = np.empty(n, dtype=np.int32)
+    sd_d = np.empty(n, dtype=np.int32)
+    ip_anchor_y = np.empty(n, dtype=np.int32)
+    ip_anchor_m = np.empty(n, dtype=np.int32)
+    ip_anchor_d = np.empty(n, dtype=np.int32)
+    cycle_months_arr = np.empty(n, dtype=np.int32)
+    has_ip_cycle_arr = np.empty(n, dtype=np.int32)
+    dcc_code_arr = np.empty(n, dtype=np.int32)
+
+    for j, idx in enumerate(indices):
+        attrs, _ = contracts[idx]
+        ied = attrs.initial_exchange_date
+        md = attrs.maturity_date
+        sd = attrs.status_date
+        assert ied is not None and md is not None
+
+        ied_dt = _adt_to_dt(ied)
+        md_dt = _adt_to_dt(md)
+        sd_dt = _adt_to_dt(sd)
+
+        ied_y[j], ied_m[j], ied_d[j] = ied_dt.year, ied_dt.month, ied_dt.day
+        md_y[j], md_m[j], md_d[j] = md_dt.year, md_dt.month, md_dt.day
+        sd_y[j], sd_m[j], sd_d[j] = sd_dt.year, sd_dt.month, sd_dt.day
+
+        ip_cycle = attrs.interest_payment_cycle
+        if ip_cycle:
+            has_ip_cycle_arr[j] = 1
+            anchor = attrs.interest_payment_anchor or ied
+            anchor_dt = _adt_to_dt(anchor)
+            ip_anchor_y[j] = anchor_dt.year
+            ip_anchor_m[j] = anchor_dt.month
+            ip_anchor_d[j] = anchor_dt.day
+            mult, period, _stub = _parse_cycle_fast(ip_cycle)
+            cycle_months_arr[j] = mult * _CYCLE_MONTHS_MAP[period]
+        else:
+            has_ip_cycle_arr[j] = 0
+            ip_anchor_y[j] = ied_dt.year
+            ip_anchor_m[j] = ied_dt.month
+            ip_anchor_d[j] = ied_dt.day
+            cycle_months_arr[j] = 12  # placeholder
+
+        dcc = attrs.day_count_convention or DayCountConvention.A360
+        dcc_code_arr[j] = _DCC_MAP.get(dcc, _DCC_A360)
+
+    # Compute ordinals via NumPy, then transfer to JAX
+    ied_ord = _np_ymd_to_ordinal(ied_y, ied_m, ied_d).astype(np.int32)
+    md_ord = _np_ymd_to_ordinal(md_y, md_m, md_d).astype(np.int32)
+    sd_ord = _np_ymd_to_ordinal(sd_y, sd_m, sd_d).astype(np.int32)
+
+    return _BatchContractParams(
+        ied_y=jnp.asarray(ied_y),
+        ied_m=jnp.asarray(ied_m),
+        ied_d=jnp.asarray(ied_d),
+        ied_ord=jnp.asarray(ied_ord),
+        md_ord=jnp.asarray(md_ord),
+        sd_ord=jnp.asarray(sd_ord),
+        ip_anchor_y=jnp.asarray(ip_anchor_y),
+        ip_anchor_m=jnp.asarray(ip_anchor_m),
+        ip_anchor_d=jnp.asarray(ip_anchor_d),
+        cycle_months=jnp.asarray(cycle_months_arr),
+        has_ip_cycle=jnp.asarray(has_ip_cycle_arr),
+        dcc_code=jnp.asarray(dcc_code_arr),
+    )
+
+
+def _compute_max_ip(params: _BatchContractParams) -> int:
+    """Compute max possible IP events across all contracts (Python)."""
+    # Use NumPy to avoid JAX int64 warnings; ordinals fit int32
+    md_np = np.asarray(params.md_ord)
+    ied_np = np.asarray(params.ied_ord)
+    cm_np = np.asarray(params.cycle_months).clip(min=1)
+    days_span = md_np.astype(np.int64) - ied_np.astype(np.int64)
+    # Conservative: assume ~28 days/month minimum
+    max_per = days_span / (cm_np.astype(np.int64) * 28)
+    return int(np.max(max_per)) + 3
+
+
+def _jax_batch_ip_schedule(
+    params: _BatchContractParams,
+    max_ip: int,
+) -> tuple[jnp.ndarray, jnp.ndarray]:
+    """Generate IP schedule dates for all contracts simultaneously (JAX-native).
+
+    Args:
+        params: Batch contract parameters with shape ``(N,)`` per field.
+        max_ip: Maximum IP events to generate (static, determines array shape).
+
+    Returns:
+        ``(ip_ordinals, ip_valid)`` — shapes ``(N, max_ip)``.
+    """
+    from jactus.utilities.date_array import _days_in_month as _jax_days_in_month
+    from jactus.utilities.date_array import _ymd_to_ordinal as _jax_ymd_to_ordinal
+
+    # step: (1, max_ip)
+    step = jnp.arange(max_ip, dtype=jnp.int32).reshape(1, -1)
+
+    # base month ordinal: (N, 1)
+    base = (
+        params.ip_anchor_y.astype(jnp.int32) * 12
+        + params.ip_anchor_m.astype(jnp.int32)
+        - 1
+    ).reshape(-1, 1)
+
+    # cycle_months: (N, 1)
+    cm = params.cycle_months.astype(jnp.int32).reshape(-1, 1)
+
+    # Broadcast: total months for all contracts × all steps — (N, max_ip)
+    total = base + step * cm
+
+    # Decompose into Y/M/D
+    gen_y = (total // 12).astype(jnp.int32)
+    gen_m = ((total % 12) + 1).astype(jnp.int32)
+
+    # Day clamping: min(anchor_day, days_in_month)
+    anchor_d = params.ip_anchor_d.reshape(-1, 1)  # (N, 1)
+    dim = _jax_days_in_month(gen_y, gen_m)  # (N, max_ip)
+    gen_d = jnp.minimum(anchor_d, dim)  # (N, max_ip)
+
+    # Compute ordinals
+    ip_ordinals = _jax_ymd_to_ordinal(gen_y, gen_m, gen_d)  # (N, max_ip)
+
+    # Validity: date >= IED and date <= MD and contract has IP cycle
+    md_ord = params.md_ord.reshape(-1, 1)
+    ied_ord = params.ied_ord.reshape(-1, 1)
+    has_ip = params.has_ip_cycle.reshape(-1, 1).astype(jnp.bool_)
+    ip_valid = (ip_ordinals >= ied_ord) & (ip_ordinals <= md_ord) & has_ip
+
+    return ip_ordinals, ip_valid
+
+
+def _jax_batch_assemble(
+    params: _BatchContractParams,
+    ip_ordinals: jnp.ndarray,
+    ip_valid: jnp.ndarray,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """Assemble full event schedules: IED + IP + stub + MD (JAX-native).
+
+    Returns:
+        ``(event_types, event_ordinals, event_valid, n_events)``
+        Shapes: ``(N, max_events)``, ``(N, max_events)``, ``(N, max_events)``, ``(N,)``.
+        ``max_events = max_ip + 3`` (IED + IP dates + stub + MD).
+    """
+    n, max_ip = ip_ordinals.shape
+    max_events = max_ip + 3
+
+    # Initialise all as NOP (padding)
+    event_types = jnp.full((n, max_events), NOP_EVENT_IDX, dtype=jnp.int32)
+    event_ordinals = jnp.zeros((n, max_events), dtype=jnp.int32)
+    event_valid = jnp.zeros((n, max_events), dtype=jnp.bool_)
+
+    # --- Column 0: IED ---
+    ied_present = params.ied_ord >= params.sd_ord  # (N,)
+    event_types = event_types.at[:, 0].set(
+        jnp.where(ied_present, _IED_IDX, NOP_EVENT_IDX)
+    )
+    event_ordinals = event_ordinals.at[:, 0].set(params.ied_ord)
+    event_valid = event_valid.at[:, 0].set(ied_present)
+
+    # --- Columns 1..max_ip: IP events ---
+    # Filter: IP dates must be >= IED (already done in ip_valid)
+    # Also filter: >= SD
+    sd_ord = params.sd_ord.reshape(-1, 1)
+    ip_after_sd = ip_valid & (ip_ordinals >= sd_ord)
+
+    event_ordinals = event_ordinals.at[:, 1:max_ip + 1].set(ip_ordinals)
+    event_valid = event_valid.at[:, 1:max_ip + 1].set(ip_after_sd)
+    event_types = event_types.at[:, 1:max_ip + 1].set(
+        jnp.where(ip_after_sd, _IP_IDX, NOP_EVENT_IDX)
+    )
+
+    # --- Column max_ip+1: Stub IP at MD (if no IP falls on MD) ---
+    md_ord = params.md_ord.reshape(-1, 1)
+    ip_at_md = jnp.any(ip_after_sd & (ip_ordinals == md_ord), axis=1)  # (N,)
+    needs_stub = (params.has_ip_cycle.astype(jnp.bool_)) & (~ip_at_md)
+    # Stub must also be >= SD
+    needs_stub = needs_stub & (params.md_ord >= params.sd_ord)
+    stub_col = max_ip + 1
+    event_types = event_types.at[:, stub_col].set(
+        jnp.where(needs_stub, _IP_IDX, NOP_EVENT_IDX)
+    )
+    event_ordinals = event_ordinals.at[:, stub_col].set(params.md_ord)
+    event_valid = event_valid.at[:, stub_col].set(needs_stub)
+
+    # --- Column max_ip+2: MD (always present if >= SD) ---
+    md_col = max_ip + 2
+    md_present = params.md_ord >= params.sd_ord
+    event_types = event_types.at[:, md_col].set(
+        jnp.where(md_present, _MD_IDX, NOP_EVENT_IDX)
+    )
+    event_ordinals = event_ordinals.at[:, md_col].set(params.md_ord)
+    event_valid = event_valid.at[:, md_col].set(md_present)
+
+    # --- Sort each row by (ordinal, priority) ---
+    # Build priority lookup array (index by event type idx)
+    _evt_priorities = jnp.array(
+        [_get_evt_priority(i) for i in range(NOP_EVENT_IDX + 1)],
+        dtype=jnp.int32,
+    )
+    evt_priority = _evt_priorities[event_types]  # (N, max_events)
+
+    # Composite sort key: invalid events get MAX ordinal to sort last
+    MAX_ORD = jnp.int32(2_000_000)  # ~5480 years, well beyond any contract
+    sort_ordinal = jnp.where(event_valid, event_ordinals, MAX_ORD)
+    sort_key = sort_ordinal * 100 + evt_priority  # max ~200M, fits int32
+
+    sort_idx = jnp.argsort(sort_key, axis=1)  # (N, max_events)
+
+    # Apply sort (gather along axis=1)
+    row_idx = jnp.arange(n).reshape(-1, 1)
+    event_types = event_types[row_idx, sort_idx]
+    event_ordinals = event_ordinals[row_idx, sort_idx]
+    event_valid = event_valid[row_idx, sort_idx]
+
+    n_events = event_valid.sum(axis=1).astype(jnp.int32)
+
+    return event_types, event_ordinals, event_valid, n_events
+
+
+def _jax_batch_year_fractions(
+    event_ordinals: jnp.ndarray,
+    event_valid: jnp.ndarray,
+    params: _BatchContractParams,
+) -> jnp.ndarray:
+    """Compute year fractions for all events in the batch (JAX-native).
+
+    Builds the status-date chain ``[sd, evt_0, evt_1, ...]`` and computes
+    year fractions between consecutive entries using the per-contract DCC.
+
+    Returns:
+        ``(N, max_events)`` float32 year fractions.
+    """
+    from jactus.utilities.date_array import _ordinal_to_ymd as _jax_ordinal_to_ymd
+
+    n, max_events = event_ordinals.shape
+
+    # SD chain: sd_chain[i, 0] = sd_ord; sd_chain[i, j>0] = event_ordinals[i, j-1]
+    # For batch-eligible contracts (no PRD), init_sd is always SD.
+    sd_chain = jnp.concatenate(
+        [params.sd_ord.reshape(-1, 1), event_ordinals[:, :-1]], axis=1
+    )  # (N, max_events)
+
+    # Delta days (for A360/A365)
+    delta_days = (event_ordinals - sd_chain).astype(jnp.float32)
+    yf_a360 = delta_days / 360.0
+    yf_a365 = delta_days / 365.0
+
+    # For 30/360 variants, need Y/M/D components
+    sd_y, sd_m, sd_d = _jax_ordinal_to_ymd(sd_chain)
+    evt_y, evt_m, evt_d = _jax_ordinal_to_ymd(event_ordinals)
+
+    # 30E/360
+    dd1_e = jnp.where(sd_d == 31, 30, sd_d)
+    dd2_e = jnp.where(evt_d == 31, 30, evt_d)
+    days_30e = (evt_y - sd_y) * 360 + (evt_m - sd_m) * 30 + (dd2_e - dd1_e)
+    yf_30e360 = days_30e.astype(jnp.float32) / 360.0
+
+    # 30/360 US (Bond Basis)
+    dd1_b = jnp.where(sd_d == 31, 30, sd_d)
+    dd2_b = jnp.where((dd1_b >= 30) & (evt_d == 31), 30, evt_d)
+    days_30b = (evt_y - sd_y) * 360 + (evt_m - sd_m) * 30 + (dd2_b - dd1_b)
+    yf_b30360 = days_30b.astype(jnp.float32) / 360.0
+
+    # Select per-contract DCC
+    dcc = params.dcc_code.reshape(-1, 1)  # (N, 1)
+    yf = jnp.where(
+        dcc == _DCC_A360, yf_a360,
+        jnp.where(
+            dcc == _DCC_A365, yf_a365,
+            jnp.where(
+                dcc == _DCC_E30360, yf_30e360,
+                yf_b30360,  # dcc == _DCC_B30360
+            ),
+        ),
+    )
+
+    # Zero out invalid events
+    yf = jnp.where(event_valid, yf, 0.0)
+
+    return yf
+
+
+def batch_precompute_pam(
+    params: _BatchContractParams,
+    max_ip: int,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """JAX-native batch schedule generation + year fractions.
+
+    Pure JAX function — JIT-compilable, GPU/TPU-ready.  Can be composed
+    with ``batch_simulate_pam`` under a single ``jax.jit``.
+
+    Args:
+        params: Batch contract parameters (shape ``(N,)`` per field).
+        max_ip: Maximum IP events (static, determines array shapes).
+
+    Returns:
+        ``(event_types, year_fractions, rf_values, masks)`` —
+        all shape ``(N, max_events)`` where ``max_events = max_ip + 3``.
+    """
+    ip_ords, ip_valid = _jax_batch_ip_schedule(params, max_ip)
+    evt_types, evt_ords, evt_valid, _n_events = _jax_batch_assemble(
+        params, ip_ords, ip_valid
+    )
+    yf = _jax_batch_year_fractions(evt_ords, evt_valid, params)
+    rf = jnp.zeros_like(yf)  # no RR/FP/SC in batch-eligible contracts
+    masks = evt_valid.astype(jnp.float32)
+    return evt_types, yf, rf, masks
+
+
 def _raw_to_jax(
     raw: _RawPrecomputed,
 ) -> tuple[PAMArrayState, jnp.ndarray, jnp.ndarray, jnp.ndarray, PAMArrayParams]:
@@ -1484,28 +1947,15 @@ def _pad_arrays(
     return event_types, year_fractions, rf_values, mask
 
 
-def prepare_pam_batch(
-    contracts: list[tuple[ContractAttributes, RiskFactorObserver]],
+def _raw_list_to_jax_batch(
+    raw_list: list[_RawPrecomputed],
 ) -> tuple[PAMArrayState, jnp.ndarray, jnp.ndarray, jnp.ndarray, PAMArrayParams, jnp.ndarray]:
-    """Pre-compute and pad arrays for a batch of PAM contracts.
+    """Convert a list of ``_RawPrecomputed`` to padded JAX batch arrays.
 
-    Uses a two-phase approach for efficiency:
-    1. Pre-compute all contracts as Python types (no JAX overhead)
-    2. Batch-convert to JAX arrays in a single pass
-
-    Args:
-        contracts: List of ``(attributes, rf_observer)`` pairs.
-
-    Returns:
-        ``(initial_states, event_types, year_fractions, rf_values, params, masks)``
-        where each array has a leading batch dimension.
+    Pads shorter contracts with NOP events and builds NumPy arrays first
+    (fast C-level construction) then transfers to JAX via ``jnp.asarray``.
     """
-    # Phase 1: Pre-compute everything as Python types
-    raw_list = [_precompute_raw(attrs, obs) for attrs, obs in contracts]
     max_events = max(len(r.event_types) for r in raw_list)
-
-    # Phase 2: Pad and batch-convert to JAX arrays
-    # Build Python lists for batch conversion (one jnp.array per field)
 
     # State fields: (batch,) each
     state_nt = [r.state[0] for r in raw_list]
@@ -1535,9 +1985,7 @@ def prepare_pam_batch(
         for k in PAMArrayParams._fields:
             param_fields[k].append(r.params[k])
 
-    # Single batch conversion: build NumPy arrays first (fast C-level construction
-    # from Python lists), then transfer to JAX via jnp.asarray (near-zero copy).
-    # This avoids jnp.array()'s tracing/dispatch overhead which dominated prep time.
+    # Build NumPy arrays first (fast C-level), then transfer to JAX
     batched_states = PAMArrayState(
         nt=jnp.asarray(np.array(state_nt, dtype=np.float32)),
         ipnr=jnp.asarray(np.array(state_ipnr, dtype=np.float32)),
@@ -1552,7 +2000,6 @@ def prepare_pam_batch(
     batched_rf = jnp.asarray(np.array(rf_batch, dtype=np.float32))
     batched_masks = jnp.asarray(np.array(mask_batch, dtype=np.float32))
 
-    # Params: determine dtype per field (int32 for fee_basis/penalty_type, float32 otherwise)
     _int_fields = {"fee_basis", "penalty_type"}
     batched_params = PAMArrayParams(
         **{
@@ -1567,6 +2014,141 @@ def prepare_pam_batch(
     )
 
     return batched_states, batched_et, batched_yf, batched_rf, batched_params, batched_masks
+
+
+def _prepare_pam_batch_sequential(
+    contracts: list[tuple[ContractAttributes, RiskFactorObserver]],
+) -> tuple[PAMArrayState, jnp.ndarray, jnp.ndarray, jnp.ndarray, PAMArrayParams, jnp.ndarray]:
+    """Per-contract sequential pre-computation (original path)."""
+    raw_list = [_precompute_raw(attrs, obs) for attrs, obs in contracts]
+    return _raw_list_to_jax_batch(raw_list)
+
+
+def prepare_pam_batch(
+    contracts: list[tuple[ContractAttributes, RiskFactorObserver]],
+) -> tuple[PAMArrayState, jnp.ndarray, jnp.ndarray, jnp.ndarray, PAMArrayParams, jnp.ndarray]:
+    """Pre-compute and pad arrays for a batch of PAM contracts.
+
+    When ``_USE_BATCH_SCHEDULE`` is enabled, eligible contracts have their
+    schedules and year fractions generated via a JAX-native batch path
+    (GPU/TPU-ready).  Ineligible contracts fall back to per-contract
+    Python pre-computation.
+
+    Args:
+        contracts: List of ``(attributes, rf_observer)`` pairs.
+
+    Returns:
+        ``(initial_states, event_types, year_fractions, rf_values, params, masks)``
+        where each array has a leading batch dimension.
+    """
+    if not _USE_BATCH_SCHEDULE or len(contracts) <= 1:
+        return _prepare_pam_batch_sequential(contracts)
+
+    batch_idx, fallback_idx = _classify_contracts_for_batch(contracts)
+
+    if not batch_idx:
+        return _prepare_pam_batch_sequential(contracts)
+
+    # --- Batch path: JAX-native schedule + YF for eligible contracts ---
+    bp = _extract_batch_params(contracts, batch_idx)
+    max_ip = _compute_max_ip(bp)
+
+    evt_types_jax, yf_jax, rf_jax, masks_jax = batch_precompute_pam(bp, max_ip)
+
+    # Trim batch arrays to actual max valid events (remove trailing NOP padding)
+    actual_max_batch = int(masks_jax.sum(axis=1).max())
+    evt_types_jax = evt_types_jax[:, :actual_max_batch]
+    yf_jax = yf_jax[:, :actual_max_batch]
+    rf_jax = rf_jax[:, :actual_max_batch]
+    masks_jax = masks_jax[:, :actual_max_batch]
+    max_events_batch = actual_max_batch
+
+    # --- Fallback path: per-contract Python precompute ---
+    fallback_raws = [_precompute_raw(*contracts[i]) for i in fallback_idx]
+    max_events_fallback = max(
+        (len(r.event_types) for r in fallback_raws), default=0
+    )
+
+    # --- Determine final padded width ---
+    max_events = max(max_events_batch, max_events_fallback)
+    n_total = len(contracts)
+    _int_fields = {"fee_basis", "penalty_type"}
+
+    # --- Allocate final NumPy arrays ---
+    final_et = np.full((n_total, max_events), NOP_EVENT_IDX, dtype=np.int32)
+    final_yf = np.zeros((n_total, max_events), dtype=np.float32)
+    final_rf = np.zeros((n_total, max_events), dtype=np.float32)
+    final_mask = np.zeros((n_total, max_events), dtype=np.float32)
+
+    final_nt = np.zeros(n_total, dtype=np.float32)
+    final_ipnr = np.zeros(n_total, dtype=np.float32)
+    final_ipac = np.zeros(n_total, dtype=np.float32)
+    final_feac = np.zeros(n_total, dtype=np.float32)
+    final_nsc = np.zeros(n_total, dtype=np.float32)
+    final_isc = np.zeros(n_total, dtype=np.float32)
+
+    param_arrays = {
+        k: np.zeros(n_total, dtype=np.int32 if k in _int_fields else np.float32)
+        for k in PAMArrayParams._fields
+    }
+
+    # --- Place batch results (single bulk JAX → NumPy transfer) ---
+    batch_idx_np = np.array(batch_idx, dtype=np.intp)
+    final_et[batch_idx_np, :max_events_batch] = np.asarray(evt_types_jax)
+    final_yf[batch_idx_np, :max_events_batch] = np.asarray(yf_jax)
+    final_rf[batch_idx_np, :max_events_batch] = np.asarray(rf_jax)
+    final_mask[batch_idx_np, :max_events_batch] = np.asarray(masks_jax)
+
+    # States + params for batch contracts (fast Python field reads)
+    for j, idx in enumerate(batch_idx):
+        attrs, _ = contracts[idx]
+        nt, ipnr, ipac, feac, nsc, isc, _ = _fast_pam_init_state(attrs)
+        final_nt[idx] = nt
+        final_ipnr[idx] = ipnr
+        final_ipac[idx] = ipac
+        final_feac[idx] = feac
+        final_nsc[idx] = nsc
+        final_isc[idx] = isc
+        p = _extract_params_raw(attrs)
+        for k in PAMArrayParams._fields:
+            param_arrays[k][idx] = p[k]
+
+    # --- Place fallback results ---
+    for j, idx in enumerate(fallback_idx):
+        r = fallback_raws[j]
+        n_ev = len(r.event_types)
+        final_et[idx, :n_ev] = r.event_types
+        final_yf[idx, :n_ev] = r.year_fractions
+        final_rf[idx, :n_ev] = r.rf_values
+        final_mask[idx, :n_ev] = 1.0
+
+        final_nt[idx] = r.state[0]
+        final_ipnr[idx] = r.state[1]
+        final_ipac[idx] = r.state[2]
+        final_feac[idx] = r.state[3]
+        final_nsc[idx] = r.state[4]
+        final_isc[idx] = r.state[5]
+        for k in PAMArrayParams._fields:
+            param_arrays[k][idx] = r.params[k]
+
+    # --- Single NumPy → JAX transfer ---
+    return (
+        PAMArrayState(
+            nt=jnp.asarray(final_nt),
+            ipnr=jnp.asarray(final_ipnr),
+            ipac=jnp.asarray(final_ipac),
+            feac=jnp.asarray(final_feac),
+            nsc=jnp.asarray(final_nsc),
+            isc=jnp.asarray(final_isc),
+        ),
+        jnp.asarray(final_et),
+        jnp.asarray(final_yf),
+        jnp.asarray(final_rf),
+        PAMArrayParams(
+            **{k: jnp.asarray(param_arrays[k]) for k in PAMArrayParams._fields}
+        ),
+        jnp.asarray(final_mask),
+    )
 
 
 def simulate_pam_portfolio(
