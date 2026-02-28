@@ -507,7 +507,7 @@ def batch_simulate_pam_auto(
     The ``vmap`` variant (``batch_simulate_pam_vmap``) remains available
     for explicit use but is not selected automatically.
     """
-    return batch_simulate_pam(initial_states, event_types, year_fractions, rf_values, params)
+    return batch_simulate_pam(initial_states, event_types, year_fractions, rf_values, params)  # type: ignore[no-any-return]
 
 
 # ============================================================================
@@ -1443,7 +1443,7 @@ def _np_ymd_to_ordinal(y: np.ndarray, m: np.ndarray, d: np.ndarray) -> np.ndarra
     yoe = y_adj - era * 400
 
     doe = 365 * yoe + yoe // 4 - yoe // 100 + doy
-    return era * 146097 + doe - 305
+    return era * 146097 + doe - 305  # type: ignore[no-any-return]
 
 
 def _np_yf_30e360(
@@ -1458,7 +1458,7 @@ def _np_yf_30e360(
     dd1 = np.where(d1 == 31, 30, d1)
     dd2 = np.where(d2 == 31, 30, d2)
     days = (y2 - y1) * 360 + (m2 - m1) * 30 + (dd2 - dd1)
-    return days.astype(np.float64) / 360.0
+    return days.astype(np.float64) / 360.0  # type: ignore[no-any-return]
 
 
 def _np_yf_b30360(
@@ -1473,7 +1473,7 @@ def _np_yf_b30360(
     dd1 = np.where(d1 == 31, 30, d1)
     dd2 = np.where((dd1 >= 30) & (d2 == 31), 30, d2)
     days = (y2 - y1) * 360 + (m2 - m1) * 30 + (dd2 - dd1)
-    return days.astype(np.float64) / 360.0
+    return days.astype(np.float64) / 360.0  # type: ignore[no-any-return]
 
 
 # ---------------------------------------------------------------------------
@@ -1891,7 +1891,7 @@ def batch_precompute_pam(
         ``(event_types, year_fractions, rf_values, masks)`` —
         all shape ``(N, max_events)`` where ``max_events = max_ip + 3``.
     """
-    return _batch_precompute_pam_jit(params, max_ip)
+    return _batch_precompute_pam_jit(params, max_ip)  # type: ignore[no-any-return]
 
 
 def _raw_to_jax(

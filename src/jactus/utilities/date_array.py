@@ -21,6 +21,8 @@ month) falls at the *end* of the "year".
 
 from __future__ import annotations
 
+from typing import Any
+
 import jax.numpy as jnp
 import numpy as np
 
@@ -286,7 +288,7 @@ class DateArray:
     def __ge__(self, other: DateArray) -> jnp.ndarray:
         return self.ordinals >= other.ordinals
 
-    def __eq__(self, other: object) -> jnp.ndarray:
+    def __eq__(self, other: object) -> jnp.ndarray:  # type: ignore[override]
         if not isinstance(other, DateArray):
             return NotImplemented
         return self.ordinals == other.ordinals
@@ -307,7 +309,7 @@ class DateArray:
 
     # -- Slicing ------------------------------------------------------------
 
-    def __getitem__(self, idx) -> DateArray:
+    def __getitem__(self, idx: Any) -> DateArray:
         return DateArray(
             self.ordinals[idx],
             self.years[idx],
