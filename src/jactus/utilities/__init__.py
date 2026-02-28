@@ -9,6 +9,7 @@ from jactus.utilities.calendars import (
     is_weekend,
 )
 from jactus.utilities.conventions import days_between_30_360_methods, year_fraction
+from jactus.utilities.date_array import DateArray
 from jactus.utilities.math import (
     annuity_amount,
     annuity_amount_vectorized,
@@ -30,7 +31,6 @@ from jactus.utilities.schedules import (
     generate_array_schedule,
     generate_schedule,
 )
-from jactus.utilities.date_array import DateArray
 from jactus.utilities.surface import LabeledSurface2D, Surface2D
 
 __all__ = [

@@ -26,7 +26,6 @@ from jactus.utilities.date_array import (
     year_fraction_b30360,
 )
 
-
 # ===================================================================
 # Ordinal conversion
 # ===================================================================
@@ -142,7 +141,7 @@ class TestLeapYearDaysInMonth:
         years = jnp.array([1900, 2000, 2024, 2100, 2400], dtype=jnp.int32)
         result = _is_leap_year(years)
         expected = [False, True, True, False, True]
-        for i, (got, exp) in enumerate(zip(result, expected)):
+        for i, (got, exp) in enumerate(zip(result, expected, strict=False)):
             assert bool(got) == exp, f"Year {int(years[i])}: {got} != {exp}"
 
     def test_days_in_february(self):
@@ -150,7 +149,7 @@ class TestLeapYearDaysInMonth:
         months = jnp.full_like(years, 2)
         result = _days_in_month(years, months)
         expected = [28, 29, 29, 28, 28]
-        for i, (got, exp) in enumerate(zip(result, expected)):
+        for i, (got, exp) in enumerate(zip(result, expected, strict=False)):
             assert int(got) == exp, f"Year {int(years[i])}: {got} != {exp}"
 
     def test_days_in_all_months(self):
@@ -383,7 +382,7 @@ class TestIsEndOfMonth:
         )
         result = da.is_end_of_month()
         expected = [True, True, False, True, True]
-        for i, (got, exp) in enumerate(zip(result, expected)):
+        for i, (got, exp) in enumerate(zip(result, expected, strict=False)):
             assert bool(got) == exp, f"Index {i}: {got} != {exp}"
 
 
@@ -488,9 +487,7 @@ class TestYearFractions:
         )
         result = year_fraction_30e360_isda(start_da, end_da, mat_broadcast)
         for i, (s, e) in enumerate(self.DATE_PAIRS):
-            expected = self._scalar_yf(
-                DayCountConvention.E30360ISDA, s, e, maturity_ymd
-            )
+            expected = self._scalar_yf(DayCountConvention.E30360ISDA, s, e, maturity_ymd)
             assert abs(float(result[i]) - expected) < 1e-6, (
                 f"30E/360 ISDA pair {i}: {float(result[i])} != {expected}"
             )
@@ -529,7 +526,7 @@ class TestScheduleGeneration:
         return dates
 
     @pytest.mark.parametrize(
-        "start,cycle_months,end",
+        ("start", "cycle_months", "end"),
         [
             ((2024, 1, 15), 1, (2025, 1, 15)),
             ((2024, 1, 15), 3, (2025, 1, 15)),

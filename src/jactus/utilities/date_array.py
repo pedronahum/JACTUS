@@ -56,9 +56,7 @@ def _days_in_month(y: jnp.ndarray, m: jnp.ndarray) -> jnp.ndarray:
 # ---------------------------------------------------------------------------
 
 
-def _ymd_to_ordinal(
-    y: jnp.ndarray, m: jnp.ndarray, d: jnp.ndarray
-) -> jnp.ndarray:
+def _ymd_to_ordinal(y: jnp.ndarray, m: jnp.ndarray, d: jnp.ndarray) -> jnp.ndarray:
     """Convert ``(year, month, day)`` int32 arrays to ordinals.
 
     Ordinal 1 = January 1, year 1 (matches ``datetime.date.toordinal``).
@@ -321,10 +319,7 @@ class DateArray:
 
     def __repr__(self) -> str:
         if self.ordinals.ndim == 0:
-            return (
-                f"DateArray({int(self.years)}-{int(self.months):02d}"
-                f"-{int(self.days):02d})"
-            )
+            return f"DateArray({int(self.years)}-{int(self.months):02d}-{int(self.days):02d})"
         n = self.ordinals.shape[0]
         if n <= 4:
             dates = ", ".join(
@@ -332,14 +327,8 @@ class DateArray:
                 for i in range(n)
             )
         else:
-            first = (
-                f"{int(self.years[0])}-{int(self.months[0]):02d}"
-                f"-{int(self.days[0]):02d}"
-            )
-            last = (
-                f"{int(self.years[-1])}-{int(self.months[-1]):02d}"
-                f"-{int(self.days[-1]):02d}"
-            )
+            first = f"{int(self.years[0])}-{int(self.months[0]):02d}-{int(self.days[0]):02d}"
+            last = f"{int(self.years[-1])}-{int(self.months[-1]):02d}-{int(self.days[-1]):02d}"
             dates = f"{first}, ..., {last}"
         return f"DateArray([{dates}], n={n})"
 
@@ -368,11 +357,7 @@ def year_fraction_30e360(start: DateArray, end: DateArray) -> jnp.ndarray:
     """
     d1 = jnp.where(start.days == 31, 30, start.days)
     d2 = jnp.where(end.days == 31, 30, end.days)
-    days_360 = (
-        (end.years - start.years) * 360
-        + (end.months - start.months) * 30
-        + (d2 - d1)
-    )
+    days_360 = (end.years - start.years) * 360 + (end.months - start.months) * 30 + (d2 - d1)
     return days_360.astype(jnp.float32) / 360.0
 
 
@@ -383,17 +368,11 @@ def year_fraction_b30360(start: DateArray, end: DateArray) -> jnp.ndarray:
     """
     d1 = jnp.where(start.days == 31, 30, start.days)
     d2 = jnp.where((d1 >= 30) & (end.days == 31), 30, end.days)
-    days_360 = (
-        (end.years - start.years) * 360
-        + (end.months - start.months) * 30
-        + (d2 - d1)
-    )
+    days_360 = (end.years - start.years) * 360 + (end.months - start.months) * 30 + (d2 - d1)
     return days_360.astype(jnp.float32) / 360.0
 
 
-def year_fraction_30e360_isda(
-    start: DateArray, end: DateArray, maturity: DateArray
-) -> jnp.ndarray:
+def year_fraction_30e360_isda(start: DateArray, end: DateArray, maturity: DateArray) -> jnp.ndarray:
     """30E/360 ISDA year fraction (vectorised).
 
     Adjustments: last-day-of-Feb or D=31 → 30.
@@ -407,15 +386,9 @@ def year_fraction_30e360_isda(
     is_maturity = end.ordinals == maturity.ordinals
 
     d1 = jnp.where(start_is_feb_end | (start.days == 31), 30, start.days)
-    d2 = jnp.where(
-        (end_is_feb_end & ~is_maturity) | (end.days == 31), 30, end.days
-    )
+    d2 = jnp.where((end_is_feb_end & ~is_maturity) | (end.days == 31), 30, end.days)
 
-    days_360 = (
-        (end.years - start.years) * 360
-        + (end.months - start.months) * 30
-        + (d2 - d1)
-    )
+    days_360 = (end.years - start.years) * 360 + (end.months - start.months) * 30 + (d2 - d1)
     return days_360.astype(jnp.float32) / 360.0
 
 
