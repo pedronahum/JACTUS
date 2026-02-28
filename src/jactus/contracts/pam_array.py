@@ -497,16 +497,16 @@ def batch_simulate_pam_auto(
     rf_values: jnp.ndarray,
     params: PAMArrayParams,
 ) -> tuple[PAMArrayState, jnp.ndarray]:
-    """Device-aware batched simulation.
+    """Batched simulation using the optimal strategy for all backends.
 
-    Selects ``vmap`` on GPU/TPU (better parallelism across cores) and
-    manually-batched ``lax.scan`` on CPU (lower dispatch overhead).
+    Uses the single-scan batch approach (``batch_simulate_pam``) which
+    processes all contracts in shaped ``[B, T]`` arrays via a single
+    ``lax.scan``.  This is faster than ``vmap`` on CPU, GPU, *and* TPU
+    because it avoids per-contract dispatch overhead.
+
+    The ``vmap`` variant (``batch_simulate_pam_vmap``) remains available
+    for explicit use but is not selected automatically.
     """
-    backend = jax.default_backend()
-    if backend in ("gpu", "tpu"):
-        return batch_simulate_pam_vmap(
-            initial_states, event_types, year_fractions, rf_values, params
-        )
     return batch_simulate_pam(initial_states, event_types, year_fractions, rf_values, params)
 
 

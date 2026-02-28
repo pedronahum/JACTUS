@@ -942,9 +942,10 @@ for i in range(0, len(portfolio), batch_size):
 The array-mode simulation path (`pam_array.py`) is designed for transparent
 hardware acceleration:
 
-- **Device dispatch**: `batch_simulate_pam_auto()` selects `jax.vmap` on
-  GPU/TPU (parallel across CUDA cores / TPU vector units) and manual batching
-  on CPU (lower dispatch overhead).
+- **Batch strategy**: `batch_simulate_pam_auto()` uses the single-scan approach
+  (`batch_simulate_pam`) on all backends. This processes all contracts together
+  in shaped `[B, T]` arrays via a single `lax.scan`, which outperforms `vmap`
+  on CPU, GPU, *and* TPU by avoiding per-contract dispatch overhead.
 - **JIT-compiled pre-computation**: `batch_precompute_pam()` generates event
   schedules and year fractions as pure JAX operations, keeping data on-device.
 - **`lax.scan(unroll=8)`**: Reduces GPU kernel launches by 8× compared to
