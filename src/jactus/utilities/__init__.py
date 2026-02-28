@@ -30,6 +30,7 @@ from jactus.utilities.schedules import (
     generate_array_schedule,
     generate_schedule,
 )
+from jactus.utilities.date_array import DateArray
 from jactus.utilities.surface import LabeledSurface2D, Surface2D
 
 __all__ = [
@@ -65,4 +66,6 @@ __all__ = [
     # 2D Surface interpolation
     "Surface2D",
     "LabeledSurface2D",
+    # JAX-native date array
+    "DateArray",
 ]

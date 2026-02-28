@@ -52,6 +52,12 @@ from jactus.utilities.conventions import year_fraction
 NOP_EVENT_IDX: int = NUM_EVENT_TYPES  # 24 (one past the last valid EventType.index)
 
 # ---------------------------------------------------------------------------
+# DateArray feature flag — enables vectorised year fraction pre-computation.
+# Set to False to fall back to the original per-event Python loop.
+# ---------------------------------------------------------------------------
+_USE_DATE_ARRAY: bool = True
+
+# ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
 
@@ -1177,6 +1183,9 @@ def _precompute_raw(
     This is the core pre-computation that can be batched efficiently —
     all JAX array creation is deferred to the caller.
     """
+    if _USE_DATE_ARRAY:
+        return _precompute_raw_da(attrs, rf_observer)
+
     from jactus.core.types import DayCountConvention
 
     # 1. Fast schedule generation (no contract object)
@@ -1245,6 +1254,168 @@ def _precompute_raw(
         rf_values=rf_list,
         params=params_raw,
     )
+
+
+# ---------------------------------------------------------------------------
+# DateArray-based pre-computation  (vectorised year fractions)
+# ---------------------------------------------------------------------------
+
+
+def _precompute_raw_da(
+    attrs: ContractAttributes,
+    rf_observer: RiskFactorObserver,
+) -> _RawPrecomputed:
+    """Pre-compute using vectorised year fractions (NumPy, no JAX overhead).
+
+    Schedule generation reuses ``_fast_pam_schedule`` (Python business logic),
+    but year fractions are computed in a single vectorised NumPy pass using
+    the Hinnant ordinal algorithm from :mod:`jactus.utilities.date_array`.
+    """
+    from jactus.core.types import DayCountConvention
+
+    # 1. Schedule (same as before — Python business logic)
+    schedule = _fast_pam_schedule(attrs)
+
+    # 2. State initialisation (same as before)
+    nt, ipnr, ipac, feac, nsc, isc, init_sd_dt = _fast_pam_init_state(attrs)
+
+    if not schedule:
+        params_raw = _extract_params_raw(attrs)
+        return _RawPrecomputed(
+            state=(nt, ipnr, ipac, feac, nsc, isc),
+            event_types=[],
+            year_fractions=[],
+            rf_values=[],
+            params=params_raw,
+        )
+
+    # 3. Build parallel NumPy arrays from schedule tuples
+    n_events = len(schedule)
+    event_type_list = [evt_idx for evt_idx, _, _ in schedule]
+
+    # Status-date chain: [init_sd, evt_0, ..., evt_{n-2}]
+    # Calc-date array:   [calc_0, calc_1, ..., calc_{n-1}]
+    sd_y = np.empty(n_events, dtype=np.int32)
+    sd_m = np.empty(n_events, dtype=np.int32)
+    sd_d = np.empty(n_events, dtype=np.int32)
+    calc_y = np.empty(n_events, dtype=np.int32)
+    calc_m = np.empty(n_events, dtype=np.int32)
+    calc_d = np.empty(n_events, dtype=np.int32)
+
+    sd_y[0] = init_sd_dt.year
+    sd_m[0] = init_sd_dt.month
+    sd_d[0] = init_sd_dt.day
+
+    for i in range(n_events):
+        _ei, evt_dt, calc_dt = schedule[i]
+        calc_y[i] = calc_dt.year
+        calc_m[i] = calc_dt.month
+        calc_d[i] = calc_dt.day
+        if i < n_events - 1:
+            sd_y[i + 1] = evt_dt.year
+            sd_m[i + 1] = evt_dt.month
+            sd_d[i + 1] = evt_dt.day
+
+    # 4. Vectorised year fraction (pure NumPy — no JAX dispatch overhead)
+    dcc = attrs.day_count_convention or DayCountConvention.A360
+
+    if dcc in (DayCountConvention.A360, DayCountConvention.A365):
+        # Ordinal-based: compute ordinals with Hinnant algorithm (NumPy)
+        sd_ord = _np_ymd_to_ordinal(sd_y, sd_m, sd_d)
+        calc_ord = _np_ymd_to_ordinal(calc_y, calc_m, calc_d)
+        delta = (calc_ord - sd_ord).astype(np.float64)
+        divisor = 360.0 if dcc == DayCountConvention.A360 else 365.0
+        yf_list = (delta / divisor).tolist()
+    elif dcc == DayCountConvention.E30360:
+        yf_list = _np_yf_30e360(sd_y, sd_m, sd_d, calc_y, calc_m, calc_d).tolist()
+    elif dcc == DayCountConvention.B30360:
+        yf_list = _np_yf_b30360(sd_y, sd_m, sd_d, calc_y, calc_m, calc_d).tolist()
+    else:
+        # Fallback to scalar for AA, E30360ISDA, BUS252
+        yf_list = []
+        current_sd_dt = init_sd_dt
+        for _ei, evt_dt, calc_dt in schedule:
+            yf_list.append(
+                year_fraction(_dt_to_adt(current_sd_dt), _dt_to_adt(calc_dt), dcc)
+            )
+            current_sd_dt = evt_dt
+
+    # 5. Risk factor pre-query (per-event, observer is Python)
+    rf_list: list[float] = []
+    market_object = attrs.rate_reset_market_object or ""
+    contract_id = attrs.contract_id or ""
+    for evt_idx, evt_dt, _calc_dt in schedule:
+        rf_val = 0.0
+        if evt_idx == _RR_IDX:
+            try:
+                rf_val = float(
+                    rf_observer.observe_risk_factor(market_object, _dt_to_adt(evt_dt))
+                )
+            except (KeyError, NotImplementedError, TypeError):
+                rf_val = 0.0
+        elif evt_idx == _PP_IDX:
+            try:
+                rf_val = float(
+                    rf_observer.observe_event(contract_id, EventType.PP, _dt_to_adt(evt_dt))
+                )
+            except (KeyError, NotImplementedError, TypeError):
+                rf_val = 0.0
+        rf_list.append(rf_val)
+
+    # 6. Extract params
+    params_raw = _extract_params_raw(attrs)
+
+    return _RawPrecomputed(
+        state=(nt, ipnr, ipac, feac, nsc, isc),
+        event_types=event_type_list,
+        year_fractions=yf_list,
+        rf_values=rf_list,
+        params=params_raw,
+    )
+
+
+# ---------------------------------------------------------------------------
+# NumPy-backed ordinal & year-fraction helpers (zero JAX overhead)
+# ---------------------------------------------------------------------------
+
+
+def _np_ymd_to_ordinal(
+    y: np.ndarray, m: np.ndarray, d: np.ndarray
+) -> np.ndarray:
+    """Hinnant Y/M/D→ordinal, NumPy version (for pre-computation path)."""
+    a = np.where(m <= 2, 1, 0).astype(np.int64)
+    y_adj = y.astype(np.int64) - a
+    m_adj = m.astype(np.int64) + 12 * a - 3
+
+    doy = (153 * m_adj + 2) // 5 + d.astype(np.int64) - 1
+
+    era = np.where(y_adj >= 0, y_adj // 400, (y_adj - 399) // 400)
+    yoe = y_adj - era * 400
+
+    doe = 365 * yoe + yoe // 4 - yoe // 100 + doy
+    return era * 146097 + doe - 305
+
+
+def _np_yf_30e360(
+    y1: np.ndarray, m1: np.ndarray, d1: np.ndarray,
+    y2: np.ndarray, m2: np.ndarray, d2: np.ndarray,
+) -> np.ndarray:
+    """30E/360 year fraction, vectorised NumPy."""
+    dd1 = np.where(d1 == 31, 30, d1)
+    dd2 = np.where(d2 == 31, 30, d2)
+    days = (y2 - y1) * 360 + (m2 - m1) * 30 + (dd2 - dd1)
+    return days.astype(np.float64) / 360.0
+
+
+def _np_yf_b30360(
+    y1: np.ndarray, m1: np.ndarray, d1: np.ndarray,
+    y2: np.ndarray, m2: np.ndarray, d2: np.ndarray,
+) -> np.ndarray:
+    """30/360 US (Bond Basis) year fraction, vectorised NumPy."""
+    dd1 = np.where(d1 == 31, 30, d1)
+    dd2 = np.where((dd1 >= 30) & (d2 == 31), 30, d2)
+    days = (y2 - y1) * 360 + (m2 - m1) * 30 + (dd2 - dd1)
+    return days.astype(np.float64) / 360.0
 
 
 def _raw_to_jax(
