@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jactus"
-version = "0.1.5"
+version = "0.1.6"
 description = "JAX implementation of the ACTUS financial contract standard"
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
