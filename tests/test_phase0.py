@@ -24,7 +24,8 @@ class TestT01PackageInstallation:
         """Test that jactus.__version__ is accessible."""
         assert hasattr(jactus, "__version__")
         assert isinstance(jactus.__version__, str)
-        assert jactus.__version__ == "0.1.2"
+        # Check format rather than hardcoded value (version is in pyproject.toml)
+        assert len(jactus.__version__.split(".")) == 3
 
     def test_submodules_importable(self):
         """Test that all submodules are importable."""
