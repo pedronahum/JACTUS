@@ -54,6 +54,10 @@ from jactus.contracts.pam_array import (
     simulate_pam_array_jit,
     simulate_pam_portfolio,
 )
+from jactus.contracts.portfolio import (
+    BATCH_SUPPORTED_TYPES,
+    simulate_portfolio,
+)
 from jactus.contracts.stk import StockContract
 from jactus.contracts.swaps import GenericSwapContract
 from jactus.contracts.swppv import PlainVanillaSwapContract
@@ -239,4 +243,7 @@ __all__ = [
     "precompute_pam_arrays",
     "prepare_pam_batch",
     "simulate_pam_portfolio",
+    # Unified portfolio API
+    "simulate_portfolio",
+    "BATCH_SUPPORTED_TYPES",
 ]
