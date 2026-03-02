@@ -7,15 +7,10 @@ Tolerance matches the ACTUS cross-validation standard (atol=1.0).
 
 import jax
 import jax.numpy as jnp
-import pytest
 
 from jactus.contracts.swppv import PlainVanillaSwapContract
 from jactus.contracts.swppv_array import (
-    SWPPVArrayParams,
-    SWPPVArrayState,
-    batch_simulate_swppv,
     precompute_swppv_arrays,
-    prepare_swppv_batch,
     simulate_swppv_array,
     simulate_swppv_array_jit,
     simulate_swppv_portfolio,

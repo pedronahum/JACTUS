@@ -7,12 +7,10 @@ Tolerance matches the ACTUS cross-validation standard (atol=1.0).
 
 import jax
 import jax.numpy as jnp
-import pytest
 
 from jactus.contracts.optns import OptionContract
 from jactus.contracts.optns_array import (
     OPTNSArrayParams,
-    OPTNSArrayState,
     precompute_optns_arrays,
     simulate_optns_array,
     simulate_optns_array_jit,
@@ -25,7 +23,6 @@ from jactus.core import (
     ContractType,
 )
 from jactus.observers import (
-    ConstantRiskFactorObserver,
     DictRiskFactorObserver,
     TimeSeriesRiskFactorObserver,
 )

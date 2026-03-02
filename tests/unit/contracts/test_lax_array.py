@@ -7,15 +7,10 @@ Tolerance matches the ACTUS cross-validation standard (atol=1.0).
 
 import jax
 import jax.numpy as jnp
-import pytest
 
 from jactus.contracts.lax import ExoticLinearAmortizerContract
 from jactus.contracts.lax_array import (
-    LAXArrayParams,
-    LAXArrayState,
-    batch_simulate_lax,
     precompute_lax_arrays,
-    prepare_lax_batch,
     simulate_lax_array,
     simulate_lax_array_jit,
     simulate_lax_portfolio,

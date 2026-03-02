@@ -6,15 +6,11 @@ Tolerance matches the ACTUS cross-validation standard (atol=1.0).
 """
 
 import jax.numpy as jnp
-import pytest
 
 from jactus.contracts.com import CommodityContract
 from jactus.contracts.com_array import (
     COMArrayParams,
-    COMArrayState,
-    batch_simulate_com,
     precompute_com_arrays,
-    prepare_com_batch,
     simulate_com_array,
     simulate_com_array_jit,
     simulate_com_portfolio,

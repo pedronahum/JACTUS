@@ -7,15 +7,10 @@ Tolerance matches the ACTUS cross-validation standard (atol=1.0).
 
 import jax
 import jax.numpy as jnp
-import pytest
 
 from jactus.contracts.nam import NegativeAmortizerContract
 from jactus.contracts.nam_array import (
-    NAMArrayParams,
-    NAMArrayState,
-    batch_simulate_nam,
     precompute_nam_arrays,
-    prepare_nam_batch,
     simulate_nam_array,
     simulate_nam_array_jit,
     simulate_nam_portfolio,

@@ -6,15 +6,11 @@ Tolerance matches the ACTUS cross-validation standard (atol=1.0).
 """
 
 import jax.numpy as jnp
-import pytest
 
 from jactus.contracts.stk import StockContract
 from jactus.contracts.stk_array import (
     STKArrayParams,
-    STKArrayState,
-    batch_simulate_stk,
     precompute_stk_arrays,
-    prepare_stk_batch,
     simulate_stk_array,
     simulate_stk_array_jit,
     simulate_stk_portfolio,

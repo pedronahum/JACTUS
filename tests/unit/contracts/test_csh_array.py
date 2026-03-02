@@ -6,15 +6,10 @@ Tolerance matches the ACTUS cross-validation standard (atol=1.0).
 """
 
 import jax.numpy as jnp
-import pytest
 
 from jactus.contracts.csh import CashContract
 from jactus.contracts.csh_array import (
-    CSHArrayParams,
-    CSHArrayState,
-    batch_simulate_csh,
     precompute_csh_arrays,
-    prepare_csh_batch,
     simulate_csh_array,
     simulate_csh_array_jit,
     simulate_csh_portfolio,

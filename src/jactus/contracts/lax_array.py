@@ -44,51 +44,90 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from jactus.core import (
-    ActusDateTime,
-    ContractAttributes,
-    ContractRole,
-    EventType,
+from jactus.contracts.array_common import (
+    # Cached EventType indices
+    AD_IDX as _AD_IDX,
 )
-from jactus.observers import RiskFactorObserver
-from jactus.utilities.conventions import year_fraction
+from jactus.contracts.array_common import (
+    CE_IDX as _CE_IDX,
+)
+from jactus.contracts.array_common import (
+    F32 as _F32,
+)
+from jactus.contracts.array_common import (
+    FP_IDX as _FP_IDX,
+)
+from jactus.contracts.array_common import (
+    IED_IDX as _IED_IDX,
+)
+from jactus.contracts.array_common import (
+    IP_IDX as _IP_IDX,
+)
+from jactus.contracts.array_common import (
+    IPCB_IDX as _IPCB_IDX,
+)
+from jactus.contracts.array_common import (
+    IPCI_IDX as _IPCI_IDX,
+)
+from jactus.contracts.array_common import (
+    MD_IDX as _MD_IDX,
+)
 
 # Import shared infrastructure from array_common
 from jactus.contracts.array_common import (
     NOP_EVENT_IDX,
-    F32 as _F32,
-    # Cached EventType indices
-    AD_IDX as _AD_IDX,
-    IED_IDX as _IED_IDX,
-    MD_IDX as _MD_IDX,
-    PR_IDX as _PR_IDX,
+)
+from jactus.contracts.array_common import (
     PI_IDX as _PI_IDX,
+)
+from jactus.contracts.array_common import (
     PP_IDX as _PP_IDX,
-    PY_IDX as _PY_IDX,
-    PRF_IDX as _PRF_IDX,
-    FP_IDX as _FP_IDX,
+)
+from jactus.contracts.array_common import (
+    PR_IDX as _PR_IDX,
+)
+from jactus.contracts.array_common import (
     PRD_IDX as _PRD_IDX,
-    TD_IDX as _TD_IDX,
-    IP_IDX as _IP_IDX,
-    IPCI_IDX as _IPCI_IDX,
-    IPCB_IDX as _IPCB_IDX,
+)
+from jactus.contracts.array_common import (
+    PRF_IDX as _PRF_IDX,
+)
+from jactus.contracts.array_common import (
+    PY_IDX as _PY_IDX,
+)
+from jactus.contracts.array_common import (
     RR_IDX as _RR_IDX,
+)
+from jactus.contracts.array_common import (
     RRF_IDX as _RRF_IDX,
+)
+from jactus.contracts.array_common import (
     SC_IDX as _SC_IDX,
-    CE_IDX as _CE_IDX,
-    # Encoding helpers
-    encode_fee_basis as _encode_fee_basis,
-    encode_penalty_type as _encode_penalty_type,
-    get_role_sign as _get_role_sign,
+)
+from jactus.contracts.array_common import (
+    TD_IDX as _TD_IDX,
+)
+from jactus.contracts.array_common import (
     # Date helpers
     adt_to_dt as _adt_to_dt,
-    dt_to_adt as _dt_to_adt,
-    # Schedule helpers
-    get_evt_priority as _get_evt_priority,
-    get_yf_fn,
-    # Batch infrastructure
-    RawPrecomputed as _RawPrecomputed,
+)
+from jactus.contracts.array_common import (
     compute_vectorised_year_fractions as _compute_vectorised_year_fractions,
+)
+from jactus.contracts.array_common import (
+    dt_to_adt as _dt_to_adt,
+)
+from jactus.contracts.array_common import (
+    # Encoding helpers
+    encode_fee_basis as _encode_fee_basis,
+)
+from jactus.contracts.array_common import (
+    encode_penalty_type as _encode_penalty_type,
+)
+from jactus.contracts.array_common import (
+    get_role_sign as _get_role_sign,
+)
+from jactus.contracts.array_common import (
     prequery_risk_factors as _prequery_risk_factors,
 )
 
@@ -98,7 +137,12 @@ from jactus.contracts.lam_array import (
     IPCB_NTL,
     _encode_ipcb_mode,
 )
-
+from jactus.core import (
+    ActusDateTime,
+    ContractAttributes,
+)
+from jactus.observers import RiskFactorObserver
+from jactus.utilities.conventions import year_fraction
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -1189,7 +1233,7 @@ def _precompute_raw(
     # 5. Per-event prnxt values (signed)
     role_sign = _get_role_sign(attrs.contract_role)
     prnxt_list: list[float] = []
-    for evt_idx, evt_dt, calc_dt in schedule:
+    for evt_idx, _evt_dt, calc_dt in schedule:
         if evt_idx in (_PR_IDX, _PI_IDX, _PRF_IDX):
             prnxt_unsigned = _get_prnxt_for_time(attrs, _dt_to_adt(calc_dt))
             prnxt_list.append(role_sign * prnxt_unsigned)

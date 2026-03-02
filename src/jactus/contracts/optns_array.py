@@ -39,9 +39,8 @@ from jactus.contracts.array_common import (
     dt_to_adt,
     get_role_sign,
 )
-from jactus.core import ContractAttributes, EventType
+from jactus.core import ContractAttributes
 from jactus.observers import RiskFactorObserver
-
 
 # ---------------------------------------------------------------------------
 # Data structures

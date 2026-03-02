@@ -25,17 +25,16 @@ import jax.numpy as jnp
 import numpy as np
 
 from jactus.contracts.array_common import (
+    AD_IDX,
     F32,
     NOP_EVENT_IDX,
-    AD_IDX,
     PRD_IDX,
     TD_IDX,
     adt_to_dt,
     get_role_sign,
 )
-from jactus.core import ContractAttributes, EventType
+from jactus.core import ContractAttributes
 from jactus.observers import RiskFactorObserver
-
 
 # ---------------------------------------------------------------------------
 # Data structures

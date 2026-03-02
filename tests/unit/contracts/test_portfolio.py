@@ -6,7 +6,6 @@ unsupported types.
 """
 
 import jax.numpy as jnp
-import pytest
 
 from jactus.contracts.portfolio import (
     BATCH_SUPPORTED_TYPES,
@@ -387,4 +386,4 @@ class TestBatchSupportedTypes:
             ContractType.OPTNS,
             ContractType.SWPPV,
         }
-        assert BATCH_SUPPORTED_TYPES == expected
+        assert expected == BATCH_SUPPORTED_TYPES

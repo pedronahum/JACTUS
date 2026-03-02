@@ -7,12 +7,10 @@ Tolerance matches the ACTUS cross-validation standard (atol=1.0).
 
 import jax
 import jax.numpy as jnp
-import pytest
 
 from jactus.contracts.fxout import FXOutrightContract
 from jactus.contracts.fxout_array import (
     FXOUTArrayParams,
-    FXOUTArrayState,
     precompute_fxout_arrays,
     simulate_fxout_array,
     simulate_fxout_array_jit,

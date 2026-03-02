@@ -46,48 +46,73 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from jactus.core import (
-    ActusDateTime,
-    ContractAttributes,
-    ContractRole,
-    EventType,
+from jactus.contracts.array_common import (
+    # Cached EventType indices
+    AD_IDX as _AD_IDX,
 )
-from jactus.core.types import NUM_EVENT_TYPES
-from jactus.observers import RiskFactorObserver
-from jactus.utilities.conventions import year_fraction
+from jactus.contracts.array_common import (
+    CE_IDX as _CE_IDX,
+)
+from jactus.contracts.array_common import (
+    F32 as _F32,
+)
+from jactus.contracts.array_common import (
+    IED_IDX as _IED_IDX,
+)
+from jactus.contracts.array_common import (
+    IP_IDX as _IP_IDX,
+)
+from jactus.contracts.array_common import (
+    MD_IDX as _MD_IDX,
+)
 
 # Import shared infrastructure from array_common
 from jactus.contracts.array_common import (
     NOP_EVENT_IDX,
-    F32 as _F32,
-    USE_DATE_ARRAY as _USE_DATE_ARRAY,
-    # Cached EventType indices
-    AD_IDX as _AD_IDX,
-    IED_IDX as _IED_IDX,
-    MD_IDX as _MD_IDX,
-    PRD_IDX as _PRD_IDX,
-    TD_IDX as _TD_IDX,
-    IP_IDX as _IP_IDX,
-    RR_IDX as _RR_IDX,
-    RRF_IDX as _RRF_IDX,
-    CE_IDX as _CE_IDX,
-    # Encoding helpers
-    get_role_sign as _get_role_sign,
-    # Date helpers
-    adt_to_dt as _adt_to_dt,
-    dt_to_adt as _dt_to_adt,
-    # Schedule helpers
-    CYCLE_MONTHS_MAP as _CYCLE_MONTHS_MAP,
-    parse_cycle_fast as _parse_cycle_fast,
-    fast_schedule as _fast_schedule,
-    get_evt_priority as _get_evt_priority,
     get_yf_fn,
+)
+from jactus.contracts.array_common import (
+    PRD_IDX as _PRD_IDX,
+)
+from jactus.contracts.array_common import (
+    RR_IDX as _RR_IDX,
+)
+from jactus.contracts.array_common import (
+    TD_IDX as _TD_IDX,
+)
+from jactus.contracts.array_common import (
+    USE_DATE_ARRAY as _USE_DATE_ARRAY,
+)
+from jactus.contracts.array_common import (
     # Batch infrastructure
     RawPrecomputed as _RawPrecomputed,
-    pad_arrays as _pad_arrays,
+)
+from jactus.contracts.array_common import (
+    # Date helpers
+    adt_to_dt as _adt_to_dt,
+)
+from jactus.contracts.array_common import (
     compute_vectorised_year_fractions as _compute_vectorised_year_fractions,
+)
+from jactus.contracts.array_common import (
+    dt_to_adt as _dt_to_adt,
+)
+from jactus.contracts.array_common import (
+    fast_schedule as _fast_schedule,
+)
+from jactus.contracts.array_common import (
+    # Encoding helpers
+    get_role_sign as _get_role_sign,
+)
+from jactus.contracts.array_common import (
     prequery_risk_factors as _prequery_risk_factors,
 )
+from jactus.core import (
+    ContractAttributes,
+    EventType,
+)
+from jactus.observers import RiskFactorObserver
+from jactus.utilities.conventions import year_fraction
 
 # IPFX/IPFL indices (not in array_common, define locally)
 _IPFX_IDX = EventType.IPFX.index  # 22

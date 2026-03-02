@@ -35,76 +35,123 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from jactus.core import (
-    ActusDateTime,
-    ContractAttributes,
-    ContractRole,
-    EventType,
+from jactus.contracts.array_common import (
+    # Cached EventType indices
+    AD_IDX as _AD_IDX,
 )
-from jactus.core.types import NUM_EVENT_TYPES
-from jactus.observers import RiskFactorObserver
-from jactus.utilities.conventions import year_fraction
+from jactus.contracts.array_common import (
+    CE_IDX as _CE_IDX,
+)
+from jactus.contracts.array_common import (
+    # Schedule helpers
+    CYCLE_MONTHS_MAP as _CYCLE_MONTHS_MAP,
+)
+from jactus.contracts.array_common import (
+    F32 as _F32,
+)
+from jactus.contracts.array_common import (
+    FP_IDX as _FP_IDX,
+)
+from jactus.contracts.array_common import (
+    IED_IDX as _IED_IDX,
+)
+from jactus.contracts.array_common import (
+    IP_IDX as _IP_IDX,
+)
+from jactus.contracts.array_common import (
+    IPCI_IDX as _IPCI_IDX,
+)
+from jactus.contracts.array_common import (
+    MD_IDX as _MD_IDX,
+)
 
 # Import shared infrastructure from array_common
 from jactus.contracts.array_common import (
     NOP_EVENT_IDX,
-    F32 as _F32,
-    USE_DATE_ARRAY as _USE_DATE_ARRAY,
-    USE_BATCH_SCHEDULE as _USE_BATCH_SCHEDULE,
-    # Cached EventType indices
-    AD_IDX as _AD_IDX,
-    IED_IDX as _IED_IDX,
-    MD_IDX as _MD_IDX,
+)
+from jactus.contracts.array_common import (
     PP_IDX as _PP_IDX,
-    PY_IDX as _PY_IDX,
-    FP_IDX as _FP_IDX,
+)
+from jactus.contracts.array_common import (
     PRD_IDX as _PRD_IDX,
-    TD_IDX as _TD_IDX,
-    IP_IDX as _IP_IDX,
-    IPCI_IDX as _IPCI_IDX,
+)
+from jactus.contracts.array_common import (
+    PY_IDX as _PY_IDX,
+)
+from jactus.contracts.array_common import (
     RR_IDX as _RR_IDX,
+)
+from jactus.contracts.array_common import (
     RRF_IDX as _RRF_IDX,
+)
+from jactus.contracts.array_common import (
     SC_IDX as _SC_IDX,
-    CE_IDX as _CE_IDX,
-    # DCC encoding
-    DCC_A360 as _DCC_A360,
-    DCC_A365 as _DCC_A365,
-    DCC_E30360 as _DCC_E30360,
-    DCC_B30360 as _DCC_B30360,
-    # Encoding helpers
-    encode_fee_basis as _encode_fee_basis,
-    encode_penalty_type as _encode_penalty_type,
-    get_role_sign as _get_role_sign,
-    # Date helpers
-    adt_to_dt as _adt_to_dt,
-    dt_to_adt as _dt_to_adt,
-    days_in_month as _days_in_month,
-    # Schedule helpers
-    CYCLE_MONTHS_MAP as _CYCLE_MONTHS_MAP,
-    parse_cycle_fast as _parse_cycle_fast,
-    fast_month_schedule as _fast_month_schedule,
-    fast_schedule as _fast_schedule,
-    get_evt_priority as _get_evt_priority,
-    # Year fraction functions
-    yf_a360 as _yf_a360,
-    yf_a365 as _yf_a365,
-    yf_30e360 as _yf_30e360,
-    yf_b30360 as _yf_b30360,
-    # NumPy helpers
-    np_ymd_to_ordinal as _np_ymd_to_ordinal,
-    np_yf_30e360 as _np_yf_30e360,
-    np_yf_b30360 as _np_yf_b30360,
+)
+from jactus.contracts.array_common import (
+    TD_IDX as _TD_IDX,
+)
+from jactus.contracts.array_common import (
+    USE_BATCH_SCHEDULE as _USE_BATCH_SCHEDULE,
+)
+from jactus.contracts.array_common import (
+    USE_DATE_ARRAY as _USE_DATE_ARRAY,
+)
+from jactus.contracts.array_common import (
     # Batch infrastructure
     BatchContractParams as _BatchContractParams,
+)
+from jactus.contracts.array_common import (
     RawPrecomputed as _RawPrecomputed,
-    pad_arrays as _pad_arrays,
-    jax_batch_ip_schedule as _jax_batch_ip_schedule,
-    jax_batch_year_fractions as _jax_batch_year_fractions,
+)
+from jactus.contracts.array_common import (
+    # Date helpers
+    adt_to_dt as _adt_to_dt,
+)
+from jactus.contracts.array_common import (
     compute_max_ip as _compute_max_ip,
-    extract_batch_params as _extract_batch_params,
+)
+from jactus.contracts.array_common import (
     compute_vectorised_year_fractions as _compute_vectorised_year_fractions,
+)
+from jactus.contracts.array_common import (
+    dt_to_adt as _dt_to_adt,
+)
+from jactus.contracts.array_common import (
+    # Encoding helpers
+    encode_fee_basis as _encode_fee_basis,
+)
+from jactus.contracts.array_common import (
+    encode_penalty_type as _encode_penalty_type,
+)
+from jactus.contracts.array_common import (
+    extract_batch_params as _extract_batch_params,
+)
+from jactus.contracts.array_common import (
+    fast_schedule as _fast_schedule,
+)
+from jactus.contracts.array_common import (
+    get_evt_priority as _get_evt_priority,
+)
+from jactus.contracts.array_common import (
+    get_role_sign as _get_role_sign,
+)
+from jactus.contracts.array_common import (
+    jax_batch_ip_schedule as _jax_batch_ip_schedule,
+)
+from jactus.contracts.array_common import (
+    jax_batch_year_fractions as _jax_batch_year_fractions,
+)
+from jactus.contracts.array_common import (
+    parse_cycle_fast as _parse_cycle_fast,
+)
+from jactus.contracts.array_common import (
     prequery_risk_factors as _prequery_risk_factors,
 )
+from jactus.core import (
+    ContractAttributes,
+)
+from jactus.observers import RiskFactorObserver
+from jactus.utilities.conventions import year_fraction
 
 # ---------------------------------------------------------------------------
 # Data structures

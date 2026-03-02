@@ -7,12 +7,9 @@ Tolerance matches the ACTUS cross-validation standard (atol=1.0).
 
 import jax
 import jax.numpy as jnp
-import pytest
 
 from jactus.contracts.ann import AnnuityContract
 from jactus.contracts.ann_array import (
-    ANNArrayParams,
-    ANNArrayState,
     precompute_ann_arrays,
     simulate_ann_array,
     simulate_ann_array_jit,
