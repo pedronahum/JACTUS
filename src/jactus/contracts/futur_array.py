@@ -217,9 +217,7 @@ def precompute_futur_arrays(
     sd_dt = adt_to_dt(attrs.status_date)
 
     # Check for pre-exercised state
-    pre_exercised = (
-        attrs.exercise_date is not None and attrs.exercise_amount is not None
-    )
+    pre_exercised = attrs.exercise_date is not None and attrs.exercise_amount is not None
 
     if pre_exercised:
         # Pre-exercised: only STD with known exercise amount
@@ -245,9 +243,7 @@ def precompute_futur_arrays(
         # XD at maturity: observe spot, compute Xa
         underlier_ref = attrs.contract_structure or ""
         try:
-            spot_price = float(
-                rf_observer.observe_risk_factor(underlier_ref, attrs.maturity_date)
-            )
+            spot_price = float(rf_observer.observe_risk_factor(underlier_ref, attrs.maturity_date))
         except (KeyError, NotImplementedError, TypeError):
             spot_price = 0.0
 
@@ -274,9 +270,7 @@ def precompute_futur_arrays(
 
 def prepare_futur_batch(
     contracts: list[tuple[ContractAttributes, RiskFactorObserver]],
-) -> tuple[
-    FUTURArrayState, jnp.ndarray, jnp.ndarray, jnp.ndarray, FUTURArrayParams, jnp.ndarray
-]:
+) -> tuple[FUTURArrayState, jnp.ndarray, jnp.ndarray, jnp.ndarray, FUTURArrayParams, jnp.ndarray]:
     """Pre-compute and pad arrays for a batch of FUTUR contracts.
 
     Args:

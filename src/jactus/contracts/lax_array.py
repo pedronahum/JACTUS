@@ -230,9 +230,7 @@ def _pof_pr(
     Note: state.prnxt is already updated from the per-event schedule
     before this function is called.
     """
-    effective_prnxt = jnp.sign(state.prnxt) * jnp.minimum(
-        jnp.abs(state.prnxt), jnp.abs(state.nt)
-    )
+    effective_prnxt = jnp.sign(state.prnxt) * jnp.minimum(jnp.abs(state.prnxt), jnp.abs(state.nt))
     return state.nsc * effective_prnxt
 
 
@@ -395,9 +393,7 @@ def _stf_pr(
     before this function is called.
     """
     new_ipac = _accrue_interest_lax(state, yf)
-    effective_prnxt = jnp.sign(state.prnxt) * jnp.minimum(
-        jnp.abs(state.prnxt), jnp.abs(state.nt)
-    )
+    effective_prnxt = jnp.sign(state.prnxt) * jnp.minimum(jnp.abs(state.prnxt), jnp.abs(state.nt))
     new_nt = state.nt - effective_prnxt
     new_ipcb = jnp.where(
         params.ipcb_mode == IPCB_NTL,
@@ -1207,9 +1203,7 @@ def _precompute_raw(
     schedule = _lax_schedule_via_scalar(attrs, rf_observer)
 
     # 2. State initialisation
-    nt, ipnr, ipac, feac, nsc, isc, prnxt, ipcb, init_sd_dt = _lax_init_state(
-        attrs, rf_observer
-    )
+    nt, ipnr, ipac, feac, nsc, isc, prnxt, ipcb, init_sd_dt = _lax_init_state(attrs, rf_observer)
 
     if not schedule:
         params_raw = _extract_params_raw(attrs)

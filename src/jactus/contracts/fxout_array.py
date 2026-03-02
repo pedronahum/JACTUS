@@ -272,9 +272,7 @@ def precompute_fxout_arrays(
             cur2 = attrs.currency_2 or "YYY"
             rate_id = f"{cur2}/{cur}"
             try:
-                fx_rate = float(
-                    rf_observer.observe_risk_factor(rate_id, maturity_date)
-                )
+                fx_rate = float(rf_observer.observe_risk_factor(rate_id, maturity_date))
             except (KeyError, NotImplementedError, TypeError):
                 fx_rate = 0.0
             schedule.append((STD_IDX, fx_rate))
@@ -304,9 +302,7 @@ def precompute_fxout_arrays(
 
 def prepare_fxout_batch(
     contracts: list[tuple[ContractAttributes, RiskFactorObserver]],
-) -> tuple[
-    FXOUTArrayState, jnp.ndarray, jnp.ndarray, jnp.ndarray, FXOUTArrayParams, jnp.ndarray
-]:
+) -> tuple[FXOUTArrayState, jnp.ndarray, jnp.ndarray, jnp.ndarray, FXOUTArrayParams, jnp.ndarray]:
     """Pre-compute and pad arrays for a batch of FXOUT contracts.
 
     Args:

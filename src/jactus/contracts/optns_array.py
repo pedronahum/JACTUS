@@ -248,9 +248,7 @@ def precompute_optns_arrays(
     underlier_ref = attrs.contract_structure or ""
 
     # Check for pre-exercised state
-    pre_exercised = (
-        attrs.exercise_date is not None and attrs.exercise_amount is not None
-    )
+    pre_exercised = attrs.exercise_date is not None and attrs.exercise_amount is not None
 
     if pre_exercised:
         # Pre-exercised: only STD with known exercise amount
@@ -284,9 +282,7 @@ def precompute_optns_arrays(
         if exercise_type == "E":
             # European: XD at maturity
             try:
-                spot = float(
-                    rf_observer.observe_risk_factor(underlier_ref, attrs.maturity_date)
-                )
+                spot = float(rf_observer.observe_risk_factor(underlier_ref, attrs.maturity_date))
             except (KeyError, NotImplementedError, TypeError):
                 spot = 0.0
             xa = _compute_intrinsic_value(option_type, spot, strike_1, strike_2)
@@ -304,9 +300,7 @@ def precompute_optns_arrays(
                 if xd_dt > sd_dt:
                     try:
                         spot = float(
-                            rf_observer.observe_risk_factor(
-                                underlier_ref, dt_to_adt(xd_dt)
-                            )
+                            rf_observer.observe_risk_factor(underlier_ref, dt_to_adt(xd_dt))
                         )
                     except (KeyError, NotImplementedError, TypeError):
                         spot = 0.0
@@ -350,9 +344,7 @@ def precompute_optns_arrays(
 
 def prepare_optns_batch(
     contracts: list[tuple[ContractAttributes, RiskFactorObserver]],
-) -> tuple[
-    OPTNSArrayState, jnp.ndarray, jnp.ndarray, jnp.ndarray, OPTNSArrayParams, jnp.ndarray
-]:
+) -> tuple[OPTNSArrayState, jnp.ndarray, jnp.ndarray, jnp.ndarray, OPTNSArrayParams, jnp.ndarray]:
     """Pre-compute and pad arrays for a batch of OPTNS contracts.
 
     Args:

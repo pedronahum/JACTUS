@@ -137,9 +137,7 @@ def _assert_payoffs_match(py_result, payoffs, atol=ATOL):
     )
 
     # 2. Filter out PRF events from Python path (they map to NOP in array path)
-    py_events_filtered = [
-        e for e in py_result.events if e.event_type != EventType.PRF
-    ]
+    py_events_filtered = [e for e in py_result.events if e.event_type != EventType.PRF]
     py_payoffs = [float(e.payoff) for e in py_events_filtered]
 
     # 3. Filter out NOP events (zero-payoff padding from PRF conversion) from array
@@ -155,8 +153,7 @@ def _assert_payoffs_match(py_result, payoffs, atol=ATOL):
     # 5. Per-event payoff comparison for all non-NOP/non-PRF events
     for i in range(len(array_payoffs)):
         assert abs(array_payoffs[i] - py_payoffs_nonzero[i]) <= atol, (
-            f"Non-zero event {i}: array={array_payoffs[i]:.2f}, "
-            f"python={py_payoffs_nonzero[i]:.2f}"
+            f"Non-zero event {i}: array={array_payoffs[i]:.2f}, python={py_payoffs_nonzero[i]:.2f}"
         )
 
 
@@ -289,12 +286,12 @@ class TestScanEquivalence:
         # and cap (0.09 + 0.01 = 0.10 > 0.08)
         ts_data = {
             "LIBOR": [
-                (ActusDateTime(2024, 1, 1), 0.04),   # 0.04+0.01=0.05 (within bounds)
-                (ActusDateTime(2024, 7, 1), 0.005),   # 0.005+0.01=0.015 -> floor=0.02
-                (ActusDateTime(2025, 1, 1), 0.09),    # 0.09+0.01=0.10 -> cap=0.08
-                (ActusDateTime(2025, 7, 1), 0.05),    # 0.05+0.01=0.06 (within bounds)
-                (ActusDateTime(2026, 1, 1), 0.03),    # 0.03+0.01=0.04 (within bounds)
-                (ActusDateTime(2026, 7, 1), 0.06),    # 0.06+0.01=0.07 (within bounds)
+                (ActusDateTime(2024, 1, 1), 0.04),  # 0.04+0.01=0.05 (within bounds)
+                (ActusDateTime(2024, 7, 1), 0.005),  # 0.005+0.01=0.015 -> floor=0.02
+                (ActusDateTime(2025, 1, 1), 0.09),  # 0.09+0.01=0.10 -> cap=0.08
+                (ActusDateTime(2025, 7, 1), 0.05),  # 0.05+0.01=0.06 (within bounds)
+                (ActusDateTime(2026, 1, 1), 0.03),  # 0.03+0.01=0.04 (within bounds)
+                (ActusDateTime(2026, 7, 1), 0.06),  # 0.06+0.01=0.07 (within bounds)
             ]
         }
         rf_obs = TimeSeriesRiskFactorObserver(risk_factors=ts_data)
@@ -316,13 +313,14 @@ class TestScanEquivalence:
         )
 
         # Verify non-zero event counts match (NOP<->PRF mapping preserved)
-        py_nonzero = [e for e in py_result.events
-                      if e.event_type != EventType.PRF and float(e.payoff) != 0.0]
-        array_nonzero = [float(payoffs[i]) for i in range(payoffs.shape[0])
-                         if float(payoffs[i]) != 0.0]
+        py_nonzero = [
+            e for e in py_result.events if e.event_type != EventType.PRF and float(e.payoff) != 0.0
+        ]
+        array_nonzero = [
+            float(payoffs[i]) for i in range(payoffs.shape[0]) if float(payoffs[i]) != 0.0
+        ]
         assert len(array_nonzero) == len(py_nonzero), (
-            f"Non-zero event count mismatch: array={len(array_nonzero)}, "
-            f"python={len(py_nonzero)}"
+            f"Non-zero event count mismatch: array={len(array_nonzero)}, python={len(py_nonzero)}"
         )
 
     def test_total_cashflow_equivalence(self):

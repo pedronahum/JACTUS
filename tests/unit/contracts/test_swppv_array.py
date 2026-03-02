@@ -317,12 +317,12 @@ class TestScanEquivalence:
         # where full_IP_0 spans before+after SD (so it's larger than the
         # array's partial_IP). The subsequent full IPs should match.
         py_post_sd_ips = [
-            float(e.payoff) for e in py_result.events
+            float(e.payoff)
+            for e in py_result.events
             if e.event_time > sd and float(e.payoff) != 0.0
         ]
         array_full_ips = [
-            float(payoffs[i]) for i in range(1, payoffs.shape[0])
-            if float(payoffs[i]) != 0.0
+            float(payoffs[i]) for i in range(1, payoffs.shape[0]) if float(payoffs[i]) != 0.0
         ]
 
         # Array full IPs should match Python post-SD IPs[1:] (both skip
@@ -367,12 +367,12 @@ class TestScanEquivalence:
         # Use LIBOR values that trigger both floor and cap
         ts_data = {
             "LIBOR-6M": [
-                (ActusDateTime(2024, 1, 1), 0.03),    # 0.03+0.01=0.04 (within bounds)
-                (ActusDateTime(2024, 7, 1), 0.005),   # 0.005+0.01=0.015 -> floor=0.02
-                (ActusDateTime(2025, 1, 1), 0.09),    # 0.09+0.01=0.10 -> cap=0.08
-                (ActusDateTime(2025, 7, 1), 0.05),    # 0.05+0.01=0.06 (within bounds)
-                (ActusDateTime(2026, 1, 1), 0.04),    # 0.04+0.01=0.05 (within bounds)
-                (ActusDateTime(2026, 7, 1), 0.06),    # 0.06+0.01=0.07 (within bounds)
+                (ActusDateTime(2024, 1, 1), 0.03),  # 0.03+0.01=0.04 (within bounds)
+                (ActusDateTime(2024, 7, 1), 0.005),  # 0.005+0.01=0.015 -> floor=0.02
+                (ActusDateTime(2025, 1, 1), 0.09),  # 0.09+0.01=0.10 -> cap=0.08
+                (ActusDateTime(2025, 7, 1), 0.05),  # 0.05+0.01=0.06 (within bounds)
+                (ActusDateTime(2026, 1, 1), 0.04),  # 0.04+0.01=0.05 (within bounds)
+                (ActusDateTime(2026, 7, 1), 0.06),  # 0.06+0.01=0.07 (within bounds)
             ]
         }
         rf_obs = TimeSeriesRiskFactorObserver(risk_factors=ts_data)

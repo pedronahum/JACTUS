@@ -123,9 +123,7 @@ class TestScanEquivalence:
 
     def test_short_position(self):
         """Short futures position (RPL)."""
-        attrs = _make_futur_attrs(
-            futures_price=1800.0, notional=100.0, role=ContractRole.RPL
-        )
+        attrs = _make_futur_attrs(futures_price=1800.0, notional=100.0, role=ContractRole.RPL)
         rf_obs = DictRiskFactorObserver({"GC": 1850.0})
 
         py_result = _simulate_python_path(attrs, rf_obs)
@@ -134,9 +132,7 @@ class TestScanEquivalence:
 
     def test_with_purchase(self):
         """FUTUR with purchase event (PRD)."""
-        attrs = _make_futur_with_purchase_attrs(
-            futures_price=1800.0, notional=100.0, pprd=50.0
-        )
+        attrs = _make_futur_with_purchase_attrs(futures_price=1800.0, notional=100.0, pprd=50.0)
         rf_obs = DictRiskFactorObserver({"GC": 1850.0})
 
         py_result = _simulate_python_path(attrs, rf_obs)
@@ -172,15 +168,11 @@ class TestBatchEquivalence:
                 DictRiskFactorObserver({"GC": 1850.0}),
             ),
             (
-                _make_futur_attrs(
-                    futures_price=1800.0, notional=50.0, role=ContractRole.RPL
-                ),
+                _make_futur_attrs(futures_price=1800.0, notional=50.0, role=ContractRole.RPL),
                 DictRiskFactorObserver({"GC": 1900.0}),
             ),
             (
-                _make_futur_with_purchase_attrs(
-                    futures_price=2000.0, notional=10.0, pprd=25.0
-                ),
+                _make_futur_with_purchase_attrs(futures_price=2000.0, notional=10.0, pprd=25.0),
                 DictRiskFactorObserver({"GC": 2100.0}),
             ),
         ]

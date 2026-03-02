@@ -282,8 +282,7 @@ class TestScanEquivalence:
         # Event count should match
         py_payoffs = jnp.array([float(e.payoff) for e in py_result.events])
         assert py_payoffs.shape == payoffs.shape, (
-            f"Event count mismatch: Python={py_payoffs.shape[0]}, "
-            f"Array={payoffs.shape[0]}"
+            f"Event count mismatch: Python={py_payoffs.shape[0]}, Array={payoffs.shape[0]}"
         )
 
         # Events before the AD boundary should match exactly

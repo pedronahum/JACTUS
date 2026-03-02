@@ -256,9 +256,7 @@ def _pof_pr(
 
     Prnxt is capped at remaining notional to prevent overshoot.
     """
-    effective_prnxt = jnp.sign(state.prnxt) * jnp.minimum(
-        jnp.abs(state.prnxt), jnp.abs(state.nt)
-    )
+    effective_prnxt = jnp.sign(state.prnxt) * jnp.minimum(jnp.abs(state.prnxt), jnp.abs(state.nt))
     return state.nsc * effective_prnxt
 
 
@@ -420,9 +418,7 @@ def _stf_pr(
     Ipcb = Nt (if mode NT or NTIED), unchanged if NTL
     """
     new_ipac = _accrue_interest_lam(state, yf)
-    effective_prnxt = jnp.sign(state.prnxt) * jnp.minimum(
-        jnp.abs(state.prnxt), jnp.abs(state.nt)
-    )
+    effective_prnxt = jnp.sign(state.prnxt) * jnp.minimum(jnp.abs(state.prnxt), jnp.abs(state.nt))
     new_nt = state.nt - effective_prnxt
     # IPCB update: NT/NTIED track current notional, NTL unchanged
     new_ipcb = jnp.where(

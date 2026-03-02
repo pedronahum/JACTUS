@@ -342,10 +342,10 @@ class TestScanEquivalence:
         )
         ts_data = {
             "LIBOR": [
-                (ActusDateTime(2024, 1, 1), 0.04),    # 0.04*1+0.01=0.05 -> ok
-                (ActusDateTime(2024, 7, 1), 0.10),     # 0.10*1+0.01=0.11 -> capped at 0.08
-                (ActusDateTime(2025, 1, 1), -0.02),    # -0.02*1+0.01=-0.01 -> floored at 0.02
-                (ActusDateTime(2025, 7, 1), 0.06),     # 0.06*1+0.01=0.07 -> ok
+                (ActusDateTime(2024, 1, 1), 0.04),  # 0.04*1+0.01=0.05 -> ok
+                (ActusDateTime(2024, 7, 1), 0.10),  # 0.10*1+0.01=0.11 -> capped at 0.08
+                (ActusDateTime(2025, 1, 1), -0.02),  # -0.02*1+0.01=-0.01 -> floored at 0.02
+                (ActusDateTime(2025, 7, 1), 0.06),  # 0.06*1+0.01=0.07 -> ok
                 (ActusDateTime(2026, 1, 1), 0.05),
                 (ActusDateTime(2026, 7, 1), 0.04),
             ]
@@ -370,7 +370,10 @@ class TestBatchEquivalence:
         rf_obs = ConstantRiskFactorObserver(0.0)
         contracts = [
             (_make_fixed_lam_attrs(notional=100_000.0, prnxt=20_000.0), rf_obs),
-            (_make_fixed_lam_attrs(notional=50_000.0, prnxt=10_000.0, role=ContractRole.RPL), rf_obs),
+            (
+                _make_fixed_lam_attrs(notional=50_000.0, prnxt=10_000.0, role=ContractRole.RPL),
+                rf_obs,
+            ),
             (_make_monthly_lam_attrs(), rf_obs),
         ]
 

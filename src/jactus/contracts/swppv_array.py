@@ -639,12 +639,8 @@ def batch_simulate_swppv(
         #   zero group:   IP, IPFX, MD, TD -> 0
         #   IED:          0
         #   default:      unchanged
-        is_accrue_ipac1 = (
-            (et == _AD_IDX) | (et == _PRD_IDX) | (et == _RR_IDX) | (et == _CE_IDX)
-        )
-        is_zero_ipac1 = (
-            (et == _IP_IDX) | (et == _IPFX_IDX) | (et == _MD_IDX) | (et == _TD_IDX)
-        )
+        is_accrue_ipac1 = (et == _AD_IDX) | (et == _PRD_IDX) | (et == _RR_IDX) | (et == _CE_IDX)
+        is_zero_ipac1 = (et == _IP_IDX) | (et == _IPFX_IDX) | (et == _MD_IDX) | (et == _TD_IDX)
         new_ipac1 = states.ipac1
         new_ipac1 = jnp.where(is_accrue_ipac1, accrue_fixed, new_ipac1)
         new_ipac1 = jnp.where(is_zero_ipac1, 0.0, new_ipac1)
@@ -662,9 +658,7 @@ def batch_simulate_swppv(
             | (et == _CE_IDX)
             | (et == _IPFX_IDX)
         )
-        is_zero_ipac2 = (
-            (et == _IP_IDX) | (et == _IPFL_IDX) | (et == _MD_IDX) | (et == _TD_IDX)
-        )
+        is_zero_ipac2 = (et == _IP_IDX) | (et == _IPFL_IDX) | (et == _MD_IDX) | (et == _TD_IDX)
         new_ipac2 = states.ipac2
         new_ipac2 = jnp.where(is_accrue_ipac2, accrue_float, new_ipac2)
         new_ipac2 = jnp.where(is_zero_ipac2, 0.0, new_ipac2)
@@ -743,9 +737,7 @@ def _extract_params_raw(attrs: ContractAttributes) -> dict[str, float | int]:
 
 def _params_raw_to_jax(raw: dict[str, float | int]) -> SWPPVArrayParams:
     """Convert raw Python params to JAX SWPPVArrayParams."""
-    return SWPPVArrayParams(
-        **{k: jnp.array(raw[k], dtype=_F32) for k in SWPPVArrayParams._fields}
-    )
+    return SWPPVArrayParams(**{k: jnp.array(raw[k], dtype=_F32) for k in SWPPVArrayParams._fields})
 
 
 # ---------------------------------------------------------------------------
@@ -803,11 +795,7 @@ def _fast_swppv_schedule(
 
     # IP / IPFX+IPFL: Interest Payment schedule
     if attrs.interest_payment_cycle:
-        ip_anchor = (
-            attrs.interest_payment_anchor
-            or attrs.interest_calculation_base_anchor
-            or ied
-        )
+        ip_anchor = attrs.interest_payment_anchor or attrs.interest_calculation_base_anchor or ied
         ip_dates = _fast_schedule(ip_anchor, attrs.interest_payment_cycle, md)
 
         # Add maturity date as final payment if not already included
@@ -826,9 +814,7 @@ def _fast_swppv_schedule(
 
     # PRD: Purchase Date
     if attrs.purchase_date:
-        events.append(
-            (_PRD_IDX, _adt_to_dt(attrs.purchase_date), _adt_to_dt(attrs.purchase_date))
-        )
+        events.append((_PRD_IDX, _adt_to_dt(attrs.purchase_date), _adt_to_dt(attrs.purchase_date)))
 
     # TD: Termination Date
     if attrs.termination_date:
@@ -1144,7 +1130,10 @@ def _raw_list_to_jax_batch(
     batched_masks = jnp.asarray(np.array(mask_batch, dtype=np.float32))
 
     batched_params = SWPPVArrayParams(
-        **{k: jnp.asarray(np.array(param_fields[k], dtype=np.float32)) for k in SWPPVArrayParams._fields}
+        **{
+            k: jnp.asarray(np.array(param_fields[k], dtype=np.float32))
+            for k in SWPPVArrayParams._fields
+        }
     )
 
     return batched_states, batched_et, batched_yf, batched_rf, batched_params, batched_masks

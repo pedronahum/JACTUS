@@ -205,6 +205,7 @@ class PAMArrayParams(NamedTuple):
 # Pure JAX payoff functions  (state, params, yf, rf) → scalar payoff
 # ============================================================================
 
+
 def _pof_ad(
     state: PAMArrayState, params: PAMArrayParams, yf: jnp.ndarray, rf: jnp.ndarray
 ) -> jnp.ndarray:
@@ -1083,8 +1084,6 @@ def _fast_pam_init_state(
     return (0.0, 0.0, 0.0, 0.0, 1.0, 1.0, sd_dt)
 
 
-
-
 def _precompute_raw(
     attrs: ContractAttributes,
     rf_observer: RiskFactorObserver,
@@ -1189,8 +1188,6 @@ def _precompute_raw_da(
         rf_values=rf_list,
         params=params_raw,
     )
-
-
 
 
 def _classify_contracts_for_batch(
@@ -1347,7 +1344,6 @@ def _jax_batch_assemble(
     return event_types, event_ordinals, event_valid, n_events
 
 
-
 def _batch_precompute_pam_impl(
     params: _BatchContractParams,
     max_ip: int,
@@ -1428,7 +1424,6 @@ def precompute_pam_arrays(
 # ============================================================================
 # Batch / portfolio API
 # ============================================================================
-
 
 
 def _raw_list_to_jax_batch(

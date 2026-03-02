@@ -126,7 +126,10 @@ class TestBatchEquivalence:
         contracts = [
             (_make_csh_attrs(notional=100_000.0), ConstantRiskFactorObserver(0.0)),
             (_make_csh_attrs(notional=200_000.0), ConstantRiskFactorObserver(0.0)),
-            (_make_csh_attrs(notional=50_000.0, role=ContractRole.RPL), ConstantRiskFactorObserver(0.0)),
+            (
+                _make_csh_attrs(notional=50_000.0, role=ContractRole.RPL),
+                ConstantRiskFactorObserver(0.0),
+            ),
         ]
 
         # Individual simulations
