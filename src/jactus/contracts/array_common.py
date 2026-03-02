@@ -10,10 +10,14 @@ Extracted from ``pam_array.py`` to avoid code duplication across contract types.
 from __future__ import annotations
 
 import re as _re
+from collections.abc import Callable, Sequence
 from datetime import datetime as _datetime
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
-import jax
+if TYPE_CHECKING:
+    from jactus.core.types import DayCountConvention
+    from jactus.observers import RiskFactorObserver
+
 import jax.numpy as jnp
 import numpy as np
 
@@ -272,7 +276,7 @@ def yf_b30360(d1: _datetime, d2: _datetime) -> float:
     return ((y2 - y1) * 360 + (m2 - m1) * 30 + (dd2 - dd1)) / 360.0
 
 
-def get_yf_fn(dcc_enum):  # noqa: ANN001
+def get_yf_fn(dcc_enum: DayCountConvention) -> Callable[[_datetime, _datetime], float] | None:
     """Return the appropriate scalar year-fraction function for a DCC enum.
 
     Returns ``None`` for uncommon DCCs that need the full ``year_fraction`` path.
@@ -551,7 +555,7 @@ class RawPrecomputed(NamedTuple):
 def compute_vectorised_year_fractions(
     schedule: list[tuple[int, _datetime, _datetime]],
     init_sd_dt: _datetime,
-    dcc_enum,  # noqa: ANN001
+    dcc_enum: DayCountConvention,
 ) -> list[float]:
     """Compute year fractions for a schedule using NumPy-vectorised helpers.
 
@@ -596,19 +600,18 @@ def compute_vectorised_year_fractions(
         calc_ord = np_ymd_to_ordinal(calc_y, calc_m, calc_d)
         delta = (calc_ord - sd_ord).astype(np.float64)
         divisor = 360.0 if dcc_enum == DayCountConvention.A360 else 365.0
-        return (delta / divisor).tolist()
-    elif dcc_enum == DayCountConvention.E30360:
-        return np_yf_30e360(sd_y, sd_m, sd_d, calc_y, calc_m, calc_d).tolist()
-    elif dcc_enum == DayCountConvention.B30360:
-        return np_yf_b30360(sd_y, sd_m, sd_d, calc_y, calc_m, calc_d).tolist()
-    else:
-        # Fallback to scalar for AA, E30360ISDA, BUS252
-        yf_list: list[float] = []
-        current_sd_dt = init_sd_dt
-        for _ei, evt_dt, calc_dt in schedule:
-            yf_list.append(year_fraction(dt_to_adt(current_sd_dt), dt_to_adt(calc_dt), dcc_enum))
-            current_sd_dt = evt_dt
-        return yf_list
+        return list((delta / divisor).tolist())
+    if dcc_enum == DayCountConvention.E30360:
+        return list(np_yf_30e360(sd_y, sd_m, sd_d, calc_y, calc_m, calc_d).tolist())
+    if dcc_enum == DayCountConvention.B30360:
+        return list(np_yf_b30360(sd_y, sd_m, sd_d, calc_y, calc_m, calc_d).tolist())
+    # Fallback to scalar for AA, E30360ISDA, BUS252
+    yf_list: list[float] = []
+    current_sd_dt = init_sd_dt
+    for _ei, evt_dt, calc_dt in schedule:
+        yf_list.append(year_fraction(dt_to_adt(current_sd_dt), dt_to_adt(calc_dt), dcc_enum))
+        current_sd_dt = evt_dt
+    return yf_list
 
 
 # ---------------------------------------------------------------------------
@@ -619,7 +622,7 @@ def compute_vectorised_year_fractions(
 def prequery_risk_factors(
     schedule: list[tuple[int, _datetime, _datetime]],
     attrs: ContractAttributes,
-    rf_observer,  # noqa: ANN001
+    rf_observer: RiskFactorObserver,
     additional_rf_events: set[int] | None = None,
 ) -> list[float]:
     """Pre-query risk factors for all events in a schedule.
@@ -671,7 +674,7 @@ def prequery_risk_factors(
 
 
 def extract_batch_params(
-    contracts: list[tuple[ContractAttributes, object]],
+    contracts: Sequence[tuple[ContractAttributes, object]],
     indices: list[int],
 ) -> BatchContractParams:
     """Extract schedule parameters into JAX arrays for batch processing."""

@@ -28,10 +28,8 @@ from typing import Any
 import jax.numpy as jnp
 import numpy as np
 
-from jactus.contracts.base import BaseContract
 from jactus.core import ContractAttributes, ContractType
 from jactus.observers import RiskFactorObserver
-
 
 # ---------------------------------------------------------------------------
 # Type -> portfolio function registry
@@ -45,7 +43,7 @@ def _get_portfolio_fn(ct: ContractType) -> Any | None:
     if ct in _PORTFOLIO_FN_REGISTRY:
         return _PORTFOLIO_FN_REGISTRY[ct]
 
-    fn = None
+    fn: Any = None
     try:
         if ct == ContractType.PAM:
             from jactus.contracts.pam_array import simulate_pam_portfolio
@@ -224,7 +222,7 @@ def simulate_portfolio(
             batch_count += len(group)
         else:
             # Scalar fallback path
-            for j, (idx, attrs, rf_obs) in enumerate(group):
+            for _j, (idx, attrs, rf_obs) in enumerate(group):
                 total_cashflows[idx] = _simulate_scalar_fallback(attrs, rf_obs)
 
             fallback_count += len(group)

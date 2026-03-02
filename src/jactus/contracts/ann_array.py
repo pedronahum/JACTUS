@@ -34,42 +34,53 @@ Example::
 from __future__ import annotations
 
 from datetime import datetime as _datetime
-from typing import Any, NamedTuple
+from typing import Any
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
-from jactus.core import (
-    ContractAttributes,
-    ContractType,
+from jactus.contracts.array_common import (
+    F32 as _F32,
 )
-from jactus.observers import RiskFactorObserver
-from jactus.utilities.conventions import year_fraction
 
 # Import shared infrastructure from array_common
 from jactus.contracts.array_common import (
     NOP_EVENT_IDX,
-    F32 as _F32,
-    USE_DATE_ARRAY as _USE_DATE_ARRAY,
-    # Cached EventType indices
-    IED_IDX as _IED_IDX,
-    PRF_IDX as _PRF_IDX,
-    RR_IDX as _RR_IDX,
-    RRF_IDX as _RRF_IDX,
-    # Encoding helpers
-    encode_fee_basis as _encode_fee_basis,
-    encode_penalty_type as _encode_penalty_type,
-    get_role_sign as _get_role_sign,
-    # Date helpers
-    adt_to_dt as _adt_to_dt,
-    dt_to_adt as _dt_to_adt,
     # Schedule helpers
     get_yf_fn,
-    get_evt_priority as _get_evt_priority,
+)
+from jactus.contracts.array_common import (
+    PRF_IDX as _PRF_IDX,
+)
+from jactus.contracts.array_common import (
+    USE_DATE_ARRAY as _USE_DATE_ARRAY,
+)
+from jactus.contracts.array_common import (
     # Batch infrastructure
     RawPrecomputed as _RawPrecomputed,
+)
+from jactus.contracts.array_common import (
+    # Date helpers
+    adt_to_dt as _adt_to_dt,
+)
+from jactus.contracts.array_common import (
     compute_vectorised_year_fractions as _compute_vectorised_year_fractions,
+)
+from jactus.contracts.array_common import (
+    dt_to_adt as _dt_to_adt,
+)
+from jactus.contracts.array_common import (
+    # Encoding helpers
+    encode_fee_basis as _encode_fee_basis,
+)
+from jactus.contracts.array_common import (
+    encode_penalty_type as _encode_penalty_type,
+)
+from jactus.contracts.array_common import (
+    get_role_sign as _get_role_sign,
+)
+from jactus.contracts.array_common import (
     prequery_risk_factors as _prequery_risk_factors,
 )
 
@@ -77,18 +88,20 @@ from jactus.contracts.array_common import (
 # Reuse NAM's kernel, state, and params -- ANN is numerically identical
 # ---------------------------------------------------------------------------
 from jactus.contracts.nam_array import (
-    NAMArrayState,
     NAMArrayParams,
-    IPCB_NT,
-    IPCB_NTIED,
-    IPCB_NTL,
-    simulate_nam_array,
-    simulate_nam_array_jit,
-    batch_simulate_nam,
-    batch_simulate_nam_auto,
+    NAMArrayState,
     _encode_ipcb_mode,
     _params_raw_to_jax,
+    batch_simulate_nam,
+    batch_simulate_nam_auto,
+    simulate_nam_array,
+    simulate_nam_array_jit,
 )
+from jactus.core import (
+    ContractAttributes,
+)
+from jactus.observers import RiskFactorObserver
+from jactus.utilities.conventions import year_fraction
 
 # Type aliases for public API clarity
 ANNArrayState = NAMArrayState
@@ -156,8 +169,7 @@ def _ann_compute_prnxt(attrs: ContractAttributes, rf_observer: RiskFactorObserve
     contract = AnnuityContract(attrs, rf_observer)
     state = contract.initialize_state()
 
-    role_sign = _get_role_sign(attrs.contract_role)
-    prnxt_signed = float(state.prnxt)
+    prnxt_signed = float(state.prnxt) if state.prnxt is not None else 0.0
     # Return unsigned value
     return abs(prnxt_signed)
 
@@ -385,9 +397,6 @@ def _precompute_raw(
     rf_list = _prequery_risk_factors(schedule, attrs, rf_observer)
 
     # 4. Compute prnxt (unsigned) for params
-    prnxt_unsigned = abs(prnxt) / abs(_get_role_sign(attrs.contract_role)) if prnxt != 0 else 0.0
-    # Actually, prnxt from init_state is already role-sign-adjusted. Extract unsigned.
-    role_sign = _get_role_sign(attrs.contract_role)
     prnxt_unsigned = abs(prnxt)  # prnxt is signed; NAMArrayParams wants unsigned
 
     # 5. Extract params
