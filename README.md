@@ -286,6 +286,7 @@ Hands-on tutorials with visualizations in `examples/notebooks/`:
 - **[03 - Interest Rate Cap](examples/notebooks/03_interest_rate_cap.ipynb)** - Interest rate protection scenarios
 - **[04 - Stock & Commodity](examples/notebooks/04_stock_commodity.ipynb)** - Asset position tracking
 - **[05 - GPU/TPU Portfolio Benchmark](examples/notebooks/05_gpu_tpu_portfolio_benchmark.ipynb)** - Array-mode PAM with 50K contracts [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/pedronahum/JACTUS/blob/main/examples/notebooks/05_gpu_tpu_portfolio_benchmark.ipynb)
+- **[06 - Gallery of Contracts](examples/notebooks/06_gallery_of_contracts.ipynb)** - All 18 ACTUS types in one notebook [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/pedronahum/JACTUS/blob/main/examples/notebooks/06_gallery_of_contracts.ipynb)
 
 ### Python Scripts
 
@@ -303,6 +304,7 @@ Ready-to-run examples in `examples/`:
 
 The Jupyter notebooks provide visual, hands-on learning with charts and step-by-step explanations:
 
+- **Gallery of Contracts** - All 18 ACTUS types in one notebook: principal, non-principal, derivative, and composite contracts with portfolio API, JAX autodiff risk metrics, and behavioral observers
 - **Annuity (ANN)** - Mortgage amortization with payment composition visualization
 - **Options (OPTNS)** - Call/put options with payoff diagrams
 - **Cap/Floor (CAPFL)** - Interest rate protection analysis
