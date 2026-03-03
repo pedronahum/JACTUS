@@ -939,20 +939,15 @@ for i in range(0, len(portfolio), batch_size):
 
 ### GPU / TPU Acceleration
 
-The array-mode simulation path (`pam_array.py`) is designed for transparent
-hardware acceleration:
+12 of 18 contract types have dedicated array-mode simulation paths (PAM, LAM, NAM, ANN, LAX, CSH, STK, COM, FXOUT, FUTUR, OPTNS, SWPPV). These use JIT-compiled JAX kernels operating on `[B, T]` shaped arrays for portfolio-scale simulation. The unified entry point is `simulate_portfolio()` in `jactus.contracts.portfolio`.
 
-- **Batch strategy**: `batch_simulate_pam_auto()` uses the single-scan approach
-  (`batch_simulate_pam`) on all backends. This processes all contracts together
-  in shaped `[B, T]` arrays via a single `lax.scan`, which outperforms `vmap`
-  on CPU, GPU, *and* TPU by avoiding per-contract dispatch overhead.
-- **JIT-compiled pre-computation**: `batch_precompute_pam()` generates event
-  schedules and year fractions as pure JAX operations, keeping data on-device.
-- **`lax.scan(unroll=8)`**: Reduces GPU kernel launches by 8× compared to
-  un-unrolled scans.
+- **Batch strategy**: `batch_simulate_<type>_auto()` uses the single-scan approach on CPU and `jax.vmap` on GPU/TPU, processing all contracts together in shaped `[B, T]` arrays.
+- **JIT-compiled pre-computation**: `batch_precompute_pam()` generates event schedules and year fractions as pure JAX operations, keeping data on-device.
+- **`lax.scan(unroll=8)`**: Reduces GPU kernel launches by 8× for stateful types.
 
-No code changes are needed — install `jax[cuda13]` or `jax[tpu]` and JACTUS
-uses the accelerator automatically.
+No code changes are needed — install `jax[cuda13]` or `jax[tpu]` and JACTUS uses the accelerator automatically.
+
+> For comprehensive array-mode documentation, see [ARRAY_MODE.md](ARRAY_MODE.md).
 
 #### Float Precision
 
@@ -974,10 +969,11 @@ jax.config.update("jax_enable_x64", True)
 
 ### Potential Optimizations
 
-1. **Array-mode for more contract types**: Extend the `pam_array.py` pattern to LAM, ANN, NAM
-2. **Multi-device parallelism**: Use `jax.experimental.shard_map` for 100K+ contract portfolios
-3. **Compilation cache**: `jax.config.update("jax_compilation_cache_dir", "/tmp/jax_cache")` avoids re-JIT across runs
-4. **Cache Event Schedules**: Pre-compute and cache schedules for repeated simulations
+1. **Array-mode for remaining 6 types**: Extend to CLM, UMP, SWAPS, CAPFL, CEG, CEC (currently these use scalar fallback)
+2. **Batch pre-computation for non-PAM types**: Extend the `batch_precompute_pam()` pattern (pure-JAX schedule generation) to other stateful types
+3. **Multi-device parallelism**: Use `jax.experimental.shard_map` for 100K+ contract portfolios
+4. **Compilation cache**: `jax.config.update("jax_compilation_cache_dir", "/tmp/jax_cache")` avoids re-JIT across runs
+5. **Cache Event Schedules**: Pre-compute and cache schedules for repeated simulations
 
 ---
 

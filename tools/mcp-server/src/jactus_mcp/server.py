@@ -43,7 +43,7 @@ Required workflow — always follow these steps in order:
 4. jactus_simulate_contract → run the simulation and get cash flows
 5. jactus_list_risk_factor_observers → discover all observer types (market + behavioral)
 6. jactus_get_topic_guide → structured guides: "contracts", "behavioral", "scenario",
-   "jax", "events", "attributes"
+   "jax", "events", "attributes", "array_mode"
 7. jactus_search_docs → keyword search across documentation
 
 The schema tool returns everything you need to build valid attributes: field names,
@@ -394,7 +394,8 @@ def jactus_get_topic_guide(topic: str) -> dict[str, Any]:
             "behavioral" (behavioral observers, callout events, prepayment/deposit models),
             "scenario" (scenario management, bundling observers),
             "jax" (JAX integration and autodiff), "events" (event types and lifecycle),
-            "attributes" (contract parameters and conventions).
+            "attributes" (contract parameters and conventions),
+            "array_mode" (batch simulation, portfolio API, GPU/TPU acceleration).
     """
     return documentation.get_topic_guide(topic)
 

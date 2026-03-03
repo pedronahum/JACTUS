@@ -20,6 +20,7 @@ JACTUS is a Python library that implements the **ACTUS (Algorithmic Contract Typ
 ### Key Features
 
 - **High Performance**: Leverages JAX's JIT compilation and GPU acceleration
+- **Array-Mode Portfolio API**: Batch simulation of 12 contract types via JIT-compiled kernels on `[B, T]` arrays — see [Array-Mode Guide](docs/ARRAY_MODE.md)
 - **Automatic Differentiation**: Built-in support for gradient-based risk analytics
 - **Behavioral Risk Models**: Prepayment surfaces, deposit behavior, and dynamic event injection via callout events
 - **Scenario Management**: Bundle market and behavioral observers into named configurations
@@ -178,6 +179,7 @@ Full documentation is available at **[pedronahum.github.io/JACTUS](https://pedro
 
 - **[Architecture Guide](docs/ARCHITECTURE.md)** - Comprehensive system architecture, design patterns, and implementation details
 - **[PAM Contract Walkthrough](docs/PAM.md)** - Deep dive into JACTUS internals using the Principal at Maturity contract
+- **[Array-Mode & Portfolio Guide](docs/ARRAY_MODE.md)** - Batch simulation, GPU acceleration, and automatic differentiation
 - **[Derivative Contracts Guide](docs/derivatives.md)** - Complete guide to all 8 derivative contract types
 
 ### Try It Now
@@ -405,6 +407,7 @@ jactus/
 ├── docs/                   # Documentation
 │   ├── ARCHITECTURE.md     # System architecture guide
 │   ├── PAM.md              # PAM implementation walkthrough
+│   ├── ARRAY_MODE.md       # Array-mode simulation & portfolio API
 │   └── derivatives.md      # Derivative contracts guide
 ├── examples/               # Example scripts
 │   ├── pam_example.py                        # Principal at Maturity examples

@@ -21,6 +21,7 @@ def search_docs(query: str) -> dict[str, Any]:
     doc_files = [
         docs_dir / "ARCHITECTURE.md",
         docs_dir / "PAM.md",
+        docs_dir / "ARRAY_MODE.md",
         docs_dir / "derivatives.md",
         jactus_root / "README.md",
     ]
@@ -73,6 +74,7 @@ def search_docs(query: str) -> dict[str, Any]:
             "available_docs": [
                 "ARCHITECTURE.md - System architecture and design",
                 "PAM.md - Principal at Maturity walkthrough",
+                "ARRAY_MODE.md - Array-mode simulation and portfolio API",
                 "derivatives.md - Derivative contracts guide",
                 "README.md - Project overview and quick start",
             ],
@@ -102,6 +104,7 @@ def get_doc_structure() -> dict[str, Any]:
         "README.md": jactus_root / "README.md",
         "ARCHITECTURE.md": docs_dir / "ARCHITECTURE.md",
         "PAM.md": docs_dir / "PAM.md",
+        "ARRAY_MODE.md": docs_dir / "ARRAY_MODE.md",
         "derivatives.md": docs_dir / "derivatives.md",
     }
 
@@ -430,6 +433,90 @@ ContractAttributes defines all contract terms:
 - calendar: NO_CALENDAR, MONDAY_TO_FRIDAY, TARGET, US_NYSE, UK_SETTLEMENT
 
 Use `jactus_get_contract_schema(contract_type)` for specific requirements.
+""",
+        },
+        "array_mode": {
+            "title": "Array-Mode Simulation & Portfolio API",
+            "content": """
+# Array-Mode Simulation & Portfolio API
+
+Array-mode is JACTUS's high-performance simulation path. It uses JIT-compiled JAX
+kernels operating on batched `[B, T]` arrays instead of Python-level event loops.
+
+## Supported Types
+
+12 of 18 types have array-mode kernels:
+
+| Pattern | Types | Kernel |
+|---------|-------|--------|
+| **Stateful** | PAM, LAM, NAM, ANN, LAX, SWPPV | `jax.lax.scan` |
+| **Simple** | CSH, STK, COM, FXOUT, FUTUR, OPTNS | Vectorized `jnp.where` |
+
+Fallback types (scalar Python): CLM, UMP, SWAPS, CAPFL, CEG, CEC
+
+## Quick Start: Portfolio API
+
+```python
+from jactus.contracts.portfolio import simulate_portfolio
+
+contracts = [
+    (pam_attrs, rf_obs),
+    (lam_attrs, rf_obs),
+    (csh_attrs, rf_obs),
+]
+result = simulate_portfolio(contracts, discount_rate=0.05)
+# result["total_cashflows"] -> jnp.array shape (3,)
+# result["batch_contracts"] -> 3
+```
+
+## Quick Start: Single Contract
+
+```python
+from jactus.contracts.pam_array import precompute_pam_arrays, simulate_pam_array_jit
+
+# Phase 1: Pre-compute (Python, runs once)
+initial_state, et, yf, rf, params = precompute_pam_arrays(attrs, rf_obs)
+
+# Phase 2: Simulate (JIT-compiled, fast on repeated calls)
+final_state, payoffs = simulate_pam_array_jit(initial_state, et, yf, rf, params)
+```
+
+## Per-Type Functions
+
+Each type provides (importable from `jactus.contracts.<type>_array`):
+- `precompute_<type>_arrays(attrs, rf_obs)` — Python pre-computation
+- `simulate_<type>_array(state, et, yf, rf, params)` — single-contract kernel
+- `batch_simulate_<type>(states, et, yf, rf, params)` — batched kernel `[B, T]`
+- `batch_simulate_<type>_auto(...)` — device-aware dispatch
+- `simulate_<type>_portfolio(contracts, discount_rate=None)` — end-to-end
+
+## Automatic Differentiation
+
+```python
+import jax
+def pv_fn(rate):
+    new_params = params._replace(nominal_interest_rate=rate)
+    new_state = initial_state._replace(ipnr=rate)
+    _, payoffs = simulate_pam_array(new_state, et, yf, rf, new_params)
+    return jnp.sum(payoffs * discount_factors)
+
+dpv_drate = jax.grad(pv_fn)(jnp.array(0.05))
+```
+
+## GPU/TPU
+
+No code changes needed. Install `jax[cuda13]` or `jax[tpu]` and JACTUS
+auto-selects the optimal strategy. Float32 by default (sufficient for
+ACTUS tolerance of +/-1.0).
+
+## Performance Tips
+
+- First kernel call includes JIT compilation (~1-5s). Subsequent calls are fast.
+- Use `jax.config.update("jax_compilation_cache_dir", "/tmp/jax_cache")` to
+  persist compiled kernels across process restarts.
+- Pre-compute once, re-run kernel many times (scenarios, Monte Carlo, gradients).
+
+See `docs/ARRAY_MODE.md` for the full reference.
 """,
         },
     }
