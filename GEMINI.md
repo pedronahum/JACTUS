@@ -20,7 +20,7 @@ Required workflow:
 3. `jactus_validate_attributes` — verify attributes before simulation
 4. `jactus_simulate_contract` — run the simulation
 5. `jactus_list_risk_factor_observers` — discover market and behavioral observer types
-6. `jactus_get_topic_guide` — structured guides on: `"contracts"`, `"behavioral"`, `"scenario"`, `"jax"`, `"events"`, `"attributes"`
+6. `jactus_get_topic_guide` — structured guides on: `"contracts"`, `"behavioral"`, `"scenario"`, `"jax"`, `"events"`, `"attributes"`, `"array_mode"`
 7. `jactus_search_docs` — keyword search across documentation
 
 For behavioral observers (prepayment, deposit transactions, callout events, scenarios), use `jactus_get_topic_guide("behavioral")` and `jactus_get_topic_guide("scenario")`.
@@ -38,6 +38,7 @@ Run: `python -m jactus_mcp` (stdio) or `python -m jactus_mcp --transport streama
 - **Utilities**: `Surface2D`, `LabeledSurface2D` — 2D surface interpolation utilities used by behavioral observers (e.g., prepayment surfaces indexed by rate incentive and seasoning)
 - **Events**: IED, IP, PR, MD, RR, etc. — represent cash flows and state transitions
 - **ContractAttributes**: Pydantic model defining all contract parameters (`src/jactus/core/attributes.py`)
+- **Array-Mode Portfolio API**: `simulate_portfolio()` in `jactus.contracts.portfolio` — batch simulation of 12 contract types via JIT-compiled JAX kernels. Per-type functions in `*_array.py` modules. See `docs/ARRAY_MODE.md` or `jactus_get_topic_guide("array_mode")`.
 
 ## Quick Start
 
