@@ -43,3 +43,4 @@ class TestPAMCrossValidation:
 
         summary = "\n".join(lines)
         print(f"\n{summary}")
+        assert passed == total, summary

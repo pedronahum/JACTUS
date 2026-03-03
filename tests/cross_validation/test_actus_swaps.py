@@ -32,7 +32,9 @@ class TestSWPPVCrossValidation:
             else:
                 lines.append(f"  {test_id}: PASS")
 
-        print("\n" + "\n".join(lines))
+        summary = "\n".join(lines)
+        print(f"\n{summary}")
+        assert passed == total, summary
 
 
 class TestSWAPSCrossValidation:
@@ -62,7 +64,9 @@ class TestSWAPSCrossValidation:
             else:
                 lines.append(f"  {test_id}: PASS")
 
-        print("\n" + "\n".join(lines))
+        summary = "\n".join(lines)
+        print(f"\n{summary}")
+        assert passed == total, summary
 
 
 class TestCAPFLCrossValidation:
@@ -92,4 +96,6 @@ class TestCAPFLCrossValidation:
             else:
                 lines.append(f"  {test_id}: PASS")
 
-        print("\n" + "\n".join(lines))
+        summary = "\n".join(lines)
+        print(f"\n{summary}")
+        assert passed == total, summary

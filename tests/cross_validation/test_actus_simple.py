@@ -32,7 +32,9 @@ class TestCSHCrossValidation:
             else:
                 lines.append(f"  {test_id}: PASS")
 
-        print("\n" + "\n".join(lines))
+        summary = "\n".join(lines)
+        print(f"\n{summary}")
+        assert passed == total, summary
 
 
 class TestSTKCrossValidation:
@@ -62,7 +64,9 @@ class TestSTKCrossValidation:
             else:
                 lines.append(f"  {test_id}: PASS")
 
-        print("\n" + "\n".join(lines))
+        summary = "\n".join(lines)
+        print(f"\n{summary}")
+        assert passed == total, summary
 
 
 class TestCOMCrossValidation:
@@ -92,4 +96,6 @@ class TestCOMCrossValidation:
             else:
                 lines.append(f"  {test_id}: PASS")
 
-        print("\n" + "\n".join(lines))
+        summary = "\n".join(lines)
+        print(f"\n{summary}")
+        assert passed == total, summary

@@ -32,7 +32,9 @@ class TestLAXCrossValidation:
             else:
                 lines.append(f"  {test_id}: PASS")
 
-        print("\n" + "\n".join(lines))
+        summary = "\n".join(lines)
+        print(f"\n{summary}")
+        assert passed == total, summary
 
 
 class TestUMPCrossValidation:
@@ -62,4 +64,6 @@ class TestUMPCrossValidation:
             else:
                 lines.append(f"  {test_id}: PASS")
 
-        print("\n" + "\n".join(lines))
+        summary = "\n".join(lines)
+        print(f"\n{summary}")
+        assert passed == total, summary
