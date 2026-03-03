@@ -483,9 +483,7 @@ class TestCanonicalContractPayoff:
         future_event.event_time = ActusDateTime(2024, 9, 15, 0, 0, 0)
         future_event.payoff = jnp.array(200.0, dtype=jnp.float32)
 
-        contract = self._mock_contract_with_events(
-            [past_event, current_event, future_event]
-        )
+        contract = self._mock_contract_with_events([past_event, current_event, future_event])
 
         time = ActusDateTime(2024, 6, 15, 0, 0, 0)
         observer = Mock()

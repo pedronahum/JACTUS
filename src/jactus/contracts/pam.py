@@ -945,7 +945,9 @@ class PAMStateTransitionFunction(BaseStateTransitionFunction):
             else:
                 scaling_ratio = 1.0
 
-            effect_str = str(attributes.scaling_effect.value) if attributes.scaling_effect else "000"
+            effect_str = (
+                str(attributes.scaling_effect.value) if attributes.scaling_effect else "000"
+            )
             if len(effect_str) >= 1 and effect_str[0] == "I":
                 new_isc = jnp.array(scaling_ratio, dtype=jnp.float32)
             if len(effect_str) >= 2 and effect_str[1] == "N":
