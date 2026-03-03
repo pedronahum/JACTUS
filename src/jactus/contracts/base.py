@@ -103,11 +103,11 @@ class BaseContract(nnx.Module, ABC):
     that all contract types share. Subclasses must implement the abstract
     methods to define contract-specific behavior.
 
-    The class extends flax.nnx.Module to enable:
-    - JIT compilation of contract simulation
-    - Automatic differentiation for sensitivity analysis
-    - Vectorization over multiple contracts or scenarios
-    - Pytree compatibility for JAX transformations
+    The class extends flax.nnx.Module for Pytree compatibility with JAX.
+    Note: the scalar simulation path (this class) processes events sequentially
+    in Python and does not support JIT/grad/vmap. For JIT-compiled batch
+    simulation with autodiff, use the array-mode API (see *_array.py modules
+    and simulate_portfolio()).
 
     Attributes:
         attributes: Contract attributes (terms and conditions)
