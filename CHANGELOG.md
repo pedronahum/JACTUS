@@ -7,18 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-03-03
+
 ### Added
-- Behavioral risk factor observer framework (`BehaviorRiskFactorObserver` protocol,
-  `BaseBehaviorRiskFactorObserver` ABC, `CalloutEvent`)
-- `PrepaymentSurfaceObserver` — 2D surface-based prepayment model (spread x loan age
-  -> prepayment rate)
-- `DepositTransactionObserver` — deposit transaction model for UMP contracts
-- `Scenario` class for bundling market and behavioral observers into named configurations
-- `Surface2D` and `LabeledSurface2D` — JAX-compatible 2D surface interpolation
-- Callout event integration in simulation engine — behavioral observers can inject events
-  into the timeline
-- MCP server updated with behavioral observer documentation in
-  `jactus_list_risk_factor_observers`
+- **Array-Mode Batch Simulation**: JIT-compiled JAX kernels for 12 of 18 contract types
+  (PAM, LAM, NAM, ANN, LAX, CSH, STK, COM, FXOUT, FUTUR, OPTNS, SWPPV). Two patterns:
+  stateful types use `jax.lax.scan`, simple types use vectorized `jnp.where`.
+- **Portfolio API**: `simulate_portfolio()` in `jactus.contracts.portfolio` — groups
+  mixed contract types, dispatches to batch kernels, falls back to scalar path for
+  CLM, UMP, SWAPS, CAPFL, CEG, CEC.
+- **Per-Type Array Modules**: `precompute_*_arrays()`, `simulate_*_array()`,
+  `batch_simulate_*()`, and `simulate_*_portfolio()` functions in 12 `*_array.py` modules.
+- **Shared Array Infrastructure**: `array_common.py` with constants, `RawPrecomputed`,
+  schedule helpers, year-fraction functions, and batch padding utilities.
+- **DateArray**: JAX-native integer date arithmetic with Hinnant ordinal encoding and
+  vectorized year-fraction computation (`jactus.utilities.date_array`).
+- **Behavioral Risk Factor Observers**: `BehaviorRiskFactorObserver` protocol,
+  `BaseBehaviorRiskFactorObserver` ABC, `CalloutEvent` for state-dependent models that
+  inject events into the simulation timeline.
+- **PrepaymentSurfaceObserver**: 2D surface-based prepayment model (spread x loan age
+  → prepayment rate) using `Surface2D` bilinear interpolation.
+- **DepositTransactionObserver**: Deposit transaction model for UMP contracts.
+- **Scenario Management**: `Scenario` class for bundling market and behavioral observers
+  into named, reusable simulation configurations.
+- **Surface Utilities**: `Surface2D` and `LabeledSurface2D` — JAX-compatible 2D bilinear
+  interpolation for behavioral observer parameterization.
+- **Array-Mode Documentation**: `docs/ARRAY_MODE.md` — comprehensive guide covering
+  architecture, two-phase pipeline, per-type reference, portfolio API, autodiff, GPU/TPU.
+- **MCP Topic Guide**: `"array_mode"` topic guide in MCP server for AI-assisted discovery
+  of batch simulation API.
+- **Gallery Notebook**: `06_gallery_of_contracts.ipynb` showcasing all contract types
+  with Colab-ready setup.
+- **GPU/TPU Benchmark Notebook**: `05_gpu_tpu_portfolio_benchmark.ipynb` with portfolio
+  valuation, risk metrics, and gradient computation examples.
+- 195 array-mode equivalence tests across 13 test files covering fixed/variable rates,
+  mid-life contracts, rate cap/floor, multiple DCC conventions, batch consistency, JIT
+  compilation, and JAX gradient computation.
+
+### Fixed
+- **CLM STF_AD**: Accrue interest (`ipac += Y × ipnr × nt`) instead of only updating
+  status date, matching ACTUS v1.1 specification.
+- **UMP STF_IED**: Apply `contract_role_sign` to notional, matching CLM and PAM
+  signed-notional convention.
+- **UMP POF_IED**: Use canonical formula `R(CNTRL) × (-1) × (NT + PDIED)`.
+- **PAM STF_SC**: Implement proper scaling logic (observe scaling index, compute ratio
+  vs reference, update nsc/isc per SCEF) instead of delegating to STF_AD.
+- **canonical_contract_payoff**: Implement via `contract.simulate()` instead of
+  returning a placeholder zero.
+- **Seasoned Contracts**: Correct initial accrued interest calculation for contracts
+  with IED before status date.
+- **Risk Metrics**: Compute DV01 and convexity with respect to discount rate, not
+  coupon rate.
+- **BaseContract Docstring**: Correct misleading claim that scalar simulation path
+  supports JIT/grad/vmap (it does not; use array-mode API for that).
+- Cross-validation test assertions now properly fail CI instead of silently passing.
+- Version string drift fixed across all 7 files (pyproject.toml, __init__.py, cli.py,
+  docs/conf.py, README.md, MCP server).
+
+### Changed
+- Array-mode batch strategy uses single `lax.scan` on all backends (CPU, GPU, TPU)
+  instead of device-dependent dispatch.
+- Pre-computation uses NumPy then `jnp.asarray()` to avoid per-element JAX dispatch
+  overhead.
+- All existing notebooks updated to be Colab-ready with `!pip install` cells.
+- `docs/ARCHITECTURE.md` GPU/TPU section updated to reference all 12 array-mode types
+  and `simulate_portfolio()`.
+- MCP server instructions and AI agent files (CLAUDE.md, GROK.md, GEMINI.md, AGENTS.md)
+  updated with array-mode and behavioral observer documentation.
 
 ## [0.1.2] - 2026-02-24
 
@@ -334,7 +389,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/pedronahum/JACTUS/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/pedronahum/JACTUS/compare/v0.1.9...HEAD
+[0.1.9]: https://github.com/pedronahum/JACTUS/compare/v0.1.2...v0.1.9
 [0.1.2]: https://github.com/pedronahum/JACTUS/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/pedronahum/JACTUS/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/pedronahum/JACTUS/releases/tag/v0.1.0
