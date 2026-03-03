@@ -320,22 +320,13 @@ def canonical_contract_payoff(
     References:
         ACTUS v1.1 Section 3.9
     """
-    # Get all events for the contract
-    event_schedule = contract.get_events(risk_factor_observer)
+    # Simulate the contract to get all events with computed payoffs
+    result = contract.simulate(risk_factor_observer=risk_factor_observer)
 
-    # Filter to future events (t_i >= t)
-    future_events = [event for event in event_schedule.events if event.time >= time]
+    # Sum payoffs of all future events (t_i >= t)
+    total = 0.0
+    for event in result.events:
+        if event.event_time >= time:
+            total += float(event.payoff)
 
-    # If no future events, return zero
-    if not future_events:
-        return jnp.array(0.0, dtype=jnp.float32)
-
-    # Sum payoffs of all future events
-    # Note: This requires simulating the contract to get states at each event
-    # For now, we use a simplified approach
-    # We need to simulate to get states - for a complete implementation,
-    # this would call contract.simulate() and extract payoffs
-    # For now, we return a placeholder
-    # TODO: Implement full simulation-based canonical payoff
-
-    return jnp.array(0.0, dtype=jnp.float32)
+    return jnp.array(total, dtype=jnp.float32)

@@ -131,14 +131,12 @@ class UMPPayoffFunction(BasePayoffFunction):
     ) -> jnp.ndarray:
         """POF_IED: Initial Exchange - disburse principal.
 
-        Formula: R(CNTRL) × (-1) × Nsc × NT
+        Formula: R(CNTRL) × (-1) × (NT + PDIED)
         """
         role_sign = contract_role_sign(attrs.contract_role)
-        return (
-            jnp.array(role_sign * (-1.0), dtype=jnp.float32)
-            * state.nsc
-            * (attrs.notional_principal or 0.0)
-        )
+        nt = attrs.notional_principal or 0.0
+        pdied = attrs.premium_discount_at_ied or 0.0
+        return jnp.array(role_sign * (-1.0) * (nt + pdied), dtype=jnp.float32)
 
     def _pof_pr(
         self, state: ContractState, attrs: ContractAttributes, time: ActusDateTime
@@ -269,8 +267,15 @@ class UMPStateTransitionFunction(BaseStateTransitionFunction):
         time: ActusDateTime,
         risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
-        """STF_AD: Analysis Date - just update status date."""
-        return state.replace(sd=time)
+        """STF_AD: Analysis Date - accrue interest and update status date.
+
+        Formula:
+            Ipac = Ipac + Y(Sd, t) × Ipnr × Nt
+            Sd = t
+        """
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
+        new_ipac = state.ipac + yf * state.ipnr * state.nt
+        return state.replace(sd=time, ipac=new_ipac)
 
     def _stf_ied(
         self,
@@ -279,8 +284,14 @@ class UMPStateTransitionFunction(BaseStateTransitionFunction):
         time: ActusDateTime,
         risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
-        """STF_IED: Initial Exchange - set up initial state."""
-        nt = jnp.array(attrs.notional_principal, dtype=jnp.float32)
+        """STF_IED: Initial Exchange - set up initial state.
+
+        Formula:
+            Nt = R(CNTRL) × NT
+            Ipnr = IPNR
+        """
+        role_sign = contract_role_sign(attrs.contract_role)
+        nt = jnp.array(role_sign * (attrs.notional_principal or 0.0), dtype=jnp.float32)
         ipnr = jnp.array(attrs.nominal_interest_rate or 0.0, dtype=jnp.float32)
 
         return state.replace(

@@ -420,12 +420,17 @@ class TestSettlementCurrencyFXRate:
 class TestCanonicalContractPayoff:
     """Test canonical_contract_payoff function."""
 
-    def test_no_future_events_returns_zero(self):
-        """Returns zero when there are no future events."""
+    def _mock_contract_with_events(self, events):
+        """Create a mock contract whose simulate() returns the given events."""
         contract = Mock()
-        event_schedule = Mock()
-        event_schedule.events = []
-        contract.get_events.return_value = event_schedule
+        sim_result = Mock()
+        sim_result.events = events
+        contract.simulate.return_value = sim_result
+        return contract
+
+    def test_no_events_returns_zero(self):
+        """Returns zero when simulation produces no events."""
+        contract = self._mock_contract_with_events([])
 
         time = ActusDateTime(2024, 6, 15, 0, 0, 0)
         observer = Mock()
@@ -436,17 +441,15 @@ class TestCanonicalContractPayoff:
 
     def test_all_past_events_returns_zero(self):
         """Returns zero when all events are in the past."""
-        contract = Mock()
-
-        # Create mock events all in the past
         past_event1 = Mock()
-        past_event1.time = ActusDateTime(2024, 1, 1, 0, 0, 0)
-        past_event2 = Mock()
-        past_event2.time = ActusDateTime(2024, 3, 1, 0, 0, 0)
+        past_event1.event_time = ActusDateTime(2024, 1, 1, 0, 0, 0)
+        past_event1.payoff = jnp.array(1000.0, dtype=jnp.float32)
 
-        event_schedule = Mock()
-        event_schedule.events = [past_event1, past_event2]
-        contract.get_events.return_value = event_schedule
+        past_event2 = Mock()
+        past_event2.event_time = ActusDateTime(2024, 3, 1, 0, 0, 0)
+        past_event2.payoff = jnp.array(500.0, dtype=jnp.float32)
+
+        contract = self._mock_contract_with_events([past_event1, past_event2])
 
         time = ActusDateTime(2024, 6, 15, 0, 0, 0)
         observer = Mock()
@@ -455,47 +458,42 @@ class TestCanonicalContractPayoff:
 
         assert jnp.allclose(result, jnp.array(0.0, dtype=jnp.float32))
 
-    def test_calls_get_events(self):
-        """Function calls contract.get_events() with observer."""
-        contract = Mock()
-        event_schedule = Mock()
-        event_schedule.events = []
-        contract.get_events.return_value = event_schedule
+    def test_calls_simulate(self):
+        """Function calls contract.simulate() with observer."""
+        contract = self._mock_contract_with_events([])
 
         time = ActusDateTime(2024, 6, 15, 0, 0, 0)
         observer = Mock()
 
         canonical_contract_payoff(contract, time, observer)
 
-        contract.get_events.assert_called_once_with(observer)
+        contract.simulate.assert_called_once_with(risk_factor_observer=observer)
 
-    def test_filters_future_events_correctly(self):
-        """Correctly filters events at or after valuation time."""
-        contract = Mock()
-
-        # Create mix of past and future events
+    def test_sums_future_event_payoffs(self):
+        """Sums payoffs of events at or after valuation time."""
         past_event = Mock()
-        past_event.time = ActusDateTime(2024, 5, 1, 0, 0, 0)
+        past_event.event_time = ActusDateTime(2024, 5, 1, 0, 0, 0)
+        past_event.payoff = jnp.array(999.0, dtype=jnp.float32)
 
         current_event = Mock()
-        current_event.time = ActusDateTime(2024, 6, 15, 0, 0, 0)
+        current_event.event_time = ActusDateTime(2024, 6, 15, 0, 0, 0)
+        current_event.payoff = jnp.array(100.0, dtype=jnp.float32)
 
         future_event = Mock()
-        future_event.time = ActusDateTime(2024, 9, 15, 0, 0, 0)
+        future_event.event_time = ActusDateTime(2024, 9, 15, 0, 0, 0)
+        future_event.payoff = jnp.array(200.0, dtype=jnp.float32)
 
-        event_schedule = Mock()
-        event_schedule.events = [past_event, current_event, future_event]
-        contract.get_events.return_value = event_schedule
+        contract = self._mock_contract_with_events(
+            [past_event, current_event, future_event]
+        )
 
         time = ActusDateTime(2024, 6, 15, 0, 0, 0)
         observer = Mock()
 
-        # Note: Current implementation returns 0.0 (TODO for full implementation)
         result = canonical_contract_payoff(contract, time, observer)
 
-        # For now, verify it doesn't crash and returns a value
-        assert isinstance(result, jnp.ndarray)
-        assert result.dtype == jnp.float32
+        # Should sum current_event (100) + future_event (200) = 300
+        assert jnp.allclose(result, jnp.array(300.0, dtype=jnp.float32))
 
 
 class TestJAXJITCompatibility:

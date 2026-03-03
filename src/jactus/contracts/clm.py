@@ -294,8 +294,15 @@ class CLMStateTransitionFunction(BaseStateTransitionFunction):
         time: ActusDateTime,
         risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
-        """STF_AD: Analysis Date - update status date only."""
-        return state.replace(sd=time)
+        """STF_AD: Analysis Date - accrue interest and update status date.
+
+        Formula:
+            Ipac = Ipac + Y(Sd, t) × Ipnr × Nt
+            Sd = t
+        """
+        yf = year_fraction(state.sd, time, attrs.day_count_convention or DayCountConvention.A360)
+        new_ipac = state.ipac + yf * state.ipnr * state.nt
+        return state.replace(sd=time, ipac=new_ipac)
 
     def _stf_ied(
         self,

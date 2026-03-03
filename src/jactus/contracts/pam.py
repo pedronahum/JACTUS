@@ -919,9 +919,48 @@ class PAMStateTransitionFunction(BaseStateTransitionFunction):
         time: ActusDateTime,
         risk_factor_observer: RiskFactorObserver,
     ) -> ContractState:
-        """STF_SC_PAM: Scaling - update scaling multipliers."""
-        # For now, same as AD
-        return self._stf_ad(state_pre, attributes, time, risk_factor_observer)
+        """STF_SC_PAM: Scaling - accrue interest and update scaling multipliers.
+
+        Formula:
+            Ipac = Ipac + Y(Sd, t) × Ipnr × Nt
+            scaling_ratio = O_rf(SCMO, t) / SCIXCDD
+            If SCEF[0] == 'I': Isc = scaling_ratio
+            If SCEF[1] == 'N': Nsc = scaling_ratio
+            Sd = t
+        """
+        dcc = attributes.day_count_convention or DayCountConvention.A360
+        yf = year_fraction(state_pre.sd, time, dcc)
+        new_ipac = float(state_pre.ipac) + yf * float(state_pre.ipnr) * float(state_pre.nt)
+
+        new_isc = state_pre.isc
+        new_nsc = state_pre.nsc
+        scaling_mo = attributes.scaling_market_object
+        if scaling_mo:
+            current_index = float(
+                risk_factor_observer.observe_risk_factor(scaling_mo, time, state_pre, attributes)
+            )
+            ref_index = attributes.scaling_index_at_contract_deal_date or 1.0
+            if ref_index != 0.0:
+                scaling_ratio = current_index / ref_index
+            else:
+                scaling_ratio = 1.0
+
+            effect_str = str(attributes.scaling_effect.value) if attributes.scaling_effect else "000"
+            if len(effect_str) >= 1 and effect_str[0] == "I":
+                new_isc = jnp.array(scaling_ratio, dtype=jnp.float32)
+            if len(effect_str) >= 2 and effect_str[1] == "N":
+                new_nsc = jnp.array(scaling_ratio, dtype=jnp.float32)
+
+        return ContractState(
+            sd=time,
+            tmd=state_pre.tmd,
+            nt=state_pre.nt,
+            ipnr=state_pre.ipnr,
+            ipac=jnp.array(new_ipac, dtype=jnp.float32),
+            feac=state_pre.feac,
+            nsc=new_nsc,
+            isc=new_isc,
+        )
 
     def _stf_ce(
         self,
