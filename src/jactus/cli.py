@@ -19,7 +19,7 @@ def simulate() -> None:
     """
     logger.info("JACTUS CLI - simulate command")
     logger.info("This command will be implemented in future phases")
-    print("JACTUS version 0.1.2")
+    print("JACTUS version 0.1.8")
     print("CLI functionality coming in Phase 1+")
 
 
