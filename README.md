@@ -27,6 +27,7 @@ JACTUS is a Python library that implements the **ACTUS (Algorithmic Contract Typ
 - **Type Safety**: Full type annotations with mypy support
 - **Comprehensive**: Implements the complete ACTUS standard
 - **Well Tested**: 276 official ACTUS cross-validation test cases passing across all 18 contract types
+- **Command-Line Interface**: Full-featured `jactus` CLI for simulation, validation, risk analytics, and portfolio management — outputs rich tables in TTY, JSON when piped
 - **Production Ready**: Robust error handling, logging, and documentation
 
 ## What is ACTUS?
@@ -195,6 +196,105 @@ pip install -e ".[docs]"
 cd docs
 make html
 # Open docs/_build/html/index.html in your browser
+```
+
+## Command-Line Interface
+
+JACTUS includes a full-featured CLI built with [Typer](https://typer.tiangolo.com/), designed for both human operators and automated pipelines. It mirrors the MCP server surface, so anything you can do programmatically you can also do from the terminal.
+
+### Why a CLI?
+
+- **Agent-first**: Outputs JSON by default when piped, rich tables in TTY — composable with `jq`, `awk`, and CI/CD pipelines
+- **No Python required**: Validate contracts, run simulations, and compute risk metrics without writing a single line of code
+- **Scriptable**: Chain commands with stdin/stdout for batch workflows (`cat portfolio.json | jactus portfolio simulate --file /dev/stdin`)
+- **Discoverable**: Built-in `contract list`, `contract schema`, and `observer list` commands for exploring ACTUS without reading docs
+
+### Installation
+
+The CLI is installed automatically with JACTUS:
+
+```bash
+pip install jactus
+jactus --help
+```
+
+### Quick Examples
+
+```bash
+# List all 18 ACTUS contract types
+jactus contract list
+
+# Get the schema for a PAM (Principal at Maturity) contract
+jactus contract schema --type PAM
+
+# Simulate a $100k loan at 5% interest
+jactus simulate --type PAM --attrs '{
+  "contract_id": "LOAN-001",
+  "status_date": "2024-01-01",
+  "contract_role": "RPA",
+  "initial_exchange_date": "2024-01-15",
+  "maturity_date": "2025-01-15",
+  "notional_principal": 100000,
+  "nominal_interest_rate": 0.05,
+  "interest_payment_cycle": "6M",
+  "day_count_convention": "30E360"
+}'
+
+# Validate contract attributes before simulation
+jactus contract validate --type PAM --attrs loan.json
+
+# Compute DV01 (dollar value of a basis point)
+jactus risk dv01 --type PAM --attrs loan.json
+
+# Get all risk sensitivities at once
+jactus risk sensitivities --type PAM --attrs loan.json
+
+# Simulate a portfolio of contracts
+jactus portfolio simulate --file portfolio.json
+
+# Aggregate portfolio cash flows by quarter
+jactus portfolio aggregate --file portfolio.json --frequency quarterly
+
+# Search documentation
+jactus docs search "amortization"
+```
+
+### JSON Output for Pipelines
+
+```bash
+# Pipe simulation results to jq for processing
+jactus simulate --type PAM --attrs loan.json --output json | jq '.summary'
+
+# Extract non-zero cash flows as CSV
+jactus simulate --type PAM --attrs loan.json --output csv --nonzero
+
+# Filter events by date range
+jactus simulate --type PAM --attrs loan.json --from 2024-06-01 --to 2024-12-31
+```
+
+### Command Reference
+
+| Command | Description |
+|---------|-------------|
+| `jactus contract list` | List all 18 contract types with categories |
+| `jactus contract schema --type <TYPE>` | Show required/optional fields for a contract type |
+| `jactus contract validate --type <TYPE> --attrs <JSON>` | Validate contract attributes |
+| `jactus simulate --type <TYPE> --attrs <JSON>` | Run a full contract simulation |
+| `jactus risk dv01\|duration\|convexity\|sensitivities` | Compute risk metrics |
+| `jactus portfolio simulate --file <FILE>` | Simulate multiple contracts |
+| `jactus portfolio aggregate --file <FILE>` | Aggregate cash flows by period |
+| `jactus observer list` | List all risk factor observer types |
+| `jactus observer describe --name <NAME>` | Show observer details |
+| `jactus docs search "<QUERY>"` | Search project documentation |
+
+### Global Flags
+
+```
+--output text|json|csv   Output format (auto-detected: text in TTY, json when piped)
+--pretty / --no-pretty   Pretty-print JSON output (default: true)
+--no-color               Disable ANSI colors
+--log-level              Set log verbosity (DEBUG, INFO, WARNING, ERROR)
+--version                Show version
 ```
 
 ## AI-Assisted Development
@@ -370,6 +470,7 @@ python examples/cross_currency_basis_swap_example.py  # Cross-currency swaps
 ```
 jactus/
 ├── src/jactus/          # Main package source
+│   ├── cli/                # Typer CLI (simulate, risk, portfolio, docs)
 │   ├── core/               # Core type definitions and enums
 │   ├── utilities/          # Date/time and calendar utilities
 │   ├── functions/          # Payoff and state transition functions
@@ -475,6 +576,7 @@ If you use JACTUS in your research, please cite:
 - ✅ 276 official ACTUS cross-validation test cases passing across all 18 contract types
 - ✅ 1,200+ unit/integration/property tests
 - ✅ Full JAX integration with automatic differentiation
+- ✅ Full-featured CLI for simulation, validation, risk analytics, and portfolio management
 - ✅ Production-ready with comprehensive documentation
 - ✅ Available on [PyPI](https://pypi.org/project/jactus/)
 - ✅ Apache License 2.0

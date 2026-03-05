@@ -5,6 +5,7 @@ JACTUS is a JAX-based implementation of the ACTUS (Algorithmic Contract Types Un
 ## Project Structure
 
 - `src/jactus/` — Main library (contracts, core types, engine, observers, utilities)
+- `src/jactus/cli/` — Typer CLI (`jactus` command): simulate, risk, portfolio, observer, contract, docs
 - `tools/mcp-server/` — MCP server for AI assistant integration
 - `tests/` — Test suite (unit, integration, cross-validation, property, performance)
 - `examples/` — Python scripts and Jupyter notebooks
@@ -39,6 +40,7 @@ Run: `python -m jactus_mcp` (stdio) or `python -m jactus_mcp --transport streama
 - **Events**: IED, IP, PR, MD, RR, etc. — represent cash flows and state transitions
 - **ContractAttributes**: Pydantic model defining all contract parameters (`src/jactus/core/attributes.py`)
 - **Array-Mode Portfolio API**: `simulate_portfolio()` in `jactus.contracts.portfolio` — batch simulation of 12 contract types via JIT-compiled JAX kernels. Per-type functions in `*_array.py` modules. See `docs/ARRAY_MODE.md` or `jactus_get_topic_guide("array_mode")`.
+- **CLI**: `jactus` Typer CLI with commands: `contract list|schema|validate`, `simulate`, `risk dv01|duration|convexity|sensitivities`, `portfolio simulate|aggregate`, `observer list|describe`, `docs search`. Entry point: `jactus = "jactus.cli:app"`. Outputs rich tables in TTY, JSON when piped. Source: `src/jactus/cli/`.
 
 ## Quick Start
 

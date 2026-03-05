@@ -142,6 +142,18 @@ def year_fraction(
 │  - Reporting and analytics                                   │
 └──────────────────────────────────────────────────────────────┘
                             │
+              ┌─────────────┼─────────────┐
+              ▼                           ▼
+┌──────────────────────────┐  ┌──────────────────────────────┐
+│      CLI LAYER           │  │     MCP SERVER LAYER         │
+│                          │  │                              │
+│  jactus simulate         │  │  jactus_simulate_contract    │
+│  jactus contract list    │  │  jactus_list_contracts       │
+│  jactus risk dv01        │  │  jactus_validate_attributes  │
+│  jactus portfolio agg    │  │  jactus_get_contract_schema  │
+└──────────────────────────┘  └──────────────────────────────┘
+              │                           │
+              └─────────────┬─────────────┘
                             ▼
 ┌──────────────────────────────────────────────────────────────┐
 │                     PUBLIC API LAYER                          │
@@ -201,6 +213,8 @@ def year_fraction(
 | Layer | Purpose | Key Components |
 |-------|---------|----------------|
 | **Application** | User-facing functionality | Contract modeling, simulation, analytics |
+| **CLI** | Terminal interface | `jactus` command: simulate, risk, portfolio, contract, observer, docs |
+| **MCP Server** | AI assistant interface | `jactus_*` tools for contract discovery, validation, simulation |
 | **Contracts** | 18 ACTUS implementations | PAM, LAM, ANN, STK, COM, FXOUT, SWAPS, etc. |
 | **Observers** | Market data + behavioral models | RiskFactor, Behavioral, Scenario |
 | **Engine** | Simulation orchestration | LifecycleEngine, SimulationEngine |
@@ -416,7 +430,30 @@ contract = create_contract(attrs, rf_obs)  # Auto-selects PAM implementation
 
 **File**: `src/jactus/contracts/__init__.py`
 
-### 8. Behavioral Risk Factor Observers
+### 8. Command-Line Interface (CLI)
+
+**Purpose**: Provide a terminal-based interface for contract simulation, validation, risk analytics, and portfolio management — designed for both human operators and automated pipelines.
+
+**Implementation**: Typer-based CLI registered as `jactus` entry point. Shared formatting via `output.py` with automatic TTY detection (rich tables in terminal, JSON when piped).
+
+**Command Tree**:
+- `jactus contract list|schema|validate` — Contract type discovery and attribute validation
+- `jactus simulate` — Full contract simulation with event filtering
+- `jactus risk dv01|duration|convexity|sensitivities` — Risk metrics via finite-difference bumping
+- `jactus portfolio simulate|aggregate` — Multi-contract portfolio simulation and cash flow aggregation
+- `jactus observer list|describe` — Risk factor observer discovery
+- `jactus docs search` — Documentation keyword search
+
+**Design Decisions**:
+- Agent-first: JSON output by default when piped (`sys.stdout.isatty()` detection)
+- Mirrors the MCP server surface — same capabilities available from terminal
+- Shared `prepare_attributes()` converts string values (dates, enums) to JACTUS types
+- Exit codes: 0 (success), 1 (user/input error), 2 (simulation error), 3 (validation failure)
+- Risk metrics use finite-difference bumping (not JAX grad) for broad compatibility
+
+**Files**: `src/jactus/cli/__init__.py`, `src/jactus/cli/output.py`, `src/jactus/cli/contract.py`, `src/jactus/cli/simulate.py`, `src/jactus/cli/risk.py`, `src/jactus/cli/portfolio.py`, `src/jactus/cli/observer.py`, `src/jactus/cli/docs.py`
+
+### 9. Behavioral Risk Factor Observers
 
 **Purpose**: Model state-dependent risk factors (prepayment, deposit behavior) that depend on the contract's internal state and can inject events into the simulation schedule.
 
@@ -448,7 +485,7 @@ When `BaseContract.simulate()` is called with behavioral observers (via a `Scena
 
 **Files**: `src/jactus/observers/behavioral.py`, `src/jactus/observers/prepayment.py`, `src/jactus/observers/deposit_transaction.py`
 
-### 9. Scenario
+### 10. Scenario
 
 **Purpose**: Bundle market and behavioral observers into named, reusable simulation configurations.
 
@@ -487,7 +524,7 @@ history = contract.simulate(scenario=scenario)
 
 **File**: `src/jactus/observers/scenario.py`
 
-### 10. Surface2D and LabeledSurface2D
+### 11. Surface2D and LabeledSurface2D
 
 **Purpose**: JAX-compatible 2D surface interpolation, used primarily by behavioral risk models.
 
@@ -1014,11 +1051,12 @@ JACTUS provides a **complete, production-ready implementation** of the ACTUS v1.
 - ✅ **Production-Ready**: Type-safe, documented, performant
 
 **Getting Started**:
-1. Read [PAM.md](PAM.md) for a detailed walkthrough of JACTUS internals
-2. Explore the Jupyter notebooks in `examples/notebooks/` for hands-on learning
-3. Run `examples/pam_example.py` and other Python examples
-4. Check out the contract implementations in `src/jactus/contracts/`
-5. Review the [derivative contracts guide](derivatives.md) for advanced features
+1. Try `jactus contract list` and `jactus simulate --type PAM` from the CLI
+2. Read [PAM.md](PAM.md) for a detailed walkthrough of JACTUS internals
+3. Explore the Jupyter notebooks in `examples/notebooks/` for hands-on learning
+4. Run `examples/pam_example.py` and other Python examples
+5. Check out the contract implementations in `src/jactus/contracts/`
+6. Review the [derivative contracts guide](derivatives.md) for advanced features
 
 **Questions?** Open an issue on [GitHub](https://github.com/pedronahum/JACTUS/issues) or start a discussion!
 

@@ -33,6 +33,8 @@ dependencies = [
     "python-dateutil>=2.8.2",
     "typing-extensions>=4.8.0",
     "pydantic>=2.5.0",
+    "typer>=0.9.0",
+    "rich>=13.0.0",
 ]
 
 [project.optional-dependencies]
@@ -73,7 +75,7 @@ Repository = "https://github.com/pedronahum/JACTUS"
 "Bug Tracker" = "https://github.com/pedronahum/JACTUS/issues"
 
 [project.scripts]
-jactus-simulate = "jactus.cli:simulate"
+jactus = "jactus.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -139,6 +141,7 @@ ignore = [
 "__init__.py" = ["F401"]  # Allow unused imports in __init__.py
 "tests/**/*.py" = ["ARG", "PT011", "PT012", "PT015", "PT017", "PT018", "B011", "DTZ001"]
 "src/jactus/core/time.py" = ["DTZ001"]  # ActusDateTime deliberately uses naive datetimes (ACTUS spec)
+"src/jactus/cli/**/*.py" = ["DTZ001"]  # CLI parses user-supplied naive datetime strings
 
 [tool.ruff.lint.isort]
 known-first-party = ["jactus"]
