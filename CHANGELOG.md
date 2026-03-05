@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-05
+
+### Added
+- **Command-Line Interface**: Full-featured Typer CLI (`jactus` command) for contract
+  simulation, validation, risk analytics, and portfolio management.
+  - `jactus contract list|schema|validate` — contract type discovery and attribute validation
+  - `jactus simulate` — full simulation with event filtering (`--nonzero`, `--from`, `--to`, `--fields`)
+  - `jactus risk dv01|duration|convexity|sensitivities` — finite-difference risk metrics
+  - `jactus portfolio simulate|aggregate` — multi-contract portfolio workflows with period bucketing
+  - `jactus observer list|describe` — risk factor observer discovery
+  - `jactus docs search` — documentation keyword search
+- Agent-first output design: rich tables in TTY, JSON when piped, CSV via `--output csv`
+- Global CLI flags: `--output`, `--pretty/--no-pretty`, `--no-color`, `--log-level`, `--version`
+- `typer>=0.9.0` and `rich>=13.0.0` added as dependencies
+
+### Changed
+- Entry point changed from `jactus-simulate` to `jactus` (breaking change)
+- `src/jactus/cli.py` placeholder replaced by `src/jactus/cli/` package (8 modules)
+- Updated README, ARCHITECTURE.md, CLAUDE.md, GROK.md, GEMINI.md, AGENTS.md with CLI documentation
+
 ## [0.1.9] - 2026-03-03
 
 ### Added
@@ -389,7 +409,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/pedronahum/JACTUS/compare/v0.1.9...HEAD
+[Unreleased]: https://github.com/pedronahum/JACTUS/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/pedronahum/JACTUS/compare/v0.1.9...v0.2.0
 [0.1.9]: https://github.com/pedronahum/JACTUS/compare/v0.1.2...v0.1.9
 [0.1.2]: https://github.com/pedronahum/JACTUS/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/pedronahum/JACTUS/compare/v0.1.0...v0.1.1
