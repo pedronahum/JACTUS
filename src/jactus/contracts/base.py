@@ -106,8 +106,8 @@ class BaseContract(nnx.Module, ABC):
     The class extends flax.nnx.Module for Pytree compatibility with JAX.
     Note: the scalar simulation path (this class) processes events sequentially
     in Python and does not support JIT/grad/vmap. For JIT-compiled batch
-    simulation with autodiff, use the array-mode API (see *_array.py modules
-    and simulate_portfolio()).
+    simulation with autodiff, use the array-mode API (see ``*_array.py`` modules
+    and ``simulate_portfolio()``).
 
     Attributes:
         attributes: Contract attributes (terms and conditions)
@@ -361,13 +361,12 @@ class BaseContract(nnx.Module, ABC):
         """Simulate contract through all events.
 
         Executes the full ACTUS algorithm:
+
         1. Collect callout events from behavioral observers (if any)
         2. Merge callout events into the scheduled event timeline
         3. Initialize state
-        4. For each event:
-           a. Calculate payoff (POF) using pre-event state
-           b. Apply state transition function (STF)
-           c. Store event with states
+        4. For each event: calculate payoff (POF) using pre-event state,
+           apply state transition function (STF), and store event with states
 
         Behavioral observers can be provided in three ways:
         - Via a ``Scenario`` object (recommended for production use)

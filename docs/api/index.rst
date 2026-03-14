@@ -338,10 +338,26 @@ Scenario Management
    :undoc-members:
    :show-inheritance:
 
+Portfolio API
+-------------
+
+.. automodule:: jactus.contracts.portfolio
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Simulation Engine
 -----------------
 
 .. automodule:: jactus.engine.simulator
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+CLI
+---
+
+.. automodule:: jactus.cli
    :members:
    :undoc-members:
    :show-inheritance:
@@ -401,26 +417,30 @@ Key Classes and Functions
 **Creating Contracts**::
 
     from jactus.contracts import create_contract
-    from jactus.core import ContractAttributes, ContractType
+    from jactus.core import ContractAttributes, ContractType, ContractRole, ActusDateTime
     from jactus.observers import ConstantRiskFactorObserver
 
     attrs = ContractAttributes(
+        contract_id="LOAN-001",
         contract_type=ContractType.PAM,
-        # ... other attributes
+        contract_role=ContractRole.RPA,
+        status_date=ActusDateTime(2024, 1, 1),
+        initial_exchange_date=ActusDateTime(2024, 1, 15),
+        maturity_date=ActusDateTime(2025, 1, 15),
+        notional_principal=100_000.0,
+        nominal_interest_rate=0.05,
     )
-    rf_observer = ConstantRiskFactorObserver(0.05)
+    rf_observer = ConstantRiskFactorObserver(constant_value=0.05)
     contract = create_contract(attrs, rf_observer)
 
 **Running Simulations**::
 
-    # Initialize state
-    state = contract.initialize_state()
+    # Run simulation — returns SimulationHistory
+    result = contract.simulate()
 
-    # Generate event schedule
-    schedule = contract.generate_event_schedule()
-
-    # Run simulation
-    result = contract.simulate(rf_observer)
+    # Access events
+    for event in result.events:
+        print(f"{event.event_time}: {event.event_type.name} ${event.payoff:,.2f}")
 
 **Working with Time**::
 

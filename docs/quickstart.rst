@@ -57,34 +57,26 @@ Complete Example
     )
 
     # Step 2: Create risk factor observer (fixed interest rate)
-    rf_observer = ConstantRiskFactorObserver(0.05)
+    rf_observer = ConstantRiskFactorObserver(constant_value=0.05)
 
     # Step 3: Create the contract
     contract = create_contract(attrs, rf_observer)
 
-    # Step 4: Initialize state
-    initial_state = contract.initialize_state()
-    print(f"Initial notional: ${float(initial_state.nt):,.2f}")
-    print(f"Interest rate: {float(initial_state.ipnr) * 100:.2f}%")
+    # Step 4: Run simulation
+    result = contract.simulate()
+    print(f"Generated {len(result.events)} events")
 
-    # Step 5: Generate event schedule
-    schedule = contract.generate_event_schedule()
-    print(f"\nGenerated {len(schedule.events)} events")
-
-    # Step 6: Display payment schedule
+    # Step 5: Display payment schedule
     print("\nPayment Schedule:")
     print("-" * 60)
-    for event in schedule.events[:10]:  # Show first 10 events
+    for event in result.events[:10]:  # Show first 10 events
         date = f"{event.event_time.year}-{event.event_time.month:02d}-{event.event_time.day:02d}"
-        print(f"{event.event_type.value:<6} {date:<12} ${event.payoff:>12,.2f}")
+        print(f"{event.event_type.name:<6} {date:<12} ${event.payoff:>12,.2f}")
 
-    # Step 7: Run simulation
-    result = contract.simulate(rf_observer)
-
-    # Step 8: Analyze results
+    # Step 6: Analyze results
     total_interest = sum(
-        event.payoff for event in schedule.events
-        if event.event_type.value == "IP"
+        event.payoff for event in result.events
+        if event.event_type.name == "IP"
     )
     print(f"\nTotal interest over 5 years: ${total_interest:,.2f}")
 
@@ -92,9 +84,6 @@ Expected Output
 ^^^^^^^^^^^^^^^
 
 Running this example produces::
-
-    Initial notional: $100,000.00
-    Interest rate: 5.00%
 
     Generated 22 events
 
@@ -133,15 +122,15 @@ Risk Factor Observer
 
 The ``ConstantRiskFactorObserver`` provides market data (interest rates, FX rates, etc.)::
 
-    rf_observer = ConstantRiskFactorObserver(0.05)
+    rf_observer = ConstantRiskFactorObserver(constant_value=0.05)
 
-For fixed-rate contracts, this remains constant. For floating-rate contracts, you would
-implement a custom observer that returns different rates over time.
+For fixed-rate contracts, this remains constant. For floating-rate contracts, use
+``TimeSeriesRiskFactorObserver`` or ``DictRiskFactorObserver`` for varying rates.
 
-Event Schedule
-^^^^^^^^^^^^^^
+SimulationHistory
+^^^^^^^^^^^^^^^^^^
 
-The event schedule contains all cash flow events:
+The ``simulate()`` method returns a ``SimulationHistory`` containing all events:
 
 * **IED**: Initial Exchange Date (loan disbursement)
 * **IP**: Interest Payment (quarterly interest payments)
@@ -156,16 +145,16 @@ Each event has:
 Simulation
 ^^^^^^^^^^
 
-The ``simulate()`` method processes all events and returns the final state::
+The ``simulate()`` method processes all events and returns a ``SimulationHistory``::
 
-    result = contract.simulate(rf_observer)
+    result = contract.simulate()
 
 The simulation:
 
 1. Starts with initial state
 2. Processes each event in chronological order
 3. Updates state variables at each event
-4. Returns final contract state
+4. Returns a ``SimulationHistory`` with ``events``, ``states``, ``initial_state``, and ``final_state``
 
 Next Steps
 ----------
@@ -289,11 +278,11 @@ Calculate monthly payments on a loan::
         maturity_date=ActusDateTime(2054, 1, 1, 0, 0, 0),  # 30 years
     )
 
-    contract = create_contract(attrs, ConstantRiskFactorObserver(0.065))
-    schedule = contract.generate_event_schedule()
+    contract = create_contract(attrs, ConstantRiskFactorObserver(constant_value=0.065))
+    result = contract.simulate()
 
     # Find monthly payment
-    ip_events = [e for e in schedule.events if e.event_type.value == "IP"]
+    ip_events = [e for e in result.events if e.event_type.name == "IP"]
     monthly_payment = ip_events[0].payoff
     print(f"Monthly payment: ${monthly_payment:,.2f}")
 
@@ -302,12 +291,12 @@ Analyzing Cash Flows
 
 Analyze different event types::
 
-    schedule = contract.generate_event_schedule()
+    result = contract.simulate()
 
     # Group by event type
     events_by_type = {}
-    for event in schedule.events:
-        event_type = event.event_type.value
+    for event in result.events:
+        event_type = event.event_type.name
         if event_type not in events_by_type:
             events_by_type[event_type] = []
         events_by_type[event_type].append(event)
@@ -326,12 +315,12 @@ Compare different interest rates::
 
     for rate in rates:
         attrs.nominal_interest_rate = rate
-        contract = create_contract(attrs, ConstantRiskFactorObserver(rate))
-        schedule = contract.generate_event_schedule()
+        contract = create_contract(attrs, ConstantRiskFactorObserver(constant_value=rate))
+        result = contract.simulate()
 
         total_interest = sum(
-            e.payoff for e in schedule.events
-            if e.event_type.value == "IP"
+            e.payoff for e in result.events
+            if e.event_type.name == "IP"
         )
         print(f"Rate {rate*100:.1f}%: Total interest = ${total_interest:,.2f}")
 

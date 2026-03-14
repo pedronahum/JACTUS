@@ -58,7 +58,7 @@ attrs = ContractAttributes(
     price_at_purchase_date=1.10,  # 1 EUR = 1.10 USD
 )
 
-rf_observer = ConstantRiskFactorObserver(1.12)  # Forward rate
+rf_observer = ConstantRiskFactorObserver(constant_value=1.12)  # Forward rate
 contract = create_contract(attrs, rf_observer)
 ```
 
@@ -105,7 +105,7 @@ attrs = ContractAttributes(
     currency="USD",
 )
 
-rf_observer = ConstantRiskFactorObserver(0.03)
+rf_observer = ConstantRiskFactorObserver(constant_value=0.03)
 contract = create_contract(attrs, rf_observer)
 ```
 

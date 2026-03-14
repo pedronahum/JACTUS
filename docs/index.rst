@@ -17,17 +17,20 @@ and GPU acceleration.
    guides/index
    spec/actus_overview
    ARCHITECTURE
+   ARRAY_MODE
    PAM
    derivatives
 
 Features
 --------
 
-* **High Performance**: Leverages JAX for JIT compilation and GPU acceleration
+* **18 Contract Types**: Principal, non-principal, and derivative instruments
+* **High Performance**: JAX JIT compilation, GPU/TPU acceleration, array-mode portfolio API
+* **Differentiable**: Automatic differentiation for risk analytics (DV01, duration, sensitivities)
+* **CLI**: Full ``jactus`` command-line interface for simulation, risk analytics, and portfolio management
+* **MCP Server**: AI assistant integration via Model Context Protocol
 * **Type Safety**: Full type annotations and mypy support
-* **Comprehensive**: Implements the complete ACTUS standard
-* **Differentiable**: Automatic differentiation for risk analytics
-* **Well Tested**: Extensive test coverage and validation
+* **Well Tested**: 1400+ tests with cross-validation against ACTUS reference
 
 Quick Links
 -----------

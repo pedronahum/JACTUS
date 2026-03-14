@@ -68,13 +68,24 @@ For GPU acceleration, install JAX with CUDA support:
 
 .. code-block:: bash
 
-    # For CUDA 12
-    pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+    # NVIDIA CUDA 13 (recommended)
+    pip install jactus "jax[cuda13]"
 
-    # For CUDA 11
-    pip install --upgrade "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+    # NVIDIA CUDA 12
+    pip install jactus "jax[cuda12]"
 
-See the `JAX installation guide <https://github.com/google/jax#installation>`_ for more details.
+    # TPU
+    pip install jactus "jax[tpu]"
+
+**Float64 precision** (CPU/GPU only — TPUs do not support float64):
+
+.. code-block:: python
+
+    import jax
+    jax.config.update("jax_enable_x64", True)
+    import jactus  # import AFTER enabling
+
+See the `JAX installation guide <https://jax.readthedocs.io/en/latest/installation.html>`_ for more details.
 
 Verification
 ------------
@@ -85,7 +96,7 @@ Verify your installation:
 
     import jactus
     print(jactus.__version__)
-    # Output: 0.1.2
+    # Output: 0.2.0
 
 Test JAX is working:
 

@@ -518,11 +518,13 @@ def adjust_to_business_day(
     """Adjust a date to a business day according to the given convention.
 
     ACTUS business day conventions have two components:
+
     - **S (Shift)**: Move the payment/settlement date to a business day.
     - **C (Calculate)**: Use the original (unadjusted) date for accrual
       calculations, even if the payment date was shifted.
 
     Convention naming: ``[S|CS][F|MF|P|MP]``
+
     - ``S`` prefix = Shift only (both payment and calculation use shifted date)
     - ``CS`` prefix = Calculate-Shift (payment is shifted, calculation uses
       original date)

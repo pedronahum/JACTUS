@@ -527,8 +527,7 @@ def simulate_pam_array(
         initial_state: Starting state (6 scalar fields).
         event_types: ``(num_events,)`` int32 — ``EventType.index`` values.
         year_fractions: ``(num_events,)`` float32 — pre-computed YF per event.
-        rf_values: ``(num_events,)`` float32 — pre-computed risk factor values
-            (market rate for RR, prepayment amount for PP, 0.0 otherwise).
+        rf_values: ``(num_events,)`` float32 — pre-computed risk factor per event.
         params: Static contract parameters.
 
     Returns:

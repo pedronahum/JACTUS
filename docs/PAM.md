@@ -6,19 +6,6 @@
 
 ---
 
-## Table of Contents
-
-1. [Introduction](#introduction)
-2. [What is PAM?](#what-is-pam)
-3. [Architecture Overview](#architecture-overview)
-4. [Building Blocks](#building-blocks)
-5. [Step-by-Step Implementation](#step-by-step-implementation)
-6. [Testing Strategy](#testing-strategy)
-7. [Advanced Topics](#advanced-topics)
-8. [Summary](#summary)
-
----
-
 ## Introduction
 
 This document provides a **complete walkthrough** of the JACTUS architecture by exploring how the PAM (Principal at Maturity) contract type is implemented. By following this guide, you'll understand:

@@ -45,16 +45,18 @@ language = "en"
 # Exclude patterns
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
-# Pygments style for syntax highlighting
-pygments_style = "sphinx"
-
 # HTML output options
-html_theme = "sphinx_rtd_theme"
+html_theme = "furo"
 html_theme_options = {
-    "navigation_depth": 4,
-    "collapse_navigation": False,
-    "sticky_navigation": True,
-    "includehidden": True,
+    "navigation_with_keys": True,
+    "dark_css_variables": {
+        "color-brand-primary": "#58a6ff",
+        "color-brand-content": "#58a6ff",
+    },
+    "light_css_variables": {
+        "color-brand-primary": "#0969da",
+        "color-brand-content": "#0969da",
+    },
 }
 
 html_static_path = ["_static"]
@@ -103,3 +105,8 @@ mathjax_path = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
 
 # Todo extension options
 todo_include_todos = True
+
+# Suppress warnings from re-exported symbols and duplicate dataclass fields.
+# These occur because dataclass fields are documented via both the defining
+# module (e.g., jactus.core.states) and re-exporting modules (e.g., jactus.core).
+suppress_warnings = ["ref.python"]

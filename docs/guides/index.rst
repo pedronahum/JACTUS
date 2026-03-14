@@ -62,7 +62,7 @@ The typical workflow for using JACTUS:
 
     from jactus.observers import ConstantRiskFactorObserver
 
-    rf_observer = ConstantRiskFactorObserver(0.05)  # 5% interest rate
+    rf_observer = ConstantRiskFactorObserver(constant_value=0.05)  # 5% interest rate
 
 3. **Create Contract**::
 
@@ -70,15 +70,11 @@ The typical workflow for using JACTUS:
 
     contract = create_contract(attrs, rf_observer)
 
-4. **Generate Event Schedule**::
+4. **Run Simulation**::
 
-    schedule = contract.generate_event_schedule()
-    for event in schedule.events:
+    result = contract.simulate()
+    for event in result.events:
         print(f"{event.event_type}: {event.event_time} -> ${event.payoff:.2f}")
-
-5. **Run Simulation**::
-
-    result = contract.simulate(rf_observer)
 
 Principal Contracts Guide
 -------------------------
@@ -122,16 +118,15 @@ Principal at Maturity contracts are interest-only loans where principal is repai
     )
 
     # Create observer with fixed rate
-    rf_observer = ConstantRiskFactorObserver(0.06)
+    rf_observer = ConstantRiskFactorObserver(constant_value=0.06)
 
     # Create contract and simulate
     contract = create_contract(attrs, rf_observer)
-    schedule = contract.generate_event_schedule()
-    result = contract.simulate(rf_observer)
+    result = contract.simulate()
 
     # Analyze results
-    total_interest = sum(event.payoff for event in schedule.events
-                        if event.event_type.value == "IP")
+    total_interest = sum(event.payoff for event in result.events
+                        if event.event_type.name == "IP")
     print(f"Total interest over 30 years: ${total_interest:,.2f}")
 
 **Key Parameters:**
@@ -254,7 +249,7 @@ Foreign exchange outright contracts for currency exchange at future dates.
     )
 
     # Forward rate observer
-    rf_observer = ConstantRiskFactorObserver(1.12)  # Forward rate
+    rf_observer = ConstantRiskFactorObserver(constant_value=1.12)  # Forward rate
 
 **See:** ``examples/fx_swap_example.py`` for complete example
 
@@ -446,56 +441,75 @@ Advanced Topics
 JAX Integration
 ^^^^^^^^^^^^^^^
 
-All JACTUS contracts are JAX-compatible for automatic differentiation::
+JACTUS supports JAX automatic differentiation for risk analytics::
 
     import jax
     import jax.numpy as jnp
+    from jactus.observers import JaxRiskFactorObserver
 
-    def calculate_pv(interest_rate):
-        attrs.nominal_interest_rate = float(interest_rate)
-        contract = create_contract(attrs, ConstantRiskFactorObserver(float(interest_rate)))
-        schedule = contract.generate_event_schedule()
-        return sum(event.payoff for event in schedule.events)
+    def contract_pv(rate):
+        attrs = ContractAttributes(
+            contract_id="LOAN",
+            contract_type=ContractType.PAM,
+            contract_role=ContractRole.RPA,
+            status_date=ActusDateTime(2024, 1, 1),
+            initial_exchange_date=ActusDateTime(2024, 1, 15),
+            maturity_date=ActusDateTime(2025, 1, 15),
+            notional_principal=100_000.0,
+            nominal_interest_rate=rate,
+            interest_payment_cycle="6M",
+            day_count_convention="30E360",
+        )
+        observer = JaxRiskFactorObserver(jnp.array([rate]))
+        result = create_contract(attrs, observer).simulate()
+        return sum(e.payoff for e in result.events)
 
-    # Calculate sensitivity to interest rate
-    interest_rate = 0.05
-    pv_sensitivity = jax.grad(calculate_pv)(interest_rate)
-    print(f"PV sensitivity to rates: {pv_sensitivity}")
+    dv01 = jax.grad(contract_pv)(0.05) * 0.0001
+    print(f"DV01: ${dv01:,.2f}")
 
-Batch Processing
-^^^^^^^^^^^^^^^^
+Array-Mode Portfolio API
+^^^^^^^^^^^^^^^^^^^^^^^^
 
-Use JAX's vmap for vectorized operations::
+For batch simulation of large portfolios, use the array-mode API which runs
+JIT-compiled JAX kernels over batched arrays (12 of 18 contract types supported):
 
-    from jax import vmap
+.. code-block:: python
 
-    rates = jnp.array([0.03, 0.04, 0.05, 0.06, 0.07])
-    pvs = vmap(calculate_pv)(rates)
+    from jactus.contracts.portfolio import simulate_portfolio
+
+    # contracts = list of (ContractAttributes, RiskFactorObserver) tuples
+    results = simulate_portfolio(contracts)
+
+See :doc:`../ARRAY_MODE` for full details, ``vmap`` patterns, and GPU benchmarks.
 
 Performance Optimization
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 Tips for optimal performance:
 
-1. **Use JIT compilation** for repeated calculations
-2. **Batch operations** with vmap when possible
-3. **Pre-generate schedules** for multiple simulations
-4. **Use constant observers** when rates don't change
+1. **Use array-mode** for portfolios (``simulate_portfolio()``)
+2. **Use JIT compilation** for repeated calculations
+3. **Use constant observers** when rates don't change
+4. **Enable float64** before importing JACTUS for precision-sensitive analytics
 
 Custom Risk Factor Observers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Implement custom observers for dynamic rates::
+Implement custom observers by subclassing ``BaseRiskFactorObserver``::
 
-    from jactus.observers.risk_factor import RiskFactorObserverProtocol
+    from jactus.observers.risk_factor import BaseRiskFactorObserver
 
-    class YieldCurveObserver:
+    class YieldCurveObserver(BaseRiskFactorObserver):
         def __init__(self, curve):
+            super().__init__(name="yield_curve")
             self.curve = curve
 
-        def observe(self, market_object_code, time, states, attributes):
+        def _get_risk_factor(self, identifier, time, *args, **kwargs):
             # Interpolate rate from yield curve
             return self.curve.get_rate(time)
+
+        def _get_event_data(self, identifier, time, *args, **kwargs):
+            return None
 
 Behavioral Risk Factor Observers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -574,7 +588,7 @@ Define a 2D prepayment surface and attach it to a PAM contract::
     )
 
     # Create contract and simulate with behavioral observer
-    rf_observer = ConstantRiskFactorObserver(0.0)
+    rf_observer = ConstantRiskFactorObserver(constant_value=0.0)
     contract = create_contract(attrs, rf_observer)
     result = contract.simulate(behavior_observers=[prepayment_observer])
 
@@ -600,7 +614,7 @@ different simulation environments (e.g., base case vs. stress scenarios).
         scenario_id="base-case",
         description="Stable rates with moderate prepayment behavior",
         market_observers={
-            "rates": ConstantRiskFactorObserver(0.04),
+            "rates": ConstantRiskFactorObserver(constant_value=0.04),
         },
         behavior_observers={
             "prepayment": prepayment_observer,
@@ -612,7 +626,7 @@ different simulation environments (e.g., base case vs. stress scenarios).
         scenario_id="rising-rates",
         description="Rising rate environment, no prepayment",
         market_observers={
-            "rates": ConstantRiskFactorObserver(0.07),
+            "rates": ConstantRiskFactorObserver(constant_value=0.07),
         },
         behavior_observers={},
     )
@@ -644,10 +658,111 @@ parameter, or as the ``risk_factor_observer`` itself), the simulation engine:
 This means no special setup is required beyond creating the behavioral observer and
 passing it to ``simulate()``.
 
+CLI Guide
+---------
+
+JACTUS ships a ``jactus`` CLI (auto-installed with pip). Outputs rich tables
+in TTY, JSON when piped.
+
+Exploring Contracts
+^^^^^^^^^^^^^^^^^^^^
+
+::
+
+    # List all 18 contract types
+    jactus contract list
+
+    # Get schema for a specific type
+    jactus contract schema --type PAM
+
+    # List available observers
+    jactus observer list
+
+Simulating
+^^^^^^^^^^
+
+::
+
+    # Simulate from JSON attributes
+    jactus simulate --type PAM --attrs '{
+      "contract_id": "LOAN-001",
+      "status_date": "2024-01-01",
+      "contract_role": "RPA",
+      "initial_exchange_date": "2024-01-15",
+      "maturity_date": "2025-01-15",
+      "notional_principal": 100000,
+      "nominal_interest_rate": 0.05,
+      "interest_payment_cycle": "6M",
+      "day_count_convention": "30E360"
+    }'
+
+    # Validate before simulating
+    jactus contract validate --type PAM --attrs loan.json
+
+Risk Analytics
+^^^^^^^^^^^^^^^
+
+::
+
+    # DV01 (dollar value of a basis point)
+    jactus risk dv01 --type PAM --attrs loan.json
+
+    # Duration, convexity, and full sensitivities
+    jactus risk sensitivities --type PAM --attrs loan.json
+
+Portfolio Management
+^^^^^^^^^^^^^^^^^^^^^
+
+::
+
+    # Simulate a portfolio
+    jactus portfolio simulate --file portfolio.json
+
+    # Aggregate cash flows by frequency
+    jactus portfolio aggregate --file portfolio.json --frequency quarterly
+
+Output Formats
+^^^^^^^^^^^^^^^
+
+::
+
+    # JSON output for pipelines
+    jactus simulate --type PAM --attrs loan.json --output json | jq '.summary'
+
+    # CSV output, non-zero events only
+    jactus simulate --type PAM --attrs loan.json --output csv --nonzero
+
+MCP Server
+-----------
+
+JACTUS includes an MCP (Model Context Protocol) server for integration with
+AI assistants like Claude Code and Claude Desktop.
+
+Installation
+^^^^^^^^^^^^^
+
+::
+
+    pip install git+https://github.com/pedronahum/JACTUS.git#subdirectory=tools/mcp-server
+
+The MCP server provides tools for:
+
+* Listing and discovering contract types
+* Getting contract schemas with working examples
+* Validating contract attributes
+* Simulating contracts
+* Computing risk metrics (DV01, delta, gamma)
+* Simulating portfolios
+* Searching documentation
+
+For Claude Code, place ``.mcp.json`` in the project root to enable
+auto-discovery when opening the JACTUS workspace.
+
 See Also
 --------
 
 * :doc:`../api/index` - Complete API reference
+* :doc:`../ARRAY_MODE` - Array-mode portfolio API for GPU/TPU
 * :doc:`../derivatives` - Derivative contracts guide
 * :doc:`../ARCHITECTURE` - System architecture
 * :doc:`../PAM` - Deep dive into PAM implementation
@@ -667,6 +782,7 @@ Additional Resources
 **Documentation:**
 
 * ``docs/ARCHITECTURE.md`` - High-level architecture
+* ``docs/ARRAY_MODE.md`` - Array-mode portfolio API
 * ``docs/PAM.md`` - PAM implementation walkthrough
 * ``docs/derivatives.md`` - All derivative contract types
 

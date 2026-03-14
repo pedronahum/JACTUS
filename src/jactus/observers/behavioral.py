@@ -8,6 +8,7 @@ age, performance status, etc.) and can dynamically inject events into the
 simulation timeline.
 
 Key concepts:
+
 - **CalloutEvent**: An event that a behavioral model requests be added to the
   simulation schedule. When the simulation reaches that time, it calls back to
   the behavioral observer with the current contract state.

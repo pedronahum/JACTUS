@@ -6,19 +6,6 @@
 
 ---
 
-## Table of Contents
-
-1. [Introduction](#introduction)
-2. [Design Principles](#design-principles)
-3. [System Architecture](#system-architecture)
-4. [Key Components](#key-components)
-5. [Data Flow](#data-flow)
-6. [JAX Integration](#jax-integration)
-7. [Extending JACTUS](#extending-jactus)
-8. [Performance Considerations](#performance-considerations)
-
----
-
 ## Introduction
 
 **JACTUS** (JAX-Accelerated ACTUS) is a Python library for simulating financial contracts using the ACTUS standard, built on Google's JAX framework for high-performance computing.

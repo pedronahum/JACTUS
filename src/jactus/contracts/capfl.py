@@ -2,9 +2,10 @@
 
 This module implements interest rate cap and floor contracts. A cap/floor
 protects against interest rate movements:
-  - Cap: pays max(0, floating_rate - cap_rate) * NT * YF
-  - Floor: pays max(0, floor_rate - floating_rate) * NT * YF
-  - Collar: both cap and floor
+
+- Cap: pays max(0, floating_rate - cap_rate) * NT * YF
+- Floor: pays max(0, floor_rate - floating_rate) * NT * YF
+- Collar: both cap and floor
 
 The CAPFL wraps an underlier (typically PAM or SWPPV) and generates events
 on the underlier's IP/RR schedule.
