@@ -70,7 +70,10 @@ client.
 
 ### Context Hub (chub)
 
-Agent-optimized documentation for [Context Hub](https://github.com/andrewyng/context-hub):
+Agent-optimized documentation for [Context Hub](https://github.com/andrewyng/context-hub).
+JACTUS docs are being added to the public Context Hub registry ([PR #103](https://github.com/andrewyng/context-hub/pull/103)) — once merged, any agent running `chub search jactus` will find them automatically.
+
+In the meantime, you can use the docs locally:
 
 ```bash
 chub build /path/to/JACTUS/tools/chub/ -o /tmp/jactus-chub/
