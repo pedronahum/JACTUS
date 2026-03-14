@@ -68,6 +68,18 @@ client.
 }
 ```
 
+### Context Hub (chub)
+
+Agent-optimized documentation for [Context Hub](https://github.com/andrewyng/context-hub):
+
+```bash
+chub build /path/to/JACTUS/tools/chub/ -o /tmp/jactus-chub/
+chub search jactus
+```
+
+Provides structured contract reference, observer API, and array-mode docs
+optimized for agent consumption. See [`tools/chub/`](tools/chub/) for details.
+
 ### Pair with Google Workspace CLI
 
 ```bash
@@ -344,22 +356,22 @@ jactus simulate --type PAM --attrs loan.json --from 2024-06-01 --to 2024-12-31
 
 ## AI-Assisted Development
 
-For Claude Code and LLM-assisted development, JACTUS includes an **MCP (Model Context Protocol) server** that provides AI assistants with direct access to JACTUS capabilities:
+JACTUS provides multiple integration paths for AI agents and assistants:
 
-- **Contract Discovery**: List all 18 contract types with schemas
-- **Example Retrieval**: Access working, tested code examples
-- **Validation**: Validate contract attributes before creation
-- **Documentation Search**: Search across all JACTUS docs
-- **No Hallucination**: AI gets accurate information from your codebase
+| Tool | Purpose | Location |
+|------|---------|----------|
+| **MCP Server** | 18 tools for contract simulation, risk analytics, portfolio management, and docs | [`tools/mcp-server/`](tools/mcp-server/) |
+| **Context Hub** | Agent-optimized reference docs (contract types, observers, array-mode) | [`tools/chub/`](tools/chub/) |
+| **Agent Skill** | Portable skill package for compatible agent clients | [`skills/jactus/`](skills/jactus/) |
+| **Gemini Extension** | One-command install for Gemini CLI | [`gemini-extension.json`](gemini-extension.json) |
 
-### Quick Setup
+### MCP Server (18 tools)
+
+The MCP server gives AI assistants direct access to JACTUS — contract discovery, schema validation, simulation, risk metrics (DV01, delta, gamma, PV01), portfolio aggregation, and documentation search.
 
 ```bash
-# Install MCP server (automatically installs jactus from PyPI)
 pip install git+https://github.com/pedronahum/JACTUS.git#subdirectory=tools/mcp-server
 ```
-
-Configure in Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
 ```json
 {
@@ -372,7 +384,7 @@ Configure in Claude Desktop (`~/Library/Application Support/Claude/claude_deskto
 }
 ```
 
-For Claude Code, the `.mcp.json` in the project root provides auto-discovery when you open the JACTUS workspace.
+The `.mcp.json` in the project root enables auto-discovery in VS Code and compatible editors.
 
 See **[MCP Server Documentation](tools/mcp-server/README.md)** for full setup and usage.
 
@@ -555,13 +567,11 @@ jactus/
 │   ├── PAM.md              # PAM implementation walkthrough
 │   ├── ARRAY_MODE.md       # Array-mode simulation & portfolio API
 │   └── derivatives.md      # Derivative contracts guide
-├── examples/               # Example scripts
-│   ├── pam_example.py                        # Principal at Maturity examples
-│   ├── lam_example.py                        # Linear Amortizer examples
-│   ├── interest_rate_swap_example.py         # Interest rate swap
-│   ├── fx_swap_example.py                    # FX swap
-│   ├── cross_currency_basis_swap_example.py  # Cross-currency swap
-│   └── basic_example.py                      # Basic usage
+├── tools/                  # AI agent integrations
+│   ├── mcp-server/            # MCP server (18 tools for AI assistants)
+│   └── chub/                  # Context Hub agent-optimized docs
+├── skills/jactus/          # Agent Skill package
+├── examples/               # Example scripts and notebooks
 └── scripts/                # Development scripts
 ```
 
