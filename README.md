@@ -9,8 +9,16 @@
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/pedronahum/JACTUS/blob/main/examples/notebooks/00_getting_started_pam.ipynb)
 [![GPU Benchmark](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/pedronahum/JACTUS/blob/main/examples/notebooks/05_gpu_tpu_portfolio_benchmark.ipynb)
 
+### Interactive Demo
+
+Explore JACTUS hands-on — CLI commands, Python API, behavioral risk models, and batch simulation on GPU:
+
+[![Open Demo In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/pedronahum/JACTUS/blob/main/examples/notebooks/07_demo_cli_and_python.ipynb)
+
+### Claude Opus talks JACTUS
+
 <p align="center">
-  <img src="docs/jactus-demo.gif" alt="JACTUS Demo">
+  <img src="docs/jactus-demo.gif" alt="Claude Opus talks JACTUS" width="600">
 </p>
 
 ## Overview
