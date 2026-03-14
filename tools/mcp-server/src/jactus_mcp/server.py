@@ -13,7 +13,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from .tools import contracts, documentation, examples, system, validation
+from .tools import contracts, documentation, examples, risk, system, validation
 from .tools._utils import get_jactus_root
 
 # Configure logging
@@ -424,6 +424,57 @@ def jactus_get_version_info() -> dict[str, Any]:
     plus Python version and compatibility status.
     """
     return system.get_version_info()
+
+
+# ---- Risk Analytics Tools ----
+
+
+@mcp.tool()
+@log_tool_call
+def jactus_compute_risk(
+    attributes: dict[str, Any],
+    risk_metric: str = "dv01",
+    base_rate: float = 0.05,
+    bump_size: float = 0.0001,
+) -> dict[str, Any]:
+    """Compute risk metrics (DV01, delta, gamma, PV01) for a contract.
+
+    Uses finite difference approximation on the nominal interest rate.
+    Returns the metric value, base PV, and computation parameters.
+
+    Args:
+        attributes: Contract attributes dict (same format as simulate).
+        risk_metric: One of "dv01", "delta", "gamma", "pv01".
+        base_rate: Base nominal interest rate (default 0.05).
+        bump_size: Finite difference bump size (default 0.0001 = 1bp).
+    """
+    return risk.compute_risk(
+        attributes=attributes,
+        risk_metric=risk_metric,
+        base_rate=base_rate,
+        bump_size=bump_size,
+    )
+
+
+@mcp.tool()
+@log_tool_call
+def jactus_simulate_portfolio(
+    contracts: list[dict[str, Any]],
+    risk_factor_rate: float = 0.05,
+) -> dict[str, Any]:
+    """Simulate a portfolio of contracts and return aggregate results.
+
+    Simulates each contract and aggregates total inflows, outflows, and
+    net cashflow across the portfolio. Returns per-contract summaries.
+
+    Args:
+        contracts: Array of contract attribute dicts (same format as simulate).
+        risk_factor_rate: Flat risk factor rate for all contracts (default 0.05).
+    """
+    return risk.simulate_portfolio(
+        contracts=contracts,
+        risk_factor_rate=risk_factor_rate,
+    )
 
 
 # ---- Resources ----

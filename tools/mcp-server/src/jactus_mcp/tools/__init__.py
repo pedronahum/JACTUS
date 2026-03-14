@@ -1,11 +1,12 @@
 """JACTUS MCP Tools."""
 
-from . import contracts, documentation, examples, simulate, system, validation
+from . import contracts, documentation, examples, risk, simulate, system, validation
 from ._utils import get_jactus_root
 
 __all__ = [
     "contracts",
     "examples",
+    "risk",
     "validation",
     "documentation",
     "system",
