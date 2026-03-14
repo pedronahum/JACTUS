@@ -1,56 +1,36 @@
-# JACTUS - JAX ACTUS Financial Contracts
+# JACTUS — Project Context
 
-JACTUS is a JAX-based implementation of the ACTUS (Algorithmic Contract Types Unified Standards) specification. It provides high-performance simulation of 18 financial contract types with automatic differentiation support.
+JACTUS is a Python library implementing the ACTUS (Algorithmic Contract Types
+Unified Standards) specification using JAX for high-performance, differentiable
+financial contract modeling.
 
-## Project Structure
+## Project Layout
 
-- `src/jactus/` — Main library (contracts, core types, engine, observers, utilities)
-- `src/jactus/cli/` — Typer CLI (`jactus` command): simulate, risk, portfolio, observer, contract, docs
-- `tools/mcp-server/` — MCP server for AI assistant integration
-- `tests/` — Test suite (unit, integration, cross-validation, property, performance)
-- `examples/` — Python scripts and Jupyter notebooks
-- `docs/` — Architecture guides and contract documentation
+- `src/jactus/` — main package
+  - `core/` — ContractAttributes, ContractType, ActusDateTime enums
+  - `contracts/` — 18 contract implementations (pam.py, ann.py, swppv.py, ...)
+  - `observers/` — RiskFactorObserver base class + ConstantRiskFactorObserver
+  - `engine/` — simulation engine
+  - `functions/` — payoff and state transition functions
+- `tools/mcp-server/` — MCP server exposing JACTUS via Model Context Protocol
+- `skills/jactus/` — Agent Skill for Gemini CLI and compatible agents
+- `tests/` — 1,400+ tests, 100% passing
+- `examples/` — runnable Python scripts and Jupyter notebooks
+- `docs/` — architecture guides and contract documentation
 
-## MCP Server — USE TOOLS FIRST
-
-When the JACTUS MCP server is available, **always use the `jactus_*` MCP tools** to discover contract types, get schemas, validate attributes, and simulate contracts. Do NOT read JACTUS source code to learn about contracts or parameters — the MCP tools are authoritative and return everything you need, including complete working Python examples.
-
-Required workflow:
-1. `jactus_list_contracts` — discover available contract types
-2. `jactus_get_contract_schema` — get required/optional fields and example code
-3. `jactus_validate_attributes` — verify attributes before simulation
-4. `jactus_simulate_contract` — run the simulation
-5. `jactus_list_risk_factor_observers` — discover market and behavioral observer types
-6. `jactus_get_topic_guide` — structured guides on: `"contracts"`, `"behavioral"`, `"scenario"`, `"jax"`, `"events"`, `"attributes"`, `"array_mode"`
-7. `jactus_search_docs` — keyword search across documentation
-
-For behavioral observers (prepayment, deposit transactions, callout events, scenarios), use `jactus_get_topic_guide("behavioral")` and `jactus_get_topic_guide("scenario")`.
-
-Only read source code if you need to modify or debug JACTUS itself. For using JACTUS (simulating contracts, generating code, understanding parameters), the MCP tools are sufficient.
-
-Run: `python -m jactus_mcp` (stdio) or `python -m jactus_mcp --transport streamable-http`
-
-## Key Concepts
-
-- **Contract Types**: PAM, LAM, LAX, NAM, ANN, CLM, UMP, CSH, STK, COM, FXOUT, OPTNS, FUTUR, SWPPV, SWAPS, CAPFL, CEG, CEC (18 total)
-- **Risk Factor Observers**: `ConstantRiskFactorObserver`, `DictRiskFactorObserver`, `TimeSeriesRiskFactorObserver`, `CurveRiskFactorObserver`, `CompositeRiskFactorObserver`, `CallbackRiskFactorObserver`, `JaxRiskFactorObserver`
-- **Behavioral Risk Factor Observers**: `PrepaymentSurfaceObserver`, `DepositTransactionObserver` — extend the observer framework with behavioral models that inject `CalloutEvent`s into the simulation timeline (protocol: `BehaviorRiskFactorObserver`, base class: `BaseBehaviorRiskFactorObserver`)
-- **Scenario Management**: `Scenario` — defines simulation scenarios combining contract attributes with risk factor and behavioral observer configurations
-- **Utilities**: `Surface2D`, `LabeledSurface2D` — 2D surface interpolation utilities used by behavioral observers (e.g., prepayment surfaces indexed by rate incentive and seasoning)
-- **Events**: IED, IP, PR, MD, RR, etc. — represent cash flows and state transitions
-- **ContractAttributes**: Pydantic model defining all contract parameters (`src/jactus/core/attributes.py`)
-- **Array-Mode Portfolio API**: `simulate_portfolio()` in `jactus.contracts.portfolio` — batch simulation of 12 contract types via JIT-compiled JAX kernels. Per-type functions in `*_array.py` modules. See `docs/ARRAY_MODE.md` or `jactus_get_topic_guide("array_mode")`.
-- **CLI**: `jactus` Typer CLI with commands: `contract list|schema|validate`, `simulate`, `risk dv01|duration|convexity|sensitivities`, `portfolio simulate|aggregate`, `observer list|describe`, `docs search`. Entry point: `jactus = "jactus.cli:app"`. Outputs rich tables in TTY, JSON when piped. Source: `src/jactus/cli/`.
-
-## Quick Start
+## Key Classes
 
 ```python
 from jactus.contracts import create_contract
 from jactus.core import ContractAttributes, ContractType, ContractRole, ActusDateTime
 from jactus.observers import ConstantRiskFactorObserver
+```
 
+## Quick Simulation
+
+```python
 attrs = ContractAttributes(
-    contract_id="LOAN-001",
+    contract_id="X",
     contract_type=ContractType.PAM,
     contract_role=ContractRole.RPA,
     status_date=ActusDateTime(2024, 1, 1),
@@ -59,25 +39,89 @@ attrs = ContractAttributes(
     notional_principal=100_000.0,
     nominal_interest_rate=0.05,
 )
-
-rf_observer = ConstantRiskFactorObserver(constant_value=0.0)
-contract = create_contract(attrs, rf_observer)
-result = contract.simulate()
+result = create_contract(attrs, ConstantRiskFactorObserver()).simulate()
+for event in result.events:
+    if event.payoff != 0:
+        print(f"{event.event_time} | {event.event_type.name} | {event.payoff:,.2f}")
 ```
 
-## Running Tests
+## Supported Contract Types
 
-```bash
-# Main library tests
-pytest tests/ -v
+**Principal:** PAM, LAM, LAX, NAM, ANN, CLM
+**Non-Principal:** UMP, CSH, STK, COM
+**Derivatives:** FXOUT, OPTNS, FUTUR, SWPPV, SWAPS, CAPFL, CEG, CEC
 
-# MCP server tests
-cd tools/mcp-server && pytest tests/ -v
+## Contract Roles
+
+- `RPA` — Real Position Asset (lender/long)
+- `RPL` — Real Position Liability (borrower/short)
+- `RFL`/`PFL` — Receive/Pay First Leg (swaps)
+- `BUY`/`SEL` — Protection Buyer/Seller (credit enhancement)
+- `LG`/`ST` — Long/Short (futures)
+
+## Risk Factor Observers
+
+```python
+# Fixed rate
+rf = ConstantRiskFactorObserver(constant_value=0.0)
+
+# Multiple static rates
+rf = DictRiskFactorObserver({"LIBOR-3M": 0.05, "USD/EUR": 1.18})
+
+# Time-varying rates
+rf = TimeSeriesRiskFactorObserver(
+    time_series={"LIBOR-3M": [(ActusDateTime(2024, 1, 1), 0.04), ...]},
+    interpolation="step",
+)
 ```
 
-## Conventions
+## JAX Risk Analytics
 
-- All financial amounts use Python `float` (backed by JAX `jnp.ndarray` internally)
-- Dates use `ActusDateTime` (wraps Python datetime with ACTUS-specific methods)
-- Cycles use string notation: `"1M"`, `"3M"`, `"6M"`, `"1Y"`
-- Contract roles: `RPA` = lender/asset side, `RPL` = borrower/liability side
+```python
+import jax
+
+def pv(rate):
+    attrs = ContractAttributes(..., nominal_interest_rate=float(rate))
+    return sum(e.payoff for e in create_contract(attrs, rf).simulate().events)
+
+dv01 = jax.grad(pv)(0.05)  # automatic differentiation
+```
+
+## Portfolio Batch Simulation
+
+```python
+from jactus.contracts.portfolio import simulate_portfolio
+results = simulate_portfolio([(attrs1, rf), (attrs2, rf), ...])
+```
+
+## Development Commands
+
+- `pytest tests/ -v` — run full test suite
+- `python -m jactus_mcp` — start MCP server
+- `jactus contract list` — CLI: list contract types
+- `jactus simulate --type PAM --notional 100000 --rate 0.05` — CLI: simulate
+
+## Google Workspace Integration
+
+JACTUS pairs with the `gws` CLI (https://github.com/googleworkspace/cli):
+- Use `gws drive` to fetch term sheets
+- Use JACTUS to simulate contract cash flows
+- Use `gws sheets` to write results
+- Use `gws gmail` to send summaries
+
+## MCP Configuration
+
+```json
+{
+  "mcpServers": {
+    "jactus": { "command": "python", "args": ["-m", "jactus_mcp"] }
+  }
+}
+```
+
+## Key Conventions
+
+- Dates: `ActusDateTime(YYYY, MM, DD)` with integer arguments
+- Cycles: `"1M"` (monthly), `"3M"` (quarterly), `"6M"` (semi-annual), `"1Y"` (annual)
+- Amounts: Python `float` (JAX `jnp.ndarray` internally)
+- Day count: `AA`, `A360`, `A365`, `E30360ISDA`, `E30360`, `B30360`, `BUS252`

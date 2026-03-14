@@ -1,0 +1,14 @@
+{
+  "name": "jactus",
+  "version": "0.2.0",
+  "description": "High-performance ACTUS financial contract simulation with JAX. Simulate loans, bonds, swaps, options, FX forwards, and structured finance instruments with automatic differentiation for risk analytics. Pairs with Google Workspace (gws) to read term sheets from Drive and write cash flows to Sheets.",
+  "contextFileName": "GEMINI.md",
+  "mcpServers": {
+    "jactus": {
+      "command": "${extensionPath}${/}.venv${/}bin${/}python3",
+      "args": ["-m", "jactus_mcp"],
+      "cwd": "${extensionPath}",
+      "description": "JACTUS MCP server exposing ACTUS contract simulation, validation, and risk analytics tools"
+    }
+  }
+}

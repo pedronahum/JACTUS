@@ -34,6 +34,51 @@ JACTUS is a Python library that implements the **ACTUS (Algorithmic Contract Typ
 
 ACTUS (Algorithmic Contract Types Unified Standards) is a standardized framework for representing financial contracts as mathematical algorithms. It provides a unified approach to modeling cash flows, risk analytics, and contract behavior across various financial instruments.
 
+## AI Agent Integration
+
+### Gemini CLI Extension (one-command install)
+
+```bash
+gemini extensions install https://github.com/pedronahum/JACTUS
+```
+
+Gives Gemini CLI direct access to JACTUS simulation, risk analytics, and
+Google Workspace integration recipes.
+
+### Agent Skill (any compatible client)
+
+```bash
+npx skills add https://github.com/pedronahum/JACTUS
+```
+
+Adds JACTUS expertise to Claude Code, Gemini CLI, or any Agent Skills-compatible
+client.
+
+### MCP Server (Claude Desktop, VS Code, etc.)
+
+```json
+{
+  "mcpServers": {
+    "jactus": {
+      "command": "python",
+      "args": ["-m", "jactus_mcp"],
+      "cwd": "/path/to/JACTUS"
+    }
+  }
+}
+```
+
+### Pair with Google Workspace CLI
+
+```bash
+gws auth setup      # authenticate once
+gws mcp -s drive,sheets,gmail &   # start gws MCP
+python -m jactus_mcp &             # start JACTUS MCP
+```
+
+Agent can now read term sheets from Drive, simulate contracts, write cash flows
+to Sheets, and send summaries via Gmail — all in one session.
+
 ## Installation
 
 ```bash

@@ -108,6 +108,33 @@ python -m jactus_mcp
 python -m jactus_mcp --transport streamable-http
 ```
 
+### Pair with Google Workspace CLI (`gws`)
+
+Configure both `gws` and `jactus` MCP servers for cross-server financial workflows:
+
+```json
+{
+  "mcpServers": {
+    "gws": {
+      "command": "gws",
+      "args": ["mcp", "-s", "drive,sheets,gmail,calendar"]
+    },
+    "jactus": {
+      "command": "python",
+      "args": ["-m", "jactus_mcp"],
+      "cwd": "/absolute/path/to/JACTUS"
+    }
+  }
+}
+```
+
+**Cross-server workflow pattern:**
+1. Use `gws` tools to read/write Google Workspace data (Drive, Sheets, Gmail, Calendar)
+2. Use `jactus` tools to model and simulate financial contracts
+3. The agent orchestrates both server namespaces in the same conversation
+
+Example flow: fetch term sheet from Drive → simulate contract with JACTUS → write cash flows to Sheets → email summary via Gmail.
+
 ### Verify Installation
 
 After configuration, restart Claude Desktop or VSCode. You should see the JACTUS MCP server connected.
@@ -121,7 +148,7 @@ Claude: *calls jactus_list_contracts tool*
 
 ## Available Tools
 
-The MCP server provides 15 tools to AI assistants:
+The MCP server provides 18 tools to AI assistants:
 
 ### Contract Tools
 
@@ -133,6 +160,8 @@ The MCP server provides 15 tools to AI assistants:
 | `jactus_get_event_types` | List all ACTUS event types |
 | `jactus_list_risk_factor_observers` | List all risk factor observer types with usage guidance |
 | `jactus_simulate_contract` | **Simulate a contract and get structured cash flows** |
+| `jactus_compute_risk` | **Compute DV01, delta, gamma, PV01 risk metrics** |
+| `jactus_simulate_portfolio` | **Simulate a portfolio of contracts with aggregation** |
 
 ### Example Tools
 
