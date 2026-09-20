@@ -409,3 +409,49 @@ class TestGradients:
         grad = jax.grad(total_cashflow)(params.nominal_interest_rate)
         assert jnp.isfinite(grad)
         assert float(grad) != 0.0
+
+
+# ============================================================================
+# IPCB mode encoding
+# ============================================================================
+
+
+class _IpcbAttrs:
+    """Carries the one attribute _encode_ipcb_mode reads."""
+
+    def __init__(self, interest_calculation_base):
+        self.interest_calculation_base = interest_calculation_base
+
+
+def test_encode_ipcb_mode_sees_the_enum_value_not_its_repr():
+    """Regression for the array path emitting no IPCB events at all.
+
+    nam_array carries its own copy of _encode_ipcb_mode, so it needs its own
+    regression test: fixing lam_array alone would leave this one broken and
+    nothing else would notice. InterestCalculationBase is a (str, Enum) mixin,
+    so str() of a member is "InterestCalculationBase.NTL" rather than "NTL";
+    comparing str(ipcb) against the bare literals missed every branch and
+    collapsed all three modes to IPCB_NT, so the array path emitted no IPCB
+    events while the scalar contract, comparing the attribute directly, did.
+    Imported locally because the symbol is private.
+    """
+    from jactus.contracts.nam_array import (
+        IPCB_NT,
+        IPCB_NTIED,
+        IPCB_NTL,
+        _encode_ipcb_mode,
+    )
+    from jactus.core import InterestCalculationBase
+
+    assert str(InterestCalculationBase.NTL) != "NTL"
+
+    for value, expected in (
+        (InterestCalculationBase.NT, IPCB_NT),
+        (InterestCalculationBase.NTIED, IPCB_NTIED),
+        (InterestCalculationBase.NTL, IPCB_NTL),
+        ("NT", IPCB_NT),
+        ("NTIED", IPCB_NTIED),
+        ("NTL", IPCB_NTL),
+        (None, IPCB_NT),
+    ):
+        assert _encode_ipcb_mode(_IpcbAttrs(value)) == expected, value

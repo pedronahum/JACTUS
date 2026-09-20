@@ -157,11 +157,21 @@ IPCB_NTL: int = 2  # Interest on lagged notional (updated at IPCB events)
 def _encode_ipcb_mode(attrs: ContractAttributes) -> int:
     """Encode interest calculation base mode as integer."""
     ipcb = attrs.interest_calculation_base
-    if ipcb is None or str(ipcb) == "NT":
+    if ipcb is None:
         return IPCB_NT
-    if str(ipcb) == "NTIED":
+    # Compare the enum's value, not str() of it. InterestCalculationBase is a
+    # (str, Enum) mixin, whose str() is "InterestCalculationBase.NTL" rather
+    # than "NTL", so all three comparisons below used to fail and every mode
+    # collapsed to IPCB_NT. The array path consequently emitted no IPCB events
+    # for any contract, while the scalar contract — which compares the
+    # attribute directly and so was never affected — emitted them, and the two
+    # paths disagreed about the schedule of every NTL contract.
+    mode = ipcb.value if hasattr(ipcb, "value") else ipcb
+    if mode == "NT":
+        return IPCB_NT
+    if mode == "NTIED":
         return IPCB_NTIED
-    if str(ipcb) == "NTL":
+    if mode == "NTL":
         return IPCB_NTL
     return IPCB_NT  # default
 
