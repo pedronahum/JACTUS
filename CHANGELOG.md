@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`_encode_ipcb_mode` never detected `NTL` or `NTIED`** — in `lam_array`, and
+  in the duplicate copy `nam_array` carries. `InterestCalculationBase` is a
+  `(str, Enum)` mixin, so `str()` of a member is `"InterestCalculationBase.NTL"`
+  rather than `"NTL"`; every comparison missed and all three modes collapsed to
+  `IPCB_NT`. The array path gates IPCB schedule emission on that result, so it
+  emitted **no IPCB events for any contract**, while the scalar contract — which
+  compares the attribute directly and was never affected — emitted them. Every
+  NTL contract therefore had a different event schedule depending on which path
+  simulated it, and the array path was missing the interest-calculation-base
+  fixings that NTL exists to schedule. Both copies now compare the enum's value,
+  and both have a regression test.
+
 ## [0.2.0] - 2026-03-05
 
 ### Added
